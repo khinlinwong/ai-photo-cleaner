@@ -123,6 +123,8 @@ interface PhotoWorkspaceContextType {
   uploadFiles: (files: File[]) => void;
   startAnalysis: () => void;
   togglePhotoStatus: (id: string) => void;
+  updatePhotoStatus: (id: string, status: 'keep' | 'review' | 'delete') => void;
+  updateMultiplePhotosStatus: (ids: string[], status: 'keep' | 'review' | 'delete') => void;
   deletePhoto: (id: string) => void;
   deleteSuggestedPhotos: () => void;
   resetWorkspace: () => void;
@@ -313,6 +315,20 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     );
   };
 
+  // 单张照片状态手动订正
+  const updatePhotoStatus = (id: string, status: 'keep' | 'review' | 'delete') => {
+    setPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status } : p))
+    );
+  };
+
+  // 多张照片状态批量手动订正
+  const updateMultiplePhotosStatus = (ids: string[], status: 'keep' | 'review' | 'delete') => {
+    setPhotos((prev) =>
+      prev.map((p) => (ids.includes(p.id) ? { ...p, status } : p))
+    );
+  };
+
   // 删除单张照片
   const deletePhoto = (id: string) => {
     setPhotos((prev) => {
@@ -359,6 +375,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         uploadFiles,
         startAnalysis,
         togglePhotoStatus,
+        updatePhotoStatus,
+        updateMultiplePhotosStatus,
         deletePhoto,
         deleteSuggestedPhotos,
         resetWorkspace,

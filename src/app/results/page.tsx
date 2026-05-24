@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -25,7 +25,9 @@ import {
   Eye,
   Sliders,
   FolderSync,
-  UploadCloud
+  UploadCloud,
+  Download,
+  ShieldCheck
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -35,6 +37,8 @@ export default function ResultsPage() {
   const {
     photos,
     togglePhotoStatus,
+    updatePhotoStatus,
+    updateMultiplePhotosStatus,
     deleteSuggestedPhotos,
     resetWorkspace,
     loadDemoPhotos
@@ -44,6 +48,95 @@ export default function ResultsPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isZipping, setIsZipping] = useState(false);
+
+  // 切换选项卡时清空选中状态，防止隐藏的图片在批量操作中被误改
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [activeTab]);
+
+  // 获取当前活跃 Tab 下的照片列表
+  const getTabPhotos = () => {
+    switch (activeTab) {
+      case 'all': return photos;
+      case 'keep': return photos.filter((p) => p.status === 'keep');
+      case 'review': return photos.filter((p) => p.status === 'review');
+      case 'delete': return photos.filter((p) => p.status === 'delete');
+      default: return [];
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const currentTabPhotos = getTabPhotos();
+    const currentTabIds = currentTabPhotos.map((p) => p.id);
+    
+    // 如果当前 Tab 的所有图片都已选中，则取消全选它们；否则全选当前 Tab
+    const isAllSelected = currentTabIds.length > 0 && currentTabIds.every((id) => selectedIds.includes(id));
+    if (isAllSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !currentTabIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentTabIds])));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleBatchStatusChange = (status: 'keep' | 'review' | 'delete') => {
+    if (selectedIds.length === 0) return;
+    updateMultiplePhotosStatus(selectedIds, status);
+    setSelectedIds([]);
+  };
+
+  // 纯客户端打包下载精选照片 (JSZip)
+  const downloadKeepPhotosZip = async () => {
+    const keepPhotos = photos.filter((p) => p.status === 'keep');
+    if (keepPhotos.length === 0) return;
+    setIsZipping(true);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      for (let i = 0; i < keepPhotos.length; i++) {
+        const photo = keepPhotos[i];
+        if (photo.file) {
+          zip.file(photo.name, photo.file);
+        } else {
+          // 演示图片没有本地 file 引用时，使用 fetch 进行跨域下载降级
+          try {
+            const res = await fetch(photo.url);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            const blob = await res.blob();
+            zip.file(photo.name, blob);
+          } catch (e) {
+            console.error('Failed to fetch remote image for ZIP package:', photo.url, e);
+          }
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `ai-photo-cleaner-keep-${Date.now()}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Failed to download ZIP pack:', err);
+    } finally {
+      setIsZipping(false);
+    }
+  };
 
   // 移除了空数据时自动分析的 useEffect，改为在空状态下由用户点击手动加载 Demo 数据，避免意外路由干扰
 
@@ -140,20 +233,21 @@ export default function ResultsPage() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {items.map((photo) => (
           <Card 
             key={photo.id} 
-            className={`glassmorphism rounded-2xl overflow-hidden group transition-all duration-300 relative ${
+            className={cn(
+              "min-w-0 overflow-hidden rounded-2xl glassmorphism group transition-all duration-300 relative",
               photo.status === 'delete' 
                 ? 'border-red-500/20 hover:border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.05)]' 
                 : photo.status === 'review'
                 ? 'border-yellow-500/20 hover:border-yellow-500/40 shadow-[0_0_20px_rgba(234,179,8,0.05)]'
                 : 'border-white/5 hover:border-indigo-500/20 hover:shadow-[0_0_25px_rgba(99,102,241,0.08)]'
-            }`}
+            )}
           >
             {/* Image section */}
-            <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden">
+            <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-950">
               <img
                 src={photo.url}
                 alt={photo.name}
@@ -165,31 +259,83 @@ export default function ResultsPage() {
                 {renderIssueBadge(photo)}
               </div>
 
+              {/* Checkbox overlay for multi-select (z-20 to be clickable above hover overlay) */}
+              <div 
+                className={cn(
+                  "absolute top-3 right-3 z-20 h-5 w-5 rounded-full border flex items-center justify-center cursor-pointer transition-all duration-200",
+                  selectedIds.includes(photo.id)
+                    ? "bg-indigo-600 border-indigo-500 text-white"
+                    : "bg-slate-950/80 border-white/20 opacity-0 group-hover:opacity-100 hover:border-white/40",
+                  selectedIds.length > 0 ? "opacity-100" : ""
+                )}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleSelect(photo.id);
+                }}
+              >
+                {selectedIds.includes(photo.id) && (
+                  <svg className="h-3 w-3 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+
               {/* Hover quick overlay actions */}
-              <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                <Button 
-                  size="sm" 
-                  variant="secondary"
-                  className="rounded-lg h-9 text-xs flex items-center gap-1.5"
-                  onClick={() => openDetail(photo)}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  像素诊断
-                </Button>
-                
-                <Button
-                  size="sm"
-                  variant={photo.status === 'keep' ? 'destructive' : 'default'}
-                  className={`rounded-lg h-9 text-xs flex items-center gap-1.5 ${
-                    photo.status === 'keep' 
-                      ? 'bg-red-500 hover:bg-red-600 text-white' 
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  }`}
-                  onClick={() => togglePhotoStatus(photo.id)}
-                >
-                  {photo.status === 'keep' ? <Trash2 className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
-                  {photo.status === 'keep' ? '标为删除' : '恢复保留'}
-                </Button>
+              <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                <div className="flex flex-col gap-2 w-full max-w-[180px]">
+                  <Button 
+                    size="sm" 
+                    variant="secondary"
+                    className="w-full h-8 text-xs flex items-center justify-center gap-1.5 rounded-lg"
+                    onClick={() => openDetail(photo)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    像素诊断
+                  </Button>
+                  
+                  <div className="grid grid-cols-3 gap-1">
+                    <Button
+                      size="sm"
+                      variant={photo.status === 'keep' ? 'default' : 'outline'}
+                      className={cn(
+                        "h-8 px-0 text-[10px] flex items-center justify-center gap-1 rounded-lg",
+                        photo.status === 'keep' 
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0" 
+                          : "border-white/10 hover:bg-white/5 text-slate-300"
+                      )}
+                      onClick={() => updatePhotoStatus(photo.id, 'keep')}
+                    >
+                      保留
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={photo.status === 'review' ? 'default' : 'outline'}
+                      className={cn(
+                        "h-8 px-0 text-[10px] flex items-center justify-center gap-1 rounded-lg",
+                        photo.status === 'review' 
+                          ? "bg-yellow-600 hover:bg-yellow-700 text-white border-0" 
+                          : "border-white/10 hover:bg-white/5 text-slate-300"
+                      )}
+                      onClick={() => updatePhotoStatus(photo.id, 'review')}
+                    >
+                      复核
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={photo.status === 'delete' ? 'default' : 'outline'}
+                      className={cn(
+                        "h-8 px-0 text-[10px] flex items-center justify-center gap-1 rounded-lg",
+                        photo.status === 'delete' 
+                          ? "bg-red-600 hover:bg-red-700 text-white border-0" 
+                          : "border-white/10 hover:bg-white/5 text-slate-300"
+                      )}
+                      onClick={() => updatePhotoStatus(photo.id, 'delete')}
+                    >
+                      删除
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -229,7 +375,7 @@ export default function ResultsPage() {
       <div className="bg-grid-glow" />
       <Header />
 
-      <main className="flex-grow container mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-10">
+      <main className="flex-grow max-w-7xl mx-auto px-6 py-8 relative z-10 w-full">
         
         {totalPhotos === 0 ? (
           <div className="max-w-3xl mx-auto py-12">
@@ -280,24 +426,41 @@ export default function ResultsPage() {
                   <p className="text-xs text-slate-400 mt-1">AI 帮您检测出了 {deletePhotos.length} 张低画质或异常曝光的相片。</p>
                 </div>
                 
-                <div className="flex gap-3 mt-6">
-                  {deletePhotos.length > 0 && (
-                    <Button 
-                      onClick={deleteSuggestedPhotos}
-                      className="bg-red-500 hover:bg-red-600 text-white font-semibold text-xs py-5 px-5 shadow-lg shadow-red-500/25"
+                <div>
+                  <div className="flex flex-wrap gap-3 mt-6">
+                    {deletePhotos.length > 0 && (
+                      <Button 
+                        onClick={deleteSuggestedPhotos}
+                        className="bg-red-500 hover:bg-red-600 text-white font-semibold text-xs py-5 px-5 shadow-lg shadow-red-500/25"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        一键删除所有废片 ({spaceSavedMB} MB)
+                      </Button>
+                    )}
+                    
+                    <Button
+                      onClick={downloadKeepPhotosZip}
+                      disabled={keepPhotos.length === 0 || isZipping}
+                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs py-5 px-5 shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      一键删除所有废片 ({spaceSavedMB} MB)
+                      <Download className="h-4 w-4" />
+                      {isZipping ? '正在打包 ZIP...' : `下载精选照片 ZIP (${keepPhotos.length} 张)`}
                     </Button>
-                  )}
-                  <Button 
-                    onClick={handleRestart}
-                    variant="outline" 
-                    className="border-white/10 hover:bg-white/5 text-xs text-slate-300 py-5"
-                  >
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    重新导入
-                  </Button>
+
+                    <Button 
+                      onClick={handleRestart}
+                      variant="outline" 
+                      className="border-white/10 hover:bg-white/5 text-xs text-slate-300 py-5"
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      重新导入
+                    </Button>
+                  </div>
+                  
+                  <p className="text-[10px] text-slate-500 mt-4 flex items-center gap-1 select-none">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                    下载 ZIP 也在浏览器本地完成，照片不会上传到服务器。
+                  </p>
                 </div>
               </Card>
 
@@ -328,8 +491,7 @@ export default function ResultsPage() {
               </Card>
             </div>
 
-            {/* Tab Controls and Photo Grid */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col w-full space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4">
                 <TabsList className="bg-slate-900/60 border border-white/10 p-1 rounded-xl">
                   <TabsTrigger value="all" className="rounded-lg text-xs font-semibold px-4 py-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
@@ -349,6 +511,67 @@ export default function ResultsPage() {
                 <p className="text-xs text-slate-500">
                   💡 技巧：点击卡片可开启「AI 智能像素诊断仪」，调整保留权重
                 </p>
+              </div>
+ 
+              {/* Multi-select Control Bar */}
+              <div className="flex items-center justify-between gap-4 bg-slate-900/40 border border-white/5 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-400">
+                    已选择 <strong className="text-indigo-400 font-mono">{selectedIds.length}</strong> 张照片
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/10 hover:bg-white/5 text-xs h-8"
+                    onClick={handleSelectAll}
+                  >
+                    {(() => {
+                      const currentTabIds = getTabPhotos().map(p => p.id);
+                      const isAllSelected = currentTabIds.length > 0 && currentTabIds.every(id => selectedIds.includes(id));
+                      return isAllSelected ? "取消全选" : "全选当前分类";
+                    })()}
+                  </Button>
+                  {selectedIds.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-slate-400 hover:text-white text-xs h-8 px-2"
+                      onClick={handleClearSelection}
+                    >
+                      取消选择
+                    </Button>
+                  )}
+                </div>
+ 
+                {selectedIds.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">批量操作:</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-300 text-emerald-400 text-xs h-8"
+                      onClick={() => handleBatchStatusChange('keep')}
+                    >
+                      批量保留
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-yellow-500/20 hover:bg-yellow-500/10 hover:text-yellow-300 text-yellow-400 text-xs h-8"
+                      onClick={() => handleBatchStatusChange('review')}
+                    >
+                      批量复核
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-500/20 hover:bg-red-500/10 hover:text-red-300 text-red-400 text-xs h-8"
+                      onClick={() => handleBatchStatusChange('delete')}
+                    >
+                      批量删除
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <TabsContent value="all" className="focus-visible:outline-none">
