@@ -17,15 +17,19 @@ export default function ProcessingPage() {
     isAnalyzing, 
     analysisProgress, 
     analysisLogs, 
-    startAnalysis 
+    startAnalysis,
+    currentAnalysisIndex,
+    currentAnalysisName
   } = usePhotoWorkspace();
   
   const consoleEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const hasStartedRef = useRef(false);
 
-  // 1. 进入页面后：如果有照片，且尚未开始分析（进度为 0 且未在分析），则自动触发分析
+  // 1. 进入页面后：如果有照片，且尚未开始分析（进度为 0 且未在分析），则自动触发分析，并加入 Ref 拦截防止二次重复执行
   useEffect(() => {
-    if (photos.length > 0 && !isAnalyzing && analysisProgress === 0) {
+    if (photos.length > 0 && !isAnalyzing && analysisProgress === 0 && !hasStartedRef.current) {
+      hasStartedRef.current = true;
       startAnalysis();
     }
   }, [photos, isAnalyzing, analysisProgress, startAnalysis]);
@@ -102,10 +106,10 @@ export default function ProcessingPage() {
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
                   {analysisProgress === 100 ? '分析已完成' : 'AI 智能分析中'}
                 </h2>
-                <p className="text-slate-400 text-sm mt-1">
+                <p className="text-slate-400 text-sm mt-1 truncate max-w-full" title={currentAnalysisName}>
                   {analysisProgress === 100 
                     ? '像素诊断已全部完成，报表生成中，请稍候...' 
-                    : '深度神经网络正在读取每张照片并计算图像学特征...'}
+                    : `正在诊断：第 ${currentAnalysisIndex + 1} / ${photos.length} 张照片 — ${currentAnalysisName}`}
                 </p>
               </div>
 
@@ -129,7 +133,7 @@ export default function ProcessingPage() {
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 to-transparent" />
                       
                       {/* Status badge */}
-                      <div className="absolute bottom-2 left-2 text-[9px] text-slate-300 bg-slate-950/70 px-1.5 py-0.5 rounded font-mono truncate max-w-[90%]">
+                      <div className="absolute bottom-2 left-2 text-[9px] text-slate-300 bg-slate-950/70 px-1.5 py-0.5 rounded font-mono truncate max-w-[90%]" title={photo.name}>
                         {photo.name}
                       </div>
                     </div>
@@ -144,6 +148,9 @@ export default function ProcessingPage() {
                   <span className="font-mono text-white font-bold">{analysisProgress}%</span>
                 </div>
                 <Progress value={analysisProgress} className="h-3 bg-slate-950 border border-white/5 rounded-full overflow-hidden" />
+                <p className="text-[11px] text-slate-500 text-center mt-2 flex items-center justify-center gap-1 select-none">
+                  🔒 所有照片都在浏览器本地处理，绝不上传到任何服务器。
+                </p>
               </div>
 
               {/* Diagnostic Logs (Terminal Style) */}

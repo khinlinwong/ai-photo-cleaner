@@ -120,6 +120,8 @@ interface PhotoWorkspaceContextType {
   isAnalyzing: boolean;
   analysisProgress: number;
   analysisLogs: string[];
+  currentAnalysisIndex: number;
+  currentAnalysisName: string;
   uploadFiles: (files: File[]) => void;
   startAnalysis: () => void;
   togglePhotoStatus: (id: string) => void;
@@ -138,6 +140,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisLogs, setAnalysisLogs] = useState<string[]>([]);
+  const [currentAnalysisIndex, setCurrentAnalysisIndex] = useState(-1);
+  const [currentAnalysisName, setCurrentAnalysisName] = useState('');
   const router = useRouter();
 
   // startAnalysis 运行中保护 Lock
@@ -205,6 +209,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     setAnalysisLogs([]);
+    setCurrentAnalysisIndex(0);
+    setCurrentAnalysisName(currentPhotos[0]?.name || '');
 
     const updatedPhotos = [...currentPhotos];
     const total = updatedPhotos.length;
@@ -214,6 +220,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     for (let i = 0; i < total; i++) {
       const photo = updatedPhotos[i];
       const percentEnd = Math.round(((i + 1) / total) * 100);
+      
+      setCurrentAnalysisIndex(i);
+      setCurrentAnalysisName(photo.name);
 
       // 日志输出
       setAnalysisLogs((prev) => [
@@ -357,6 +366,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     isAnalyzingRef.current = false;
     setAnalysisProgress(0);
     setAnalysisLogs([]);
+    setCurrentAnalysisIndex(-1);
+    setCurrentAnalysisName('');
   };
 
   // 载入演示图片数据包
@@ -372,6 +383,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         isAnalyzing,
         analysisProgress,
         analysisLogs,
+        currentAnalysisIndex,
+        currentAnalysisName,
         uploadFiles,
         startAnalysis,
         togglePhotoStatus,

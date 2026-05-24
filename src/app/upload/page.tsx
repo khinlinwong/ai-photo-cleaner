@@ -17,6 +17,7 @@ export default function UploadPage() {
   const { uploadFiles } = usePhotoWorkspace();
   const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 组件卸载时释放所有未处理的 previewUrl 内存
@@ -35,6 +36,26 @@ export default function UploadPage() {
     };
   }, []);
 
+  // 处理拖拽文件和点击选择文件的校验机制
+  const processFiles = (files: FileList) => {
+    setErrorMsg(null);
+    const filesArray = Array.from(files);
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+    const unsupportedFiles = filesArray.filter(file => !allowedTypes.includes(file.type));
+    if (unsupportedFiles.length > 0) {
+      setErrorMsg(`不支持的文件格式。仅支持 JPG, PNG, WEBP 格式图片，已过滤 ${unsupportedFiles.length} 个文件。`);
+    }
+
+    const validFiles = filesArray.filter(file => allowedTypes.includes(file.type));
+    const newItems = validFiles.map(file => ({
+      file,
+      previewUrl: URL.createObjectURL(file)
+    }));
+
+    setSelectedFiles(prev => [...prev, ...newItems]);
+  };
+
   // 处理拖拽事件
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -52,24 +73,14 @@ export default function UploadPage() {
     setDragActive(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const filesArray = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
-      const newItems = filesArray.map(file => ({
-        file,
-        previewUrl: URL.createObjectURL(file)
-      }));
-      setSelectedFiles(prev => [...prev, ...newItems]);
+      processFiles(e.dataTransfer.files);
     }
   };
 
   // 处理点击选择文件
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const filesArray = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
-      const newItems = filesArray.map(file => ({
-        file,
-        previewUrl: URL.createObjectURL(file)
-      }));
-      setSelectedFiles(prev => [...prev, ...newItems]);
+      processFiles(e.target.files);
     }
   };
 
@@ -98,6 +109,7 @@ export default function UploadPage() {
       }
     });
     setSelectedFiles([]);
+    setErrorMsg(null);
   };
 
   // 触发 AI 分析
@@ -112,6 +124,9 @@ export default function UploadPage() {
   const handleUseDemo = () => {
     uploadFiles([]);
   };
+
+  const totalSize = selectedFiles.reduce((acc, f) => acc + f.file.size, 0);
+  const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
 
   return (
     <div className="flex flex-col min-h-screen relative overflow-hidden bg-grid-pattern">
@@ -148,7 +163,7 @@ export default function UploadPage() {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -159,65 +174,98 @@ export default function UploadPage() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-base font-bold text-white">点击上传 或 拖拽文件到这里</p>
-                    <p className="text-xs text-slate-500">建议一次性上传 10-100 张旅行照片以获得最佳效果</p>
+                    <p className="text-xs text-slate-500">仅支持 JPG, PNG, WEBP 格式 • 建议导入 10-100 张照片</p>
                   </div>
                 </div>
               </div>
 
-              {/* Preview Grid */}
-              {selectedFiles.length > 0 && (
-                <Card className="glassmorphism p-6 rounded-3xl">
+              {/* Permanent Upload Status & Preview Card */}
+              <Card className="glassmorphism p-6 rounded-3xl flex flex-col justify-between">
+                <div>
                   <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
                       <ImageIcon className="h-4 w-4 text-indigo-400" />
-                      待处理照片 ({selectedFiles.length} 张)
+                      待处理照片 ({selectedFiles.length} 张 • 共 {totalSizeMB} MB)
                     </h3>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={handleClearAll}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs"
-                    >
-                      全部清空
-                    </Button>
+                    {selectedFiles.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleClearAll}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs"
+                      >
+                        全部清空
+                      </Button>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-[300px] overflow-y-auto pr-1">
-                    {selectedFiles.map((item, index) => {
-                      return (
-                        <div key={index} className="relative aspect-square group rounded-lg overflow-hidden border border-white/5 bg-slate-950">
-                          <img
-                            src={item.previewUrl}
-                            alt={item.file.name}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeFile(index);
-                            }}
-                            className="absolute top-1.5 right-1.5 p-1 rounded-md bg-slate-950/80 text-red-400 hover:bg-red-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100 shadow-md"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                          <div className="absolute bottom-0 left-0 right-0 bg-slate-950/60 p-1 text-[9px] text-slate-400 truncate text-center">
-                            {(item.file.size / (1024 * 1024)).toFixed(1)}M
+                  {selectedFiles.length === 0 ? (
+                    <div className="text-center py-10 border border-white/5 rounded-2xl bg-slate-950/20">
+                      <p className="text-slate-500 text-xs">暂未导入任何照片，请通过上方区域进行选择或拖拽文件</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                      {selectedFiles.map((item, index) => {
+                        return (
+                          <div key={index} className="relative aspect-square group rounded-lg overflow-hidden border border-white/5 bg-slate-950">
+                            <img
+                              src={item.previewUrl}
+                              alt={item.file.name}
+                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFile(index);
+                              }}
+                              className="absolute top-1.5 right-1.5 p-1 rounded-md bg-slate-950/80 text-red-400 hover:bg-red-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100 shadow-md"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                            <div className="absolute bottom-0 left-0 right-0 bg-slate-950/60 p-1 text-[9px] text-slate-400 truncate text-center">
+                              {(item.file.size / (1024 * 1024)).toFixed(1)}M
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
-                  <div className="mt-6 flex justify-end">
-                    <Button 
-                      onClick={handleStartAnalysis}
-                      className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-8 h-11"
-                    >
-                      开始 AI 智能整理 ({selectedFiles.length}张)
-                    </Button>
+                {/* 温和预警与提示区域 */}
+                {(selectedFiles.length > 100 || totalSize > 300 * 1024 * 1024) && (
+                  <div className="mt-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10 text-[11px] text-amber-400 space-y-1">
+                    {selectedFiles.length > 100 && (
+                      <p className="flex items-center gap-1.5">
+                        ⚠️ 大量照片 ({selectedFiles.length} 张) 可能需要较长分析时间，建议先测试 10-50 张以获得最佳体验。
+                      </p>
+                    )}
+                    {totalSize > 300 * 1024 * 1024 && (
+                      <p className="flex items-center gap-1.5">
+                        ⚠️ 当前为浏览器本地诊断，照片总体积较大 ({totalSizeMB} MB)，大文件分析可能占用较多本地内存。
+                      </p>
+                    )}
                   </div>
-                </Card>
-              )}
+                )}
+
+                {/* 格式错误警告 */}
+                {errorMsg && (
+                  <div className="mt-4 p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-[11px] text-red-400 flex items-center gap-1.5">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                <div className="mt-6 flex justify-end">
+                  <Button 
+                    onClick={handleStartAnalysis}
+                    disabled={selectedFiles.length === 0}
+                    className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-8 h-11 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-indigo-600 disabled:hover:to-violet-600"
+                  >
+                    {selectedFiles.length > 0 ? `开始分析 ${selectedFiles.length} 张照片` : '开始分析 (0 张)'}
+                  </Button>
+                </div>
+              </Card>
             </div>
 
             {/* Sidebar Guidelines */}
