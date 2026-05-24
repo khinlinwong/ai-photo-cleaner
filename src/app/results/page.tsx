@@ -233,12 +233,12 @@ export default function ResultsPage() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(280px,360px))] gap-6 justify-center sm:justify-start">
         {items.map((photo) => (
           <Card 
             key={photo.id} 
             className={cn(
-              "min-w-0 overflow-hidden rounded-2xl glassmorphism group transition-all duration-300 relative",
+              "w-full max-w-[360px] mx-auto min-w-0 overflow-hidden rounded-2xl glassmorphism group transition-all duration-300 relative",
               photo.status === 'delete' 
                 ? 'border-red-500/20 hover:border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.05)]' 
                 : photo.status === 'review'
@@ -476,6 +476,11 @@ export default function ResultsPage() {
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
                     下载 ZIP 也在浏览器本地完成，照片不会上传到服务器。
                   </p>
+                  
+                  {/* Free Local Analysis Mode Disclaimer */}
+                  <div className="mt-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 text-[10px] text-indigo-300 leading-relaxed max-w-2xl">
+                    💡 <strong>免费本地分析说明：</strong> 当前为本地快速分析模式，分析逻辑完全运行在您浏览器的沙盒内，复杂场景下可能存在一定偏差。未来 <strong>AI Vision Pro</strong> 会员版将提供更精准的画面主体识别、手抖细节诊断与美学价值筛选。
+                  </div>
                 </div>
               </Card>
 
@@ -505,6 +510,34 @@ export default function ResultsPage() {
                 </div>
               </Card>
             </div>
+
+            {/* AI Vision Pro Promotion Banner Card */}
+            <Card className="glassmorphism-premium border-indigo-500/20 bg-gradient-to-r from-indigo-950/20 via-violet-950/15 to-slate-900/40 p-5 rounded-2xl mb-8 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
+              <div className="space-y-1.5 z-10">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider select-none">
+                  <Sparkles className="h-3 w-3" />
+                  AI Vision Pro (即将推出)
+                </span>
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  解锁专业级云端美学与主体对焦分析
+                </h3>
+                <p className="text-[11px] text-slate-400 max-w-3xl leading-relaxed">
+                  本地算力不够用？AI Vision Pro 将接入云端万亿参数视觉大模型分析，彻底告别单边缘强度的局限，实现更懂人类视觉审美的智能管理。
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-indigo-300/80 pt-1 font-semibold">
+                  <span className="flex items-center gap-1">✓ 主体识别</span>
+                  <span className="flex items-center gap-1">✓ AI 手抖检测</span>
+                  <span className="flex items-center gap-1">✓ 分享价值分析</span>
+                  <span className="flex items-center gap-1">✓ 人像质量判断</span>
+                  <span className="flex items-center gap-1">✓ AI 审美筛选</span>
+                </div>
+              </div>
+              <Button className="shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs py-4 px-6 rounded-xl border-0 shadow-lg shadow-indigo-500/25 z-10 flex items-center gap-1.5 transition-all">
+                <Sparkles className="h-3.5 w-3.5" />
+                升级 Pro
+              </Button>
+            </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col w-full space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4">
@@ -593,19 +626,19 @@ export default function ResultsPage() {
                 )}
               </div>
 
-              <TabsContent value="all" className="focus-visible:outline-none">
+              <TabsContent value="all" className="focus-visible:outline-none min-h-[480px]">
                 {renderPhotoGrid(photos)}
               </TabsContent>
               
-              <TabsContent value="keep" className="focus-visible:outline-none">
+              <TabsContent value="keep" className="focus-visible:outline-none min-h-[480px]">
                 {renderPhotoGrid(keepPhotos)}
               </TabsContent>
 
-              <TabsContent value="review" className="focus-visible:outline-none">
+              <TabsContent value="review" className="focus-visible:outline-none min-h-[480px]">
                 {renderPhotoGrid(reviewPhotos)}
               </TabsContent>
               
-              <TabsContent value="delete" className="focus-visible:outline-none">
+              <TabsContent value="delete" className="focus-visible:outline-none min-h-[480px]">
                 {renderPhotoGrid(deletePhotos)}
               </TabsContent>
             </Tabs>
@@ -662,20 +695,59 @@ export default function ResultsPage() {
                         {/* Metric 2: Sharpness Score */}
                         <div className="space-y-1.5 mb-4">
                           <div className="flex justify-between text-xs">
-                            <span className="text-slate-400">图像对焦清晰度 (Sobel)</span>
-                            <span className={cn("font-bold font-mono", selectedPhoto.sharpnessScore < 45 ? 'text-red-400' : 'text-emerald-400')}>
+                            <span className="text-slate-400">图像对焦清晰度</span>
+                            <span className={cn(
+                              "font-bold font-mono",
+                              selectedPhoto.sharpnessScore < 40 ? 'text-red-400' :
+                              selectedPhoto.sharpnessScore < 60 ? 'text-yellow-400' :
+                              'text-emerald-400'
+                            )}>
                               {selectedPhoto.sharpnessScore} / 100
                             </span>
                           </div>
                           <Progress 
                             value={selectedPhoto.sharpnessScore} 
-                            className={`h-2 bg-slate-950 rounded-full ${
-                              selectedPhoto.sharpnessScore < 45 ? 'bg-red-500/20' : ''
-                            }`} 
+                            className={cn(
+                              "h-2 bg-slate-950 rounded-full",
+                              selectedPhoto.sharpnessScore < 40 ? 'bg-red-500/20' :
+                              selectedPhoto.sharpnessScore < 60 ? 'bg-yellow-500/20' :
+                              ''
+                            )} 
                           />
-                          {selectedPhoto.sharpnessScore < 45 && (
-                            <p className="text-[10px] text-red-400">⚠️ 检测到高频边缘极少，推测属于手抖失焦或模糊图片。</p>
-                          )}
+                          
+                          {/* focus explanation */}
+                          <div className="mt-1.5 text-[10px] leading-relaxed">
+                            <span className="text-slate-500 font-semibold">对焦诊断: </span>
+                            {(() => {
+                              const fs = selectedPhoto.focusStatus || (
+                                selectedPhoto.sharpnessScore >= 85 ? 'Excellent / Share-ready' :
+                                selectedPhoto.sharpnessScore >= 60 ? 'Acceptable / Casual use' :
+                                selectedPhoto.sharpnessScore >= 40 ? 'Soft Focus Detected' :
+                                'Not recommended'
+                              );
+                              switch (fs) {
+                                case 'Excellent / Share-ready':
+                                  return <span className="text-emerald-400">🟢 基础清晰度良好，检测到丰富的边缘高频细节 (Excellent / Share-ready)。</span>;
+                                case 'Acceptable / Casual use':
+                                  return <span className="text-emerald-500/80">🟢 基础清晰度良好，本地算法未检测到明显失焦 (Acceptable / Casual use)。</span>;
+                                case 'Soft Focus Detected':
+                                case 'Slightly Soft':
+                                  return <span className="text-yellow-400">🟡 检测到高频细节轻微流失，可能存在轻微散焦或虚化，建议人工复核 (Soft Focus Detected)。</span>;
+                                case 'Directional Blur Detected':
+                                  return <span className="text-red-400 font-medium">🔴 检测到高对比度边缘出现严重的单向位移拉影，可能存在运动模糊 (Directional Blur Detected)。</span>;
+                                case 'Motion Blur Detected':
+                                  return <span className="text-red-400 font-medium">🔴 检测到边缘细节呈现一致的方向性拖尾，可能存在手抖或运动模糊 (Motion Blur Detected)。</span>;
+                                case 'Edge Smear Detected':
+                                  return <span className="text-red-400 font-medium">🔴 检测到边缘对比度被高度抹平，可能存在镜头污渍或过度降噪涂抹 (Edge Smear Detected)。</span>;
+                                case 'Insufficient Subject Sharpness':
+                                  return <span className="text-red-400 font-medium">🔴 本地算法评估画面中心区域细节不足，可能存在主体对焦偏差 (Insufficient Subject Sharpness)。</span>;
+                                case 'Not recommended':
+                                case 'Blurry':
+                                default:
+                                  return <span className="text-red-400">🔴 本地算法检测到高频边缘信息极少，可能存在严重失焦或虚焦，建议清理 (Not recommended)。</span>;
+                              }
+                            })()}
+                          </div>
                         </div>
  
                         {/* Metric 3: Exposure Score */}

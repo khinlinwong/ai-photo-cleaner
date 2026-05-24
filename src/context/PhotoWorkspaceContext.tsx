@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { analyzeImage } from '@/lib/imageAnalysis';
+import { AnalysisMode } from '@/lib/analysis/vision/types';
 
 export interface PhotoItem {
   id: string;
@@ -19,6 +20,19 @@ export interface PhotoItem {
   file?: File; // 存放本地上传的原始 File 引用
   sharpnessScore: number; // 真实清晰度得分 (0-100)
   exposureScore: number; // 真实曝光得分 (0-100)
+  focusStatus?:
+    | 'Excellent / Share-ready'
+    | 'Acceptable / Casual use'
+    | 'Soft Focus Detected'
+    | 'Directional Blur Detected'
+    | 'Motion Blur Detected'
+    | 'Edge Smear Detected'
+    | 'Insufficient Subject Sharpness'
+    | 'Not recommended'
+    | 'Excellent Focus'
+    | 'Acceptable'
+    | 'Slightly Soft'
+    | 'Blurry';
 }
 
 // 预设的高质量旅行 Mock 照片（对应新版的类型定义）
@@ -122,6 +136,8 @@ interface PhotoWorkspaceContextType {
   analysisLogs: string[];
   currentAnalysisIndex: number;
   currentAnalysisName: string;
+  analysisMode: AnalysisMode;
+  setAnalysisMode: (mode: AnalysisMode) => void;
   uploadFiles: (files: File[]) => void;
   startAnalysis: () => void;
   togglePhotoStatus: (id: string) => void;
@@ -142,6 +158,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [analysisLogs, setAnalysisLogs] = useState<string[]>([]);
   const [currentAnalysisIndex, setCurrentAnalysisIndex] = useState(-1);
   const [currentAnalysisName, setCurrentAnalysisName] = useState('');
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('local');
   const router = useRouter();
 
   // startAnalysis 运行中保护 Lock
@@ -258,7 +275,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
             resolution: `${res.width} × ${res.height}`,
             category,
             sharpnessScore: res.sharpnessScore,
-            exposureScore: res.exposureScore
+            exposureScore: res.exposureScore,
+            focusStatus: res.focusStatus
           };
 
           setAnalysisLogs((prev) => [
@@ -277,6 +295,27 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         await new Promise((resolve) => setTimeout(resolve, 800)); // 模拟异步加载
         
         const demoMatch = MOCK_TRAVEL_PHOTOS.find((m) => m.name === photo.name) || MOCK_TRAVEL_PHOTOS[0];
+        
+        let focusStatus:
+          | 'Excellent / Share-ready'
+          | 'Acceptable / Casual use'
+          | 'Soft Focus Detected'
+          | 'Directional Blur Detected'
+          | 'Motion Blur Detected'
+          | 'Edge Smear Detected'
+          | 'Insufficient Subject Sharpness'
+          | 'Not recommended' = 'Acceptable / Casual use';
+
+        if (demoMatch.sharpnessScore >= 85) {
+          focusStatus = 'Excellent / Share-ready';
+        } else if (demoMatch.sharpnessScore >= 60) {
+          focusStatus = 'Acceptable / Casual use';
+        } else if (demoMatch.sharpnessScore >= 40) {
+          focusStatus = 'Soft Focus Detected';
+        } else {
+          focusStatus = demoMatch.name.includes('Blur') ? 'Motion Blur Detected' : 'Not recommended';
+        }
+
         updatedPhotos[i] = {
           ...photo,
           status: demoMatch.status,
@@ -287,7 +326,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
           resolution: demoMatch.resolution,
           category: demoMatch.category,
           sharpnessScore: demoMatch.sharpnessScore,
-          exposureScore: demoMatch.exposureScore
+          exposureScore: demoMatch.exposureScore,
+          focusStatus
         };
 
         setAnalysisLogs((prev) => [
@@ -385,6 +425,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         analysisLogs,
         currentAnalysisIndex,
         currentAnalysisName,
+        analysisMode,
+        setAnalysisMode,
         uploadFiles,
         startAnalysis,
         togglePhotoStatus,
