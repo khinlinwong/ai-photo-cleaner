@@ -20,8 +20,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AI Photo Cleaner - 智能筛选旅行废片，一键释放照片空间",
-  description: "AI Photo Cleaner 利用先进的 AI 图像算法，智能检测模糊、过曝、欠曝的旅行废片，并将其分类整理为“建议保留”和“建议删除”，一键拯救您的相机与手机存储。",
+  title: "AI Photo Cleaner - 浏览器本地照片诊断与筛选工具",
+  description: "AI Photo Cleaner 是一款本地照片清理工具，在本地沙箱中诊断运动模糊、失焦、曝光异常及相似重复照片，并分类整理为“推荐保留”和“淘汰候选”，释放照片空间。",
 };
 
 export default function RootLayout({
@@ -30,9 +30,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className={cn("font-sans dark", inter.variable)} style={{ colorScheme: 'dark' }}>
+    <html lang="zh-CN" className={cn("font-sans", inter.variable)} style={{ colorScheme: 'light' }}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-100 min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#C8CDD6] text-[#1F2937] font-sans min-h-screen`}
       >
         <PhotoWorkspaceProvider>
           <TooltipProvider>

@@ -1,0 +1,224 @@
+/* src/styles/desktop-theme.css */
+
+:root {
+  /* 强制暗灰 Dark Mode 色彩变量，实现温和防疲劳的照片工作台 */
+  --dt-root-bg: #1F2329;
+  --dt-window-bg: #2A2F36;
+  --dt-workspace-bg: #303640;
+  --dt-sidebar-bg: #252B33;
+  --dt-topbar-bg: #242A31;
+  --dt-statusbar-bg: #242A31;
+
+  --dt-panel-bg: rgba(54, 61, 72, 0.82);
+  --dt-panel-bg-solid: #363D48;
+  --dt-card-bg: rgba(62, 69, 81, 0.76);
+  --dt-card-hover-bg: rgba(72, 80, 94, 0.86);
+
+  --dt-nav-active-bg: rgba(74, 84, 99, 0.72);
+  --dt-nav-hover-bg: rgba(74, 84, 99, 0.42);
+
+  --dt-border: rgba(180, 190, 205, 0.12);
+  --dt-border-strong: rgba(200, 210, 225, 0.18);
+
+  --dt-text: #EEF2F6;
+  --dt-text-muted: #B9C1CC;
+  --dt-text-soft: #96A0AE;
+  --dt-text-faint: #727D8D;
+
+  --dt-button-primary: #E8EDF3;
+  --dt-button-primary-hover: #FFFFFF;
+  --dt-button-primary-text: #1E2631;
+
+  --dt-button-secondary: rgba(70, 78, 92, 0.86);
+  --dt-button-secondary-hover: rgba(84, 94, 110, 0.94);
+  --dt-button-secondary-text: #E8EDF3;
+
+  /* 兼容组件内部使用的原有文字别名 */
+  --dt-text-primary: var(--dt-text);
+  --dt-text-secondary: var(--dt-text-muted);
+  --dt-text-muted: var(--dt-text-soft);
+}
+
+.desktop-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  background-color: var(--dt-root-bg);
+  overflow: hidden;
+  padding: 16px;
+  font-family: var(--font-sans), sans-serif;
+  user-select: none;
+}
+
+.desktop-window {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: 1360px;
+  max-height: 850px;
+  background-color: var(--dt-window-bg);
+  border: 1px solid var(--dt-border-strong);
+  border-radius: 12px;
+  box-shadow: 
+    0 16px 40px rgba(0, 0, 0, 0.24),
+    0 4px 16px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  position: relative;
+}
+
+.desktop-glass {
+  background: var(--dt-panel-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--dt-border);
+}
+
+.desktop-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--dt-button-primary-text);
+  background-color: var(--dt-button-primary);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.desktop-button-primary:hover:not(:disabled) {
+  background-color: var(--dt-button-primary-hover);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.desktop-button-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.desktop-button-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.desktop-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--dt-button-secondary-text);
+  background-color: var(--dt-button-secondary);
+  border: 1px solid var(--dt-border);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.desktop-button-secondary:hover:not(:disabled) {
+  background-color: var(--dt-button-secondary-hover);
+  transform: translateY(-0.5px);
+}
+
+.desktop-button-secondary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.desktop-button-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.desktop-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid rgba(200, 210, 225, 0.12);
+  background-color: rgba(60, 68, 80, 0.75); /* 暗色半透明灰 */
+  color: var(--dt-text-secondary);
+}
+
+.desktop-panel {
+  background-color: var(--dt-panel-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* A/B Battle Workspace Styles */
+.desktop-battle-window {
+  background-color: var(--dt-window-bg);
+  border: 1px solid var(--dt-border-strong);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55);
+}
+
+.desktop-battle-stage {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.desktop-battle-photo-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(30, 36, 44, 0.72);
+  border: 1px solid var(--dt-border);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.desktop-battle-photo-wrapper {
+  flex: 1;
+  background-color: #12161A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.desktop-battle-vs-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  border: 1px solid var(--dt-border-strong);
+  background-color: var(--dt-workspace-bg);
+  color: var(--dt-text-faint);
+  font-size: 8px;
+  font-weight: 800;
+  font-mono: true;
+  user-select: none;
+}
+
+.desktop-battle-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 4px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 8.5px;
+  color: var(--dt-text-muted);
+  box-shadow: 0 1px 0px rgba(0, 0, 0, 0.3);
+}
