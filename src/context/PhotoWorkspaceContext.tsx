@@ -3,7 +3,24 @@
 import React, { createContext, useContext, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { analyzeImage } from '@/lib/imageAnalysis';
-import { AnalysisMode } from '@/lib/analysis/vision/types';
+import { AnalysisMode, SimilarGroup, BattleDecision } from '@/lib/analysis/vision/types';
+import { detectDuplicates, buildDuplicateSignals, DuplicateAnalysisResult, buildSimilarGroupsFromSignals, QASimilarGroupSignalForBattle } from '@/lib/analysis/local/duplicate';
+import { USE_SIGNAL_GROUPS_FOR_BATTLE } from '@/lib/config/featureFlags';
+
+export interface ActiveBattleState {
+  groupId: string;
+  photoIds: string[];
+  contenderIds: string[];
+  currentCandidateId: string;
+  nextIndex: number;
+  roundIndex: number;
+  totalRounds: number;
+  decisions: BattleDecision[];
+  recommendedKeepIds: string[];
+  similarBackupIds: string[];
+  cullCandidateIds: string[];
+  undecidedIds: string[];
+}
 
 export interface PhotoItem {
   id: string;
@@ -33,6 +50,18 @@ export interface PhotoItem {
     | 'Acceptable'
     | 'Slightly Soft'
     | 'Blurry';
+  perceptualHash?: string;
+  duplicateGroupId?: string | null;
+  duplicateScore?: number;
+  isDuplicateCandidate?: boolean;
+  duplicateRecommendation?: 'keep' | 'review' | 'delete';
+  exposureSeverity?: 'none' | 'minor' | 'moderate' | 'severe';
+  technicalRiskFlags?: ('possible_blur' | 'possible_motion_blur' | 'exposure_risk' | 'low_information' | 'duplicate_candidate' | 'severe_quality_issue')[];
+  confidence?: 'high' | 'medium' | 'low';
+  suggestedStatus?: 'keep' | 'review' | 'delete';
+  displayLabel?: '技术风险低' | '建议复核' | '淘汰候选';
+  reasonLabel?: string;
+  userDecision?: 'keep' | 'review' | 'delete';
 }
 
 // 预设的高质量旅行 Mock 照片（对应新版的类型定义）
@@ -50,7 +79,14 @@ export const MOCK_TRAVEL_PHOTOS: PhotoItem[] = [
     resolution: '4032 × 3024',
     category: '风景',
     sharpnessScore: 92,
-    exposureScore: 98
+    exposureScore: 98,
+    perceptualHash: '8a8a8a8a8a8a8a8a',
+    exposureSeverity: 'none',
+    technicalRiskFlags: [],
+    confidence: 'high',
+    suggestedStatus: 'keep',
+    displayLabel: '技术风险低',
+    reasonLabel: '未发现明显技术问题'
   },
   {
     id: 'photo-2',
@@ -65,37 +101,58 @@ export const MOCK_TRAVEL_PHOTOS: PhotoItem[] = [
     resolution: '3840 × 2160',
     category: '城市',
     sharpnessScore: 18,
-    exposureScore: 88
+    exposureScore: 88,
+    perceptualHash: '1b1b1b1b1b1b1b1b',
+    exposureSeverity: 'none',
+    technicalRiskFlags: ['possible_motion_blur', 'severe_quality_issue'],
+    confidence: 'low',
+    suggestedStatus: 'delete',
+    displayLabel: '淘汰候选',
+    reasonLabel: '检测到明显技术风险，建议淘汰候选'
   },
   {
     id: 'photo-3',
     url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop',
     name: 'Bali_Beach_Overexposed.jpg',
     size: '5.1 MB',
-    status: 'delete',
-    issue: 'overexposed',
-    score: 45,
+    status: 'review',
+    issue: 'needs_review',
+    score: 77,
     blurValue: 15,
-    exposureValue: 88,
+    exposureValue: 35,
     resolution: '4032 × 3024',
     category: '海滩',
     sharpnessScore: 85,
-    exposureScore: 12
+    exposureScore: 72,
+    perceptualHash: '2c2c2c2c2c2c2c2c',
+    exposureSeverity: 'moderate',
+    technicalRiskFlags: ['exposure_risk'],
+    confidence: 'medium',
+    suggestedStatus: 'review',
+    displayLabel: '建议复核',
+    reasonLabel: '可能存在曝光风险'
   },
   {
     id: 'photo-4',
     url: 'https://images.unsplash.com/photo-1527631746610-bca00a040d60?q=80&w=800&auto=format&fit=crop',
     name: 'Venice_Alley_Dark.jpg',
     size: '2.9 MB',
-    status: 'delete',
-    issue: 'underexposed',
-    score: 41,
+    status: 'review',
+    issue: 'needs_review',
+    score: 73,
     blurValue: 18,
-    exposureValue: -79,
+    exposureValue: -40,
     resolution: '3024 × 4032',
     category: '人文',
     sharpnessScore: 82,
-    exposureScore: 21
+    exposureScore: 70,
+    perceptualHash: '3d3d3d3d3d3d3d3d',
+    exposureSeverity: 'moderate',
+    technicalRiskFlags: ['exposure_risk'],
+    confidence: 'medium',
+    suggestedStatus: 'review',
+    displayLabel: '建议复核',
+    reasonLabel: '可能存在曝光风险'
   },
   {
     id: 'photo-5',
@@ -110,7 +167,14 @@ export const MOCK_TRAVEL_PHOTOS: PhotoItem[] = [
     resolution: '4800 × 3200',
     category: '雪山',
     sharpnessScore: 96,
-    exposureScore: 98
+    exposureScore: 98,
+    perceptualHash: '4e4e4e4e4e4e4e4e',
+    exposureSeverity: 'none',
+    technicalRiskFlags: [],
+    confidence: 'high',
+    suggestedStatus: 'keep',
+    displayLabel: '技术风险低',
+    reasonLabel: '未发现明显技术问题'
   },
   {
     id: 'photo-6',
@@ -125,7 +189,58 @@ export const MOCK_TRAVEL_PHOTOS: PhotoItem[] = [
     resolution: '3024 × 4032',
     category: '人像',
     sharpnessScore: 88,
-    exposureScore: 95
+    exposureScore: 95,
+    perceptualHash: 'e1e1e1e1e1e1e1e1',
+    exposureSeverity: 'none',
+    technicalRiskFlags: [],
+    confidence: 'high',
+    suggestedStatus: 'keep',
+    displayLabel: '技术风险低',
+    reasonLabel: '未发现明显技术问题'
+  },
+  {
+    id: 'photo-7',
+    url: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=800&auto=format&fit=crop&burst=1',
+    name: 'Eiffel_Tower_Portrait_Burst1.jpg',
+    size: '3.4 MB',
+    status: 'keep',
+    issue: 'good',
+    score: 85,
+    blurValue: 20,
+    exposureValue: 10,
+    resolution: '3024 × 4032',
+    category: '人像',
+    sharpnessScore: 80,
+    exposureScore: 95,
+    perceptualHash: 'e1e1e1e1e1e1e1e3',
+    exposureSeverity: 'none',
+    technicalRiskFlags: [],
+    confidence: 'high',
+    suggestedStatus: 'keep',
+    displayLabel: '技术风险低',
+    reasonLabel: '未发现明显技术问题'
+  },
+  {
+    id: 'photo-8',
+    url: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=800&auto=format&fit=crop&burst=2',
+    name: 'Eiffel_Tower_Portrait_Burst2.jpg',
+    size: '3.6 MB',
+    status: 'keep',
+    issue: 'good',
+    score: 80,
+    blurValue: 25,
+    exposureValue: 10,
+    resolution: '3024 × 4032',
+    category: '人像',
+    sharpnessScore: 75,
+    exposureScore: 95,
+    perceptualHash: 'e1e1e1e1e1e1ffff',
+    exposureSeverity: 'none',
+    technicalRiskFlags: [],
+    confidence: 'high',
+    suggestedStatus: 'keep',
+    displayLabel: '技术风险低',
+    reasonLabel: '未发现明显技术问题'
   }
 ];
 
@@ -147,7 +262,98 @@ interface PhotoWorkspaceContextType {
   deleteSuggestedPhotos: () => void;
   resetWorkspace: () => void;
   loadDemoPhotos: () => void;
+  // Checkpoint 6 Battle methods and state:
+  similarGroups: SimilarGroup[];
+  activeBattle: ActiveBattleState | null;
+  startBattleForGroup: (groupId: string) => void;
+  applyBattleDecision: (decision: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => void;
+  resetBattleForGroup: (groupId: string) => void;
+  closeBattle: () => void;
+  // =========================================================================
+  // CRITICAL DEV-ONLY QA WARNING:
+  // - This is a Dev-only QA field used strictly to compare legacy detectDuplicates
+  //   output with buildDuplicateSignals in non-production environments.
+  // - DO NOT under any circumstances use this field to drive UI, Results page,
+  //   Photo Battle flow, ZIP export, or user-visible decisions.
+  // =========================================================================
+  duplicateSignalResult?: DuplicateAnalysisResult | null;
+  // =========================================================================
+  // CRITICAL DEV-ONLY QA WARNING:
+  // - duplicateGroupQA is strictly a Dev-only QA field for regression testing.
+  // - DO NOT under any circumstances use this field to drive UI, Results page,
+  //   Photo Battle flow, ZIP export, or user-visible decisions.
+  // =========================================================================
+  duplicateGroupQA?: DuplicateGroupQA | null;
 }
+
+export interface DuplicateGroupQA {
+  oldSimilarGroupsForQA: SimilarGroup[];
+  newSimilarGroupsForQA: QASimilarGroupSignalForBattle[];
+  comparison: DuplicateSignalComparison;
+}
+
+type DuplicateSignalComparison = {
+  oldGroupCount: number;
+  newGroupCount: number;
+  oldGroupedPhotoCount: number;
+  newGroupedPhotoCount: number;
+  oldLeaderIds: string[];
+  newLeaderIds: string[];
+  leaderMismatchCount: number;
+
+  // 相似组 QA 扩展字段
+  oldSimilarGroupCount: number;
+  newSimilarGroupCount: number;
+  oldSimilarGroupedPhotoCount: number;
+  newSimilarGroupedPhotoCount: number;
+  similarGroupCountMismatch: boolean;
+  similarGroupedPhotoCountMismatch: boolean;
+};
+
+const compareOldAndNewDuplicates = (
+  oldPhotos: PhotoItem[],
+  newResult: DuplicateAnalysisResult,
+  oldSimilarGroups: SimilarGroup[],
+  newSimilarGroups: QASimilarGroupSignalForBattle[]
+): DuplicateSignalComparison => {
+  const oldGroupedPhotos = oldPhotos.filter(p => !!p.duplicateGroupId);
+  const oldGroupIds = Array.from(new Set(oldGroupedPhotos.map(p => p.duplicateGroupId)));
+  const oldLeaderIds = Array.from(new Set(oldPhotos.filter(p => p.duplicateRecommendation === 'keep').map(p => p.id)));
+
+  const newGroupedPhotoCount = Object.keys(newResult.photoToGroup).length;
+  const newGroupCount = newResult.groups.length;
+  const newLeaderIds = newResult.groups.map(g => g.leaderId).filter(Boolean) as string[];
+
+  let leaderMismatchCount = 0;
+  newResult.groups.forEach(g => {
+    const oldGroupPhotos = oldPhotos.filter(p => g.photoIds.includes(p.id));
+    const oldLeader = oldGroupPhotos.find(p => p.duplicateRecommendation === 'keep');
+    if (oldLeader && oldLeader.id !== g.leaderId) {
+      leaderMismatchCount++;
+    }
+  });
+
+  const oldSimilarGroupCount = oldSimilarGroups.length;
+  const newSimilarGroupCount = newSimilarGroups.length;
+  const oldSimilarGroupedPhotoCount = oldSimilarGroups.reduce((acc, g) => acc + g.photoIds.length, 0);
+  const newSimilarGroupedPhotoCount = newSimilarGroups.reduce((acc, g) => acc + g.photoIds.length, 0);
+
+  return {
+    oldGroupCount: oldGroupIds.length,
+    newGroupCount,
+    oldGroupedPhotoCount: oldGroupedPhotos.length,
+    newGroupedPhotoCount,
+    oldLeaderIds,
+    newLeaderIds,
+    leaderMismatchCount,
+    oldSimilarGroupCount,
+    newSimilarGroupCount,
+    oldSimilarGroupedPhotoCount,
+    newSimilarGroupedPhotoCount,
+    similarGroupCountMismatch: oldSimilarGroupCount !== newSimilarGroupCount,
+    similarGroupedPhotoCountMismatch: oldSimilarGroupedPhotoCount !== newSimilarGroupedPhotoCount
+  };
+};
 
 const PhotoWorkspaceContext = createContext<PhotoWorkspaceContextType | undefined>(undefined);
 
@@ -161,8 +367,378 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('local');
   const router = useRouter();
 
+  // Development-only guard.
+  // Signal-derived groups must not drive production or user-facing flows.
+  // Keep USE_SIGNAL_GROUPS_FOR_BATTLE=false until QA proves parity with legacy similarGroups.
+  const canUseSignalGroupsForBattle =
+    process.env.NODE_ENV === 'development' &&
+    (USE_SIGNAL_GROUPS_FOR_BATTLE as boolean) === true;
+
+  // Checkpoint 6 Battle states
+  const [similarGroups, setSimilarGroups] = useState<SimilarGroup[]>([]);
+  const [activeBattle, setActiveBattle] = useState<ActiveBattleState | null>(null);
+
+  // =========================================================================
+  // CRITICAL DEV-ONLY QA WARNING:
+  // - This is a Dev-only QA field used strictly to compare legacy detectDuplicates
+  //   output with buildDuplicateSignals in non-production environments.
+  // - DO NOT under any circumstances use this field to drive UI, Results page,
+  //   Photo Battle flow, ZIP export, or user-visible decisions.
+  // =========================================================================
+  const [duplicateSignalResult, setDuplicateSignalResult] = useState<DuplicateAnalysisResult | null>(null);
+
+  // =========================================================================
+  // CRITICAL DEV-ONLY QA WARNING:
+  // - duplicateGroupQA is strictly a Dev-only QA state for regression testing.
+  // - DO NOT under any circumstances use this field to drive UI, Results page,
+  //   Photo Battle flow, ZIP export, or user-visible decisions.
+  // =========================================================================
+  const [duplicateGroupQA, setDuplicateGroupQA] = useState<DuplicateGroupQA | null>(null);
+
+  // 双路运行 QA 比较辅助
+  const runDuplicateQA = (processedPhotos: PhotoItem[], oldSimilarGroupsOverride?: SimilarGroup[]) => {
+    try {
+      const signalInputs = processedPhotos.map(photo => ({
+        id: photo.id,
+        perceptualHash: photo.perceptualHash,
+        sharpnessScore: photo.sharpnessScore,
+        qualityScore: photo.score
+      }));
+
+      const newResult = buildDuplicateSignals(signalInputs);
+      setDuplicateSignalResult(newResult);
+
+      // 1. 同步还原旧版的分组数据，用于只读对比，无需依赖或重写 initializeSimilarGroups
+      const groupsMap: { [groupId: string]: string[] } = {};
+      processedPhotos.forEach((photo) => {
+        if (photo.duplicateGroupId) {
+          if (!groupsMap[photo.duplicateGroupId]) {
+            groupsMap[photo.duplicateGroupId] = [];
+          }
+          groupsMap[photo.duplicateGroupId].push(photo.id);
+        }
+      });
+      const oldSimilarGroupsMock: SimilarGroup[] = Object.entries(groupsMap).map(([groupId, photoIds]) => {
+        const groupPhotos = processedPhotos.filter(p => photoIds.includes(p.id));
+        const recommendedLeader = groupPhotos.find(p => p.duplicateRecommendation === 'keep') || groupPhotos[0];
+        const leaderId = recommendedLeader ? recommendedLeader.id : photoIds[0];
+        return {
+          id: groupId,
+          photoIds,
+          recommendedPhotoIds: [leaderId],
+          backupPhotoIds: photoIds.filter(id => id !== leaderId),
+          cullCandidateIds: [],
+          undecidedPhotoIds: photoIds,
+          battleCompleted: false,
+          battleUpdatedAt: 0
+        };
+      });
+
+      // =========================================================================
+      // QA-ONLY COMPATIBILITY SHAPE & LOCAL QA DATA WARNING:
+      // - newSimilarGroupsForQA is strictly a local variable for regression testing.
+      // - DO NOT write this to similarGroups state, activeBattle, or return it to UI.
+      // - It must never drive or influence the real user workflows or ZIP export.
+      // =========================================================================
+      const newSimilarGroupsForQA = buildSimilarGroupsFromSignals(newResult);
+
+      const comparison = compareOldAndNewDuplicates(
+        processedPhotos,
+        newResult,
+        oldSimilarGroupsOverride || oldSimilarGroupsMock,
+        newSimilarGroupsForQA
+      );
+
+      setDuplicateGroupQA({
+        oldSimilarGroupsForQA: oldSimilarGroupsOverride || oldSimilarGroupsMock,
+        newSimilarGroupsForQA,
+        comparison
+      });
+
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Duplicate SimilarGroups QA]', {
+          oldSimilarGroupCount: comparison.oldSimilarGroupCount,
+          newSimilarGroupCount: comparison.newSimilarGroupCount,
+          oldSimilarGroupedPhotoCount: comparison.oldSimilarGroupedPhotoCount,
+          newSimilarGroupedPhotoCount: comparison.newSimilarGroupedPhotoCount,
+          leaderMismatchCount: comparison.leaderMismatchCount,
+          similarGroupCountMismatch: comparison.similarGroupCountMismatch,
+          similarGroupedPhotoCountMismatch: comparison.similarGroupedPhotoCountMismatch
+        });
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[Duplicate Signal QA Error]', err);
+      }
+    }
+  };
+
   // startAnalysis 运行中保护 Lock
   const isAnalyzingRef = useRef(false);
+
+  // 初始化相似照片分组列表的辅助方法
+  const initializeSimilarGroups = (photosList: PhotoItem[]) => {
+    if (canUseSignalGroupsForBattle) {
+      // 灰度分支：使用客观相似检测信号生成的 newSimilarGroupsForQA 覆盖 similarGroups 状态，驱动 PK
+      const signalInputs = photosList.map(photo => ({
+        id: photo.id,
+        perceptualHash: photo.perceptualHash,
+        sharpnessScore: photo.sharpnessScore,
+        qualityScore: photo.score
+      }));
+      const newResult = buildDuplicateSignals(signalInputs);
+      const signalGroups = buildSimilarGroupsFromSignals(newResult);
+      setSimilarGroups(signalGroups as unknown as SimilarGroup[]);
+    } else {
+      // 稳定分支：继续使用 legacy 相似组逻辑来初始化和驱动
+      const groupsMap: { [groupId: string]: string[] } = {};
+      photosList.forEach((photo) => {
+        if (photo.duplicateGroupId) {
+          if (!groupsMap[photo.duplicateGroupId]) {
+            groupsMap[photo.duplicateGroupId] = [];
+          }
+          groupsMap[photo.duplicateGroupId].push(photo.id);
+        }
+      });
+
+      const newGroups: SimilarGroup[] = Object.entries(groupsMap).map(([groupId, photoIds]) => {
+        const groupPhotos = photosList.filter(p => photoIds.includes(p.id));
+        const recommendedLeader = groupPhotos.find(p => p.duplicateRecommendation === 'keep') || groupPhotos[0];
+        const leaderId = recommendedLeader ? recommendedLeader.id : photoIds[0];
+
+        return {
+          id: groupId,
+          photoIds,
+          recommendedPhotoIds: [leaderId],
+          backupPhotoIds: photoIds.filter(id => id !== leaderId),
+          cullCandidateIds: [],
+          undecidedPhotoIds: photoIds,
+          battleCompleted: false,
+          battleUpdatedAt: Date.now()
+        };
+      });
+
+      setSimilarGroups(newGroups);
+    }
+  };
+
+  const startBattleForGroup = (groupId: string) => {
+    const group = similarGroups.find(g => g.id === groupId);
+    if (!group) return;
+
+    const groupPhotos = photos.filter(p => group.photoIds.includes(p.id));
+    if (groupPhotos.length <= 1) return;
+
+    const sortedPhotos = [...groupPhotos].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.sharpnessScore !== a.sharpnessScore) return b.sharpnessScore - a.sharpnessScore;
+      return a.id.localeCompare(b.id);
+    });
+
+    const initialCandidateId = sortedPhotos[0].id;
+    const contenderIds = sortedPhotos.slice(1).map(p => p.id);
+
+    setActiveBattle({
+      groupId,
+      photoIds: group.photoIds,
+      contenderIds,
+      currentCandidateId: initialCandidateId,
+      nextIndex: 0,
+      roundIndex: 1,
+      totalRounds: contenderIds.length,
+      decisions: [],
+      recommendedKeepIds: [],
+      similarBackupIds: [],
+      cullCandidateIds: [],
+      undecidedIds: [...group.photoIds]
+    });
+  };
+
+  const applyBattleDecision = (decisionType: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => {
+    if (!activeBattle) return;
+
+    const leftId = activeBattle.currentCandidateId;
+    const rightId = activeBattle.contenderIds[activeBattle.nextIndex];
+
+    const decision: BattleDecision = {
+      groupId: activeBattle.groupId,
+      leftPhotoId: leftId,
+      rightPhotoId: rightId,
+      decision: decisionType,
+      createdAt: Date.now()
+    };
+
+    let nextCandidateId = activeBattle.currentCandidateId;
+    let nextIndex = activeBattle.nextIndex;
+    let roundIndex = activeBattle.roundIndex;
+
+    const newRecommended = [...activeBattle.recommendedKeepIds];
+    const newBackup = [...activeBattle.similarBackupIds];
+    const newCull = [...activeBattle.cullCandidateIds];
+    const newUndecided = activeBattle.undecidedIds.filter(id => id !== leftId && id !== rightId);
+
+    const leftPhoto = photos.find(p => p.id === leftId);
+    const rightPhoto = photos.find(p => p.id === rightId);
+
+    if (decisionType === 'keep_left') {
+      if (!newRecommended.includes(leftId)) {
+        newRecommended.push(leftId);
+      }
+      if (rightPhoto && rightPhoto.score < 60) {
+        newCull.push(rightId);
+      } else {
+        newBackup.push(rightId);
+      }
+      nextIndex += 1;
+      roundIndex += 1;
+    } else if (decisionType === 'keep_right') {
+      if (!newRecommended.includes(rightId)) {
+        newRecommended.push(rightId);
+      }
+      if (leftPhoto && leftPhoto.score < 60) {
+        newCull.push(leftId);
+      } else {
+        newBackup.push(leftId);
+      }
+      nextCandidateId = rightId;
+      nextIndex += 1;
+      roundIndex += 1;
+    } else if (decisionType === 'keep_both') {
+      if (!newRecommended.includes(leftId)) newRecommended.push(leftId);
+      if (!newRecommended.includes(rightId)) newRecommended.push(rightId);
+      nextIndex += 1;
+      roundIndex += 1;
+    } else if (decisionType === 'cull_both') {
+      newCull.push(leftId);
+      newCull.push(rightId);
+      if (nextIndex + 1 < activeBattle.contenderIds.length) {
+        nextCandidateId = activeBattle.contenderIds[nextIndex + 1];
+        nextIndex += 2;
+      } else {
+        nextIndex += 1;
+      }
+      roundIndex += 1;
+    } else if (decisionType === 'skip') {
+      if (!newUndecided.includes(leftId)) newUndecided.push(leftId);
+      if (!newUndecided.includes(rightId)) newUndecided.push(rightId);
+      nextIndex += 1;
+      roundIndex += 1;
+    }
+
+    const isCompleted = nextIndex >= activeBattle.contenderIds.length;
+
+    if (isCompleted) {
+      if (nextCandidateId && !newCull.includes(nextCandidateId) && !newBackup.includes(nextCandidateId) && !newRecommended.includes(nextCandidateId)) {
+        newRecommended.push(nextCandidateId);
+      }
+
+      const finalState = {
+        ...activeBattle,
+        currentCandidateId: nextCandidateId,
+        nextIndex,
+        roundIndex: activeBattle.totalRounds,
+        recommendedKeepIds: newRecommended,
+        similarBackupIds: newBackup,
+        cullCandidateIds: newCull,
+        undecidedIds: newUndecided.filter(id => !newRecommended.includes(id) && !newBackup.includes(id) && !newCull.includes(id)),
+        decisions: [...activeBattle.decisions, decision]
+      };
+
+      setActiveBattle(finalState);
+      completeBattleForGroupInternal(activeBattle.groupId, finalState);
+    } else {
+      setActiveBattle({
+        ...activeBattle,
+        currentCandidateId: nextCandidateId,
+        nextIndex,
+        roundIndex: Math.min(activeBattle.totalRounds, roundIndex),
+        recommendedKeepIds: newRecommended,
+        similarBackupIds: newBackup,
+        cullCandidateIds: newCull,
+        undecidedIds: newUndecided,
+        decisions: [...activeBattle.decisions, decision]
+      });
+    }
+  };
+
+  const completeBattleForGroupInternal = (groupId: string, finalState: ActiveBattleState) => {
+    setSimilarGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        return {
+          ...g,
+          recommendedPhotoIds: finalState.recommendedKeepIds,
+          backupPhotoIds: finalState.similarBackupIds,
+          cullCandidateIds: finalState.cullCandidateIds,
+          undecidedPhotoIds: finalState.undecidedIds,
+          battleCompleted: true,
+          battleUpdatedAt: Date.now()
+        };
+      }
+      return g;
+    }));
+
+    setPhotos(prev => prev.map(photo => {
+      if (photo.duplicateGroupId === groupId) {
+        let nextStatus = photo.status;
+        let reasonLabel = photo.reasonLabel || '未发现明显技术问题';
+        let displayLabel = photo.displayLabel || '技术风险低';
+
+        if (finalState.recommendedKeepIds.includes(photo.id)) {
+          nextStatus = 'keep';
+          reasonLabel = '属于相似照片组，已通过对比筛选建议保留';
+          displayLabel = '技术风险低';
+        } else if (finalState.similarBackupIds.includes(photo.id)) {
+          nextStatus = 'review';
+          reasonLabel = '属于相似照片组，对比筛选备选';
+          displayLabel = '建议复核';
+        } else if (finalState.cullCandidateIds.includes(photo.id)) {
+          nextStatus = 'delete';
+          reasonLabel = '属于相似照片组，已在对比筛选中淘汰';
+          displayLabel = '淘汰候选';
+        }
+
+        return {
+          ...photo,
+          status: nextStatus,
+          suggestedStatus: nextStatus,
+          reasonLabel,
+          displayLabel
+        };
+      }
+      return photo;
+    }));
+  };
+
+  const resetBattleForGroup = (groupId: string) => {
+    setSimilarGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        const groupPhotos = photos.filter(p => g.photoIds.includes(p.id));
+        const sorted = [...groupPhotos].sort((a, b) => b.score - a.score || b.sharpnessScore - a.sharpnessScore || a.id.localeCompare(b.id));
+        const leaderId = sorted[0]?.id || g.photoIds[0];
+
+        return {
+          ...g,
+          recommendedPhotoIds: [leaderId],
+          backupPhotoIds: g.photoIds.filter(id => id !== leaderId),
+          cullCandidateIds: [],
+          undecidedPhotoIds: g.photoIds,
+          battleCompleted: false,
+          battleUpdatedAt: Date.now()
+        };
+      }
+      return g;
+    }));
+
+    setPhotos(prev => {
+      const processed = detectDuplicates(prev);
+      runDuplicateQA(processed);
+      return processed;
+    });
+  };
+
+  const closeBattle = () => {
+    setActiveBattle(null);
+  };
 
   // 辅助函数：安全释放 blob URL
   const revokeBlobUrl = (url: string) => {
@@ -179,6 +755,16 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const uploadFiles = (files: File[]) => {
     // 释放旧的预览 URL 防止泄露
     photos.forEach(p => revokeBlobUrl(p.url));
+
+    // 重置所有分析和 Battle 相关状态
+    setAnalysisProgress(0);
+    setAnalysisLogs([]);
+    setCurrentAnalysisIndex(-1);
+    setCurrentAnalysisName('');
+    setSimilarGroups([]);
+    setActiveBattle(null);
+    setIsAnalyzing(false);
+    isAnalyzingRef.current = false;
 
     if (files.length > 0) {
       const uploadedItems: PhotoItem[] = files.map((file, index) => {
@@ -276,7 +862,14 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
             category,
             sharpnessScore: res.sharpnessScore,
             exposureScore: res.exposureScore,
-            focusStatus: res.focusStatus
+            focusStatus: res.focusStatus,
+            perceptualHash: res.perceptualHash,
+            exposureSeverity: res.exposureSeverity,
+            technicalRiskFlags: res.technicalRiskFlags,
+            confidence: res.confidence,
+            suggestedStatus: res.suggestedStatus,
+            displayLabel: res.displayLabel,
+            reasonLabel: res.reasonLabel
           };
 
           setAnalysisLogs((prev) => [
@@ -327,7 +920,14 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
           category: demoMatch.category,
           sharpnessScore: demoMatch.sharpnessScore,
           exposureScore: demoMatch.exposureScore,
-          focusStatus
+          focusStatus,
+          perceptualHash: demoMatch.perceptualHash,
+          exposureSeverity: demoMatch.exposureSeverity,
+          technicalRiskFlags: demoMatch.technicalRiskFlags,
+          confidence: demoMatch.confidence,
+          suggestedStatus: demoMatch.suggestedStatus,
+          displayLabel: demoMatch.displayLabel,
+          reasonLabel: demoMatch.reasonLabel
         };
 
         setAnalysisLogs((prev) => [
@@ -340,7 +940,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     }
 
     setAnalysisLogs((prev) => [...prev, '✅ 智能物理整理已完成，正在生成诊断报表...']);
-    setPhotos(updatedPhotos);
+    const finalPhotos = detectDuplicates(updatedPhotos);
+    setPhotos(finalPhotos);
+    runDuplicateQA(finalPhotos);
+    initializeSimilarGroups(finalPhotos);
 
     // 延时跳转，提供更好的交互感知
     setTimeout(() => {
@@ -357,7 +960,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         if (p.id === id) {
           // 如果是 keep 标为 delete，如果是 delete 标为 keep，如果是 review 标为 keep
           const nextStatus: 'keep' | 'review' | 'delete' = p.status === 'keep' ? 'delete' : 'keep';
-          return { ...p, status: nextStatus };
+          return { ...p, status: nextStatus, userDecision: nextStatus };
         }
         return p;
       })
@@ -367,14 +970,14 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   // 单张照片状态手动订正
   const updatePhotoStatus = (id: string, status: 'keep' | 'review' | 'delete') => {
     setPhotos((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status } : p))
+      prev.map((p) => (p.id === id ? { ...p, status, userDecision: status } : p))
     );
   };
 
   // 多张照片状态批量手动订正
   const updateMultiplePhotosStatus = (ids: string[], status: 'keep' | 'review' | 'delete') => {
     setPhotos((prev) =>
-      prev.map((p) => (ids.includes(p.id) ? { ...p, status } : p))
+      prev.map((p) => (ids.includes(p.id) ? { ...p, status, userDecision: status } : p))
     );
   };
 
@@ -402,6 +1005,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const resetWorkspace = () => {
     photos.forEach(p => revokeBlobUrl(p.url));
     setPhotos([]);
+    setSimilarGroups([]);
+    setActiveBattle(null);
     setIsAnalyzing(false);
     isAnalyzingRef.current = false;
     setAnalysisProgress(0);
@@ -413,7 +1018,21 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   // 载入演示图片数据包
   const loadDemoPhotos = () => {
     photos.forEach(p => revokeBlobUrl(p.url));
-    setPhotos(MOCK_TRAVEL_PHOTOS);
+
+    // 重置所有分析和 Battle 相关状态
+    setAnalysisProgress(0);
+    setAnalysisLogs([]);
+    setCurrentAnalysisIndex(-1);
+    setCurrentAnalysisName('');
+    setSimilarGroups([]);
+    setActiveBattle(null);
+    setIsAnalyzing(false);
+    isAnalyzingRef.current = false;
+
+    const processed = detectDuplicates(MOCK_TRAVEL_PHOTOS);
+    setPhotos(processed);
+    runDuplicateQA(processed);
+    initializeSimilarGroups(processed);
   };
 
   return (
@@ -435,7 +1054,21 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         deletePhoto,
         deleteSuggestedPhotos,
         resetWorkspace,
-        loadDemoPhotos
+        loadDemoPhotos,
+        similarGroups,
+        activeBattle,
+        startBattleForGroup,
+        applyBattleDecision,
+        resetBattleForGroup,
+        closeBattle,
+        duplicateSignalResult,
+        // =========================================================================
+        // CRITICAL DEV-ONLY QA WARNING:
+        // - duplicateGroupQA is strictly a Dev-only QA field for regression testing.
+        // - DO NOT under any circumstances use this field to drive UI, Results page,
+        //   Photo Battle flow, ZIP export, or user-visible decisions.
+        // =========================================================================
+        duplicateGroupQA
       }}
     >
       {children}
