@@ -248,3 +248,11 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 ### 20. `CORE-DUPLICATE-6` (开发环境灰度接入 - 当前已完成)
 - 在 Context 中正式读取了 Feature Flag，并加上了 canUseSignalGroupsForBattle 物理限流保护。
 - **状态约束**：当前 false 分支必须继续保持稳定主流程。因为开关默认值为 `false`，所以最终用户的整理流程、A/B 擂台以及 ZIP 导出数据流 100% 保持原有遗留逻辑不变。用户最终分类依然只收敛为“保留”与“淘汰候选”两类。
+
+### 21. `CORE-DUPLICATE-7-PLANNING` (true 分支本地测试规划 - 当前已完成)
+- 新建了 `duplicate_true_branch_test_plan.md` 本地灰度测试方案。
+- **状态与主流程约束**：下一阶段为 true 分支本地测试规划，不改变当前正式主流程。用户的最终分类在任何时候依然只收敛为“保留”与“淘汰候选”两类。
+
+### 22. `CORE-DUPLICATE-7` (本地灰度开发调试 - 当前已完成)
+- 经在本地开发环境临时开启开关，Demo 流程与双路算法校验 100% 对齐一致，流转测试完全通过。测试结束后开关已归位恢复为 `false`。
+- **状态与主流程约束**：当前正式主流程依然保持为 legacy 方案，以确保安全稳定。下一步工作流建议是推进 20-50 张非隐私本地图片 true 分支测试与新信号类型适配开发（`CORE-DUPLICATE-8-PLANNING`）。最终的用户可见分类依然保持二值化收敛为“保留”与“淘汰候选”。

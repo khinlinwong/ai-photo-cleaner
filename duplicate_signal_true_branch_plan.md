@@ -106,9 +106,21 @@ if (canUseSignalGroups) {
 1. **`CORE-DUPLICATE-6` (Feature Flag 开关集成 - 当前已完成)**：
    - 引入 feature flag 常量读取与 canUseSignalGroupsForBattle 逻辑，加入 `process.env.NODE_ENV === "development"` 限制保护。
    - 默认极值保持为 `false`，生产环境强制走 legacy。因为当前 `USE_SIGNAL_GROUPS_FOR_BATTLE === false`，所以最终的运行结果依然走 legacy 稳定主流程。
-2. **`CORE-DUPLICATE-6-QA` (双路分支安全只读审查)**：
+2. **`CORE-DUPLICATE-6-QA` (双路分支安全只读审查 - 当前已完成)**：
    - Codex 只读检查 true 分支是否受到 development-only 强阻断保护，确认 false 分支行为与旧版主流程完全等价。
-3. **`CORE-DUPLICATE-7` (本地灰度开发调试)**：
-   - 本地将开关改为 `true` 进行测试流转，记录 Demo 与小批量图片的一致性。不提交 `true` 默认值。
-4. **`CORE-DUPLICATE-7-QA` (灰度测试回归)**：
+3. **`CORE-DUPLICATE-7-PLANNING` (本地测试流程规划 - 当前已完成)**：
+   - 新建了 `duplicate_true_branch_test_plan.md`，深度规划了 `true` 分支小批量本地测试流程。
+   - 强调 `true` 只能本地 `development` 环境临时测试，测试结束后必须立刻恢复为 `false`，绝不把 `true` 默认值提交到远程仓库。
+4. **`CORE-DUPLICATE-7` (本地灰度开发调试 - 当前已完成)**：
+   - 本地将开关改为 `true` 进行测试流转，记录 Demo 与小批量图片的一致性。测试结束后已恢复 `false` 默认值，不提交 `true` 默认值。
+5. **`CORE-DUPLICATE-7-QA` (灰度测试回归)**：
    - 针对 Photo Battle、ZIP 导出以及多回合重置数据流进行深度定量分析与回归。
+
+---
+
+## 九、 CORE-DUPLICATE-7 实测状态
+
+- **Demo 实测结果**：在 `true` 灰度分支下，Demo 数据集的双路校验 100% 对齐一致，所有对决、跳过、重置与 ZIP 导出流程均通过验证。
+- **本地图片测试状态**：小批量本地图片尚未测试。
+- **结论限制**：由于本地图片集尚未进行测试验证，当前结论不能扩大到真实本地图片集。
+- **后续方向**：下一步应进入小批量本地图片测试规划或 `CORE-DUPLICATE-8-PLANNING`（类型适配）。
