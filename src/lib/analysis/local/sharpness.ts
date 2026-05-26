@@ -1,3 +1,5 @@
+import { calculateDHashFromGray } from './duplicate';
+
 export interface LocalSharpnessMetrics {
   avgWeightedSobel: number;
   avgWeightedSobel2: number;
@@ -16,6 +18,7 @@ export interface LocalSharpnessMetrics {
   weightedSobelCenterSum: number;
   totalWeightBorder: number;
   weightedSobelBorderSum: number;
+  perceptualHash: string;
 }
 
 /**
@@ -184,6 +187,8 @@ export function analyzeLocalSharpness(
   }
   const maxAdjacentRatio = totalGradientMagForBins > 0 ? (maxAdjacentSum / totalGradientMagForBins) : 0;
 
+  const perceptualHash = calculateDHashFromGray(gray, canvasWidth, canvasHeight);
+
   return {
     avgWeightedSobel,
     avgWeightedSobel2,
@@ -201,6 +206,7 @@ export function analyzeLocalSharpness(
     totalWeightCenter,
     weightedSobelCenterSum,
     totalWeightBorder,
-    weightedSobelBorderSum
+    weightedSobelBorderSum,
+    perceptualHash
   };
 }

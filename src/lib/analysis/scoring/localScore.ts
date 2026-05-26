@@ -154,67 +154,176 @@ export function calculateLocalScore(
   } else if (focusStatus === 'Insufficient Subject Sharpness') {
     sharpnessScore = Math.min(35, rawSharpness);
   } else if (focusStatus === 'Edge Smear Detected') {
-    sharpnessScore = Math.min(48, rawSharpness);
+    sharpnessScore = Math.max(30, Math.min(48, rawSharpness));
   } else if (focusStatus === 'Not recommended') {
     sharpnessScore = Math.min(39, rawSharpness);
   } else if (focusStatus === 'Soft Focus Detected') {
-    sharpnessScore = Math.max(40, Math.min(59, rawSharpness));
+    sharpnessScore = Math.max(40, Math.min(64, rawSharpness));
   } else if (focusStatus === 'Acceptable / Casual use') {
-    sharpnessScore = Math.max(60, Math.min(84, rawSharpness));
+    sharpnessScore = Math.max(72, Math.min(88, rawSharpness));
   } else if (focusStatus === 'Excellent / Share-ready') {
-    sharpnessScore = Math.max(85, Math.min(100, rawSharpness));
+    sharpnessScore = Math.max(88, Math.min(100, rawSharpness));
   }
 
   sharpnessScore = Math.round(sharpnessScore);
 
-  // 6. 曝光评分
-  const overexposurePenalty = highlightRatio > 0.05 ? (highlightRatio - 0.05) * 200 : 0;
-  const underexposurePenalty = shadowRatio > 0.15 ? (shadowRatio - 0.15) * 150 : 0;
-  const brightnessDeviationPenalty = Math.abs(averageBrightness - 127) * 0.4;
+  // 6. 曝光评分 (分级判定与平滑化)
+  let exposureSeverity: 'none' | 'minor' | 'moderate' | 'severe' = 'none';
+  const devBrightness = Math.abs(averageBrightness - 127);
   
-  let exposureScore = Math.round(
-    Math.max(0, 100 - overexposurePenalty - underexposurePenalty - brightnessDeviationPenalty)
-  );
-
-  if (exposureScore > 90) {
-    exposureScore = 90 + Math.round((exposureScore - 90) * 0.6);
+  if (highlightRatio > 0.22 || shadowRatio > 0.40 || devBrightness > 75) {
+    exposureSeverity = 'severe';
+  } else if (highlightRatio > 0.12 || shadowRatio > 0.25 || devBrightness > 45) {
+    exposureSeverity = 'moderate';
+  } else if (highlightRatio > 0.05 || shadowRatio > 0.15 || devBrightness > 20) {
+    exposureSeverity = 'minor';
+  }
+  
+  let exposureScore = 100;
+  if (exposureSeverity === 'minor') {
+    // 轻微偏差，小幅扣分，评分限制在 85 到 95 之间
+    const p1 = (highlightRatio > 0.05 ? (highlightRatio - 0.05) * 50 : 0);
+    const p2 = (shadowRatio > 0.15 ? (shadowRatio - 0.15) * 40 : 0);
+    const p3 = devBrightness * 0.15;
+    exposureScore = Math.round(100 - p1 - p2 - p3);
+    exposureScore = Math.max(85, Math.min(95, exposureScore));
+  } else if (exposureSeverity === 'moderate') {
+    // 中度偏差，扣除 15 到 30 分，评分限制在 70 到 84 之间
+    const p1 = (highlightRatio - 0.12) * 80;
+    const p2 = (shadowRatio - 0.25) * 60;
+    const p3 = (devBrightness - 45) * 0.3;
+    exposureScore = Math.round(84 - p1 - p2 - p3);
+    exposureScore = Math.max(70, Math.min(84, exposureScore));
+  } else if (exposureSeverity === 'severe') {
+    // 严重曝光偏差，进行大额扣分，评分限制在 10 到 69 之间
+    const p1 = (highlightRatio - 0.22) * 150;
+    const p2 = (shadowRatio - 0.40) * 120;
+    const p3 = (devBrightness - 75) * 0.5;
+    exposureScore = Math.round(60 - p1 - p2 - p3);
+    exposureScore = Math.max(10, Math.min(69, exposureScore));
+  } else {
+    // 无曝光偏差，评分在 95 到 100 之间
+    exposureScore = Math.round(100 - devBrightness * 0.15);
+    exposureScore = Math.max(95, exposureScore);
   }
 
   // 7. 质量总分 (清晰度 60%, 曝光 40%)
   let qualityScore = Math.round(sharpnessScore * 0.6 + exposureScore * 0.4);
+
+  const isSevereBlur = (
+    focusStatus === 'Directional Blur Detected' ||
+    focusStatus === 'Motion Blur Detected' ||
+    focusStatus === 'Insufficient Subject Sharpness' ||
+    focusStatus === 'Not recommended'
+  );
+  const isSevereExposure = (exposureSeverity === 'severe');
+
+  // 对严重缺陷强制得分上限
+  if (isSevereBlur) {
+    qualityScore = Math.min(45, qualityScore);
+  } else if (isSevereExposure) {
+    qualityScore = Math.min(50, qualityScore);
+  }
+
+  // 压缩 90 分以上的分数
   if (qualityScore > 90) {
     qualityScore = 90 + Math.round((qualityScore - 90) * 0.6);
   }
 
-  // 8. 判定 Issue 与建议状态
-  let issue: 'good' | 'blurry' | 'overexposed' | 'underexposed' | 'needs_review' = 'good';
+  // 7.5 构建本地技术风险信号 (Local Risk Scan Flags)
+  const technicalRiskFlags: ('possible_blur' | 'possible_motion_blur' | 'exposure_risk' | 'low_information' | 'duplicate_candidate' | 'severe_quality_issue')[] = [];
+
+  if (focusStatus === 'Soft Focus Detected' || focusStatus === 'Edge Smear Detected') {
+    technicalRiskFlags.push('possible_blur');
+  }
+
   if (
-    focusStatus === 'Not recommended' ||
     focusStatus === 'Directional Blur Detected' ||
     focusStatus === 'Motion Blur Detected' ||
     focusStatus === 'Insufficient Subject Sharpness'
   ) {
-    issue = 'blurry';
-  } else if (highlightRatio > 0.15) {
-    issue = 'overexposed';
-  } else if (shadowRatio > 0.35) {
-    issue = 'underexposed';
-  } else if (
-    focusStatus === 'Soft Focus Detected' ||
-    focusStatus === 'Edge Smear Detected' ||
-    focusStatus === 'Acceptable / Casual use' ||
-    highlightRatio > 0.08 ||
-    shadowRatio > 0.25 ||
-    exposureScore < 60
-  ) {
-    issue = 'needs_review';
+    technicalRiskFlags.push('possible_motion_blur');
   }
 
+  if (exposureSeverity === 'minor' || exposureSeverity === 'moderate' || exposureSeverity === 'severe') {
+    technicalRiskFlags.push('exposure_risk');
+  }
+
+  if (focusStatus === 'Not recommended') {
+    technicalRiskFlags.push('low_information');
+  }
+
+  if (isSevereBlur || isSevereExposure || qualityScore < 50) {
+    technicalRiskFlags.push('severe_quality_issue');
+  }
+
+  // 决定信心度 (Confidence)
+  let confidence: 'high' | 'medium' | 'low' = 'high';
+  if (technicalRiskFlags.length === 0) {
+    confidence = 'high';
+  } else if (technicalRiskFlags.length === 1) {
+    confidence = 'medium';
+  } else {
+    confidence = 'low';
+  }
+
+  // 8. 判定状态 status (与 suggestedStatus 同步)
+  // Delete / 淘汰候选必须满足以下严重问题之一：
+  // 1. 严重模糊 (isSevereBlur)
+  // 2. 严重曝光损坏 (isSevereExposure)
+  // 3. 极低质量得分 (qualityScore < 50)
   let status: 'keep' | 'review' | 'delete' = 'keep';
-  if (issue === 'blurry' || issue === 'overexposed' || issue === 'underexposed') {
+  if (isSevereBlur || isSevereExposure || qualityScore < 50) {
     status = 'delete';
-  } else if (issue === 'needs_review') {
+  } else if (
+    qualityScore < 75 ||
+    focusStatus === 'Soft Focus Detected' ||
+    focusStatus === 'Edge Smear Detected' ||
+    exposureSeverity === 'moderate' ||
+    technicalRiskFlags.length >= 2
+  ) {
     status = 'review';
+  } else {
+    status = 'keep';
+  }
+
+  const suggestedStatus = status;
+
+  // 决定展示标签与温和原因文案
+  let displayLabel: '技术风险低' | '建议复核' | '淘汰候选' = '技术风险低';
+  if (status === 'delete') {
+    displayLabel = '淘汰候选';
+  } else if (status === 'review') {
+    displayLabel = '建议复核';
+  } else {
+    displayLabel = '技术风险低';
+  }
+
+  let reasonLabel = '未发现明显技术问题';
+  if (status === 'delete') {
+    reasonLabel = '检测到明显技术风险，建议淘汰候选';
+  } else if (status === 'review') {
+    if (focusStatus === 'Soft Focus Detected' || focusStatus === 'Edge Smear Detected') {
+      reasonLabel = '可能存在轻微模糊';
+    } else if (exposureSeverity === 'moderate' || exposureSeverity === 'minor') {
+      reasonLabel = '可能存在曝光风险';
+    } else if (technicalRiskFlags.length >= 2) {
+      reasonLabel = '检测到多项轻微技术偏差，建议复核';
+    } else {
+      reasonLabel = '建议复核';
+    }
+  }
+
+  // 9. 判定 Issue 级别 (对应 badge 渲染)
+  let issue: 'good' | 'blurry' | 'overexposed' | 'underexposed' | 'needs_review' = 'good';
+  if (isSevereBlur) {
+    issue = 'blurry';
+  } else if (isSevereExposure) {
+    issue = (highlightRatio > shadowRatio) ? 'overexposed' : 'underexposed';
+  } else if (status === 'review') {
+    issue = 'needs_review';
+  } else {
+    issue = 'good';
   }
 
   return {
@@ -228,6 +337,13 @@ export function calculateLocalScore(
     qualityScore,
     issue,
     status,
-    focusStatus
+    focusStatus,
+    perceptualHash: sharpness.perceptualHash,
+    exposureSeverity,
+    technicalRiskFlags,
+    confidence,
+    suggestedStatus,
+    displayLabel,
+    reasonLabel
   };
 }
