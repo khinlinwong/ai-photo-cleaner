@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
 import { usePhotoWorkspace, PhotoItem } from '@/context/PhotoWorkspaceContext';
+import { getUserVisibleBucket, getReasonTags } from '@/lib/utils/photoLabelMapping';
+import DesktopTopBar from '@/components/desktop/DesktopTopBar';
+import DesktopSidebar from '@/components/desktop/DesktopSidebar';
+import DesktopStatusBar from '@/components/desktop/DesktopStatusBar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -20,14 +21,15 @@ import {
   CheckCircle,
   AlertTriangle,
   RotateCcw,
-  Sparkles,
   Sun,
-  Eye,
   Sliders,
   FolderSync,
-  UploadCloud,
   Download,
-  ShieldCheck
+  ShieldCheck,
+  GitCompare,
+  X,
+  Maximize2,
+  FolderOpen
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -36,88 +38,222 @@ import { cn } from "@/lib/utils";
 export default function ResultsPage() {
   const {
     photos,
-    togglePhotoStatus,
     updatePhotoStatus,
-    updateMultiplePhotosStatus,
-    deleteSuggestedPhotos,
     resetWorkspace,
-    loadDemoPhotos
+    loadDemoPhotos,
+    similarGroups,
+    activeBattle,
+    startBattleForGroup,
+    applyBattleDecision,
+    closeBattle
   } = usePhotoWorkspace();
 
   const router = useRouter();
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isZipping, setIsZipping] = useState(false);
 
-  // 切换选项卡时清空选中状态，防止隐藏的图片在批量操作中被误改
+  // 本地相似组弹窗控制机制，防止退出时陷入弹出循环
+  const [dismissedGroups, setDismissedGroups] = useState<string[]>([]);
+
+  // 全局轻量提示
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 左图的缩放与平移状态
+  const [leftScale, setLeftScale] = useState(1);
+  const [leftX, setLeftX] = useState(0);
+  const [leftY, setLeftY] = useState(0);
+  const [isLeftDragging, setIsLeftDragging] = useState(false);
+  const [leftDragStart, setLeftDragStart] = useState({ x: 0, y: 0 });
+
+  // 右图的缩放与平移状态
+  const [rightScale, setRightScale] = useState(1);
+  const [rightX, setRightX] = useState(0);
+  const [rightY, setRightY] = useState(0);
+  const [isRightDragging, setIsRightDragging] = useState(false);
+  const [rightDragStart, setRightDragStart] = useState({ x: 0, y: 0 });
+
+  // 当对比照片组切换或回合递进时，自动重置缩放比例，防跨幅拉伸
   useEffect(() => {
-    setSelectedIds([]);
-  }, [activeTab]);
+    handleResetZoom();
+  }, [activeBattle?.roundIndex, activeBattle?.groupId]);
 
-  // 获取当前活跃 Tab 下的照片列表
-  const getTabPhotos = () => {
-    switch (activeTab) {
-      case 'all': return photos;
-      case 'keep': return photos.filter((p) => p.status === 'keep');
-      case 'review': return photos.filter((p) => p.status === 'review');
-      case 'delete': return photos.filter((p) => p.status === 'delete');
-      default: return [];
+  // A/B 对局弹窗的安全退出控制
+  const handleCloseBattle = useCallback(() => {
+    if (activeBattle) {
+      setDismissedGroups((prev) => [...prev, activeBattle.groupId]);
     }
-  };
+    closeBattle();
+  }, [activeBattle, closeBattle]);
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
+  // 当检测到当前组对比 PK 结束时，自动关闭当前对比，并流转到下一组或展示 Toast
+  useEffect(() => {
+    if (activeBattle) {
+      const isBattleCompleted = activeBattle.nextIndex >= activeBattle.contenderIds.length;
+      if (isBattleCompleted) {
+        const remainingPendingCount = similarGroups.filter(
+          g => g.id !== activeBattle.groupId && !g.battleCompleted
+        ).length;
+        if (remainingPendingCount === 0) {
+          setToastMessage("A/B 对比已完成，结果已更新。");
+          setTimeout(() => {
+            setToastMessage(null);
+          }, 3000);
+        }
+        closeBattle();
+      }
+    }
+  }, [activeBattle, closeBattle, similarGroups]);
 
-  const handleSelectAll = () => {
-    const currentTabPhotos = getTabPhotos();
-    const currentTabIds = currentTabPhotos.map((p) => p.id);
+  // 自动弹出相似照片组 PK 流程（寻找首个 battleCompleted===false 且非忽略组）
+  useEffect(() => {
+    if (activeBattle) return;
+
+    const nextPendingGroup = similarGroups.find(g => !g.battleCompleted);
+    if (nextPendingGroup) {
+      if (dismissedGroups.includes(nextPendingGroup.id)) {
+        return;
+      }
+      startBattleForGroup(nextPendingGroup.id);
+    }
+  }, [similarGroups, activeBattle, dismissedGroups, startBattleForGroup]);
+
+  // 键盘快捷键监听
+  useEffect(() => {
+    if (!activeBattle) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      const key = e.key.toLowerCase();
+      if (key === 'arrowleft') {
+        e.preventDefault();
+        applyBattleDecision('keep_left');
+      } else if (key === 'arrowright') {
+        e.preventDefault();
+        applyBattleDecision('keep_right');
+      } else if (key === 'b') {
+        e.preventDefault();
+        applyBattleDecision('keep_both');
+      } else if (key === 'c') {
+        e.preventDefault();
+        applyBattleDecision('cull_both');
+      } else if (key === 's') {
+        e.preventDefault();
+        applyBattleDecision('skip');
+      } else if (key === 'escape') {
+        e.preventDefault();
+        handleCloseBattle();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeBattle, applyBattleDecision, handleCloseBattle]);
+
+
+  // 鼠标滚轮缩放处理 (1x 到 4x)
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    e.preventDefault();
+    const scaleFactor = 0.15;
+    const delta = e.deltaY < 0 ? scaleFactor : -scaleFactor;
     
-    // 如果当前 Tab 的所有图片都已选中，则取消全选它们；否则全选当前 Tab
-    const isAllSelected = currentTabIds.length > 0 && currentTabIds.every((id) => selectedIds.includes(id));
-    if (isAllSelected) {
-      setSelectedIds((prev) => prev.filter((id) => !currentTabIds.includes(id)));
+    if (side === 'left') {
+      setLeftScale(prev => {
+        const next = Math.min(Math.max(prev + delta, 1), 4);
+        if (next === 1) {
+          setLeftX(0);
+          setLeftY(0);
+        }
+        return next;
+      });
     } else {
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentTabIds])));
+      setRightScale(prev => {
+        const next = Math.min(Math.max(prev + delta, 1), 4);
+        if (next === 1) {
+          setRightX(0);
+          setRightY(0);
+        }
+        return next;
+      });
     }
   };
 
-  const handleClearSelection = () => {
-    setSelectedIds([]);
+  // 鼠标拖拽平移相关处理
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    const scale = side === 'left' ? leftScale : rightScale;
+    if (e.button !== 0 || scale <= 1) return; // 只有左键且已放大才允许拖拽
+    e.preventDefault();
+    
+    if (side === 'left') {
+      setIsLeftDragging(true);
+      setLeftDragStart({ x: e.clientX - leftX, y: e.clientY - leftY });
+    } else {
+      setIsRightDragging(true);
+      setRightDragStart({ x: e.clientX - rightX, y: e.clientY - rightY });
+    }
   };
 
-  const handleBatchStatusChange = (status: 'keep' | 'review' | 'delete') => {
-    if (selectedIds.length === 0) return;
-    updateMultiplePhotosStatus(selectedIds, status);
-    setSelectedIds([]);
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    if (side === 'left') {
+      if (!isLeftDragging) return;
+      setLeftX(e.clientX - leftDragStart.x);
+      setLeftY(e.clientY - leftDragStart.y);
+    } else {
+      if (!isRightDragging) return;
+      setRightX(e.clientX - rightDragStart.x);
+      setRightY(e.clientY - rightDragStart.y);
+    }
   };
 
-  // 纯客户端打包下载精选照片 (JSZip)
-  const downloadKeepPhotosZip = async () => {
-    const keepPhotos = photos.filter((p) => p.status === 'keep');
-    if (keepPhotos.length === 0) return;
+  const handleMouseUpOrLeave = (side: 'left' | 'right') => {
+    if (side === 'left') {
+      setIsLeftDragging(false);
+    } else {
+      setIsRightDragging(false);
+    }
+  };
+
+  const handleResetZoom = () => {
+    setLeftScale(1);
+    setLeftX(0);
+    setLeftY(0);
+    setIsLeftDragging(false);
+
+    setRightScale(1);
+    setRightX(0);
+    setRightY(0);
+    setIsRightDragging(false);
+  };
+
+  // 纯客户端打包下载特定分区照片 (JSZip)
+  const downloadPhotosZip = async (status: 'keep' | 'delete') => {
+    const targetPhotos = photos.filter((p) => {
+      if (status === 'keep') {
+        return getUserVisibleBucket(p) === 'keep';
+      }
+      return getUserVisibleBucket(p) === 'cull';
+    });
+    if (targetPhotos.length === 0) return;
     setIsZipping(true);
     try {
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
 
-      for (let i = 0; i < keepPhotos.length; i++) {
-        const photo = keepPhotos[i];
+      for (let i = 0; i < targetPhotos.length; i++) {
+        const photo = targetPhotos[i];
         if (photo.file) {
           zip.file(photo.name, photo.file);
         } else {
-          // 演示图片没有本地 file 引用时，使用 fetch 进行跨域下载降级
           try {
             const res = await fetch(photo.url);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const blob = await res.blob();
             zip.file(photo.name, blob);
           } catch (e) {
-            console.error('Failed to fetch remote image for ZIP package:', photo.url, e);
+            console.error('Failed to fetch remote image for ZIP:', photo.url, e);
           }
         }
       }
@@ -126,7 +262,7 @@ export default function ResultsPage() {
       const downloadUrl = URL.createObjectURL(zipBlob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `ai-photo-cleaner-keep-${Date.now()}.zip`;
+      link.download = `ai-photo-cleaner-${status === 'keep' ? 'winners' : 'cullCandidates'}-${Date.now()}.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -138,33 +274,34 @@ export default function ResultsPage() {
     }
   };
 
-  // 移除了空数据时自动分析的 useEffect，改为在空状态下由用户点击手动加载 Demo 数据，避免意外路由干扰
 
-  // 计算看板指标
+  // 分类计算照片
   const totalPhotos = photos.length;
-  const keepPhotos = photos.filter((p) => p.status === 'keep');
-  const reviewPhotos = photos.filter((p) => p.status === 'review');
-  const deletePhotos = photos.filter((p) => p.status === 'delete');
-  
+  const keepPhotos = photos.filter((p) => getUserVisibleBucket(p) === 'keep');
+  const deletePhotos = photos.filter((p) => getUserVisibleBucket(p) === 'cull');
+
+  const pendingGroupsCount = similarGroups.filter(g => !g.battleCompleted).length;
+
   const spaceSavedMB = deletePhotos.reduce((acc, p) => {
     const val = parseFloat(p.size);
     return acc + (isNaN(val) ? 0 : val);
   }, 0).toFixed(1);
 
-  const healthScore = totalPhotos > 0 
-    ? Math.round((keepPhotos.length / totalPhotos) * 100) 
-    : 0;
+  const keepSpaceMB = keepPhotos.reduce((acc, p) => {
+    const val = parseFloat(p.size);
+    return acc + (isNaN(val) ? 0 : val);
+  }, 0).toFixed(1);
 
-  // 打开照片详情诊断弹窗
+  // 打开详情诊断弹窗 (非主决策，隐藏入 details折叠 后辅助查看)
   const openDetail = (photo: PhotoItem) => {
     setSelectedPhoto(photo);
     setDialogOpen(true);
   };
 
-  // 重新上传
+  // 重新导入跳转到 /desktop
   const handleRestart = () => {
     resetWorkspace();
-    router.push('/upload');
+    router.push('/desktop');
   };
 
   // 获取问题标签（对应真实的 issue 类型）
@@ -172,42 +309,42 @@ export default function ResultsPage() {
     switch (photo.issue) {
       case 'good':
         return (
-          <Badge className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 gap-1 text-[10px]">
+          <Badge className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 gap-1 text-[10px] shadow-none">
             <CheckCircle className="h-3 w-3" />
             质量良好
           </Badge>
         );
       case 'blurry':
         return (
-          <Badge className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 gap-1 text-[10px]">
+          <Badge className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 gap-1 text-[10px] shadow-none">
             <AlertTriangle className="h-3 w-3" />
             画面模糊
           </Badge>
         );
       case 'overexposed':
         return (
-          <Badge className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 gap-1 text-[10px]">
+          <Badge className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 gap-1 text-[10px] shadow-none">
             <Sun className="h-3 w-3" />
             画面过曝
           </Badge>
         );
       case 'underexposed':
         return (
-          <Badge className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 gap-1 text-[10px]">
+          <Badge className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 gap-1 text-[10px] shadow-none">
             <Sun className="h-3 w-3" />
             画面欠曝
           </Badge>
         );
       case 'needs_review':
         return (
-          <Badge className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 gap-1 text-[10px]">
+          <Badge className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 gap-1 text-[10px] shadow-none">
             <AlertTriangle className="h-3 w-3" />
-            需要复核
+            待处理
           </Badge>
         );
       default:
         return (
-          <Badge className="bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/20 gap-1 text-[10px]">
+          <Badge className="bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/20 gap-1 text-[10px] shadow-none">
             待诊断
           </Badge>
         );
@@ -221,127 +358,98 @@ export default function ResultsPage() {
     return 'text-red-400';
   };
 
-  // 渲染照片卡片
-  const renderPhotoGrid = (items: PhotoItem[]) => {
+  // 状态栏动态联动
+  let statusText = '整理扫描结果';
+  if (photos.length === 0) {
+    statusText = '等待照片导入';
+  } else if (pendingGroupsCount > 0) {
+    statusText = `有 ${pendingGroupsCount} 组相似照片待进行 A/B 裁决`;
+  } else {
+    statusText = `照片已分入保留区与淘汰候选区，安全导出就绪`;
+  }
+
+  // 渲染分区照片列表 (去掉主评分，增加 details 折叠)
+  const renderPartitionGrid = (items: PhotoItem[], partitionType: 'keep' | 'cull') => {
     if (items.length === 0) {
       return (
-        <div className="text-center py-20 bg-slate-900/10 rounded-3xl border border-white/5">
-          <FolderSync className="h-10 w-10 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">该分类下没有照片</p>
+        <div className="text-center py-10 bg-black/10 rounded-lg border border-white/5">
+          <FolderSync className="h-7 w-7 text-[var(--dt-text-soft)] mx-auto mb-2" />
+          <p className="text-[var(--dt-text-soft)] text-xs">
+            {partitionType === 'keep' ? '暂无保留照片' : '暂无淘汰候选照片'}
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(280px,360px))] gap-6 justify-center sm:justify-start">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {items.map((photo) => (
           <Card 
             key={photo.id} 
             className={cn(
-              "w-full max-w-[360px] mx-auto min-w-0 overflow-hidden rounded-2xl glassmorphism group transition-all duration-300 relative",
-              photo.status === 'delete' 
-                ? 'border-red-500/20 hover:border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.05)]' 
-                : photo.status === 'review'
-                ? 'border-yellow-500/20 hover:border-yellow-500/40 shadow-[0_0_20px_rgba(234,179,8,0.05)]'
-                : 'border-white/5 hover:border-indigo-500/20 hover:shadow-[0_0_25px_rgba(99,102,241,0.08)]'
+              "w-full overflow-hidden rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md",
+              getUserVisibleBucket(photo) === 'cull'
+                ? "border-[#B96F68]/30 bg-[#B96F68]/5 hover:border-[#B96F68]/60 hover:bg-[#B96F68]/15" 
+                : "border-white/5 bg-[var(--dt-card-bg)] hover:border-[#6F8FA8]/40 hover:bg-[#6F8FA8]/5"
             )}
           >
-            {/* Image section */}
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-950">
+            {/* Image Section */}
+            <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/20">
               <img
                 src={photo.url}
                 alt={photo.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover"
               />
-
-              {/* Status Badge overlay */}
-              <div className="absolute top-3 left-3 z-10">
+              <div className="absolute top-1.5 left-1.5 z-10 scale-90 origin-top-left">
                 {renderIssueBadge(photo)}
-              </div>
-
-              {/* Checkbox overlay for multi-select (z-20 to be clickable above hover overlay) */}
-              <div 
-                className={cn(
-                  "absolute top-3 right-3 z-20 h-5 w-5 rounded-full border flex items-center justify-center cursor-pointer transition-all duration-200",
-                  selectedIds.includes(photo.id)
-                    ? "bg-indigo-600 border-indigo-500 text-white"
-                    : "bg-slate-950/80 border-white/20 opacity-0 group-hover:opacity-100 hover:border-white/40",
-                  selectedIds.length > 0 ? "opacity-100" : ""
-                )}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  toggleSelect(photo.id);
-                }}
-              >
-                {selectedIds.includes(photo.id) && (
-                  <svg className="h-3 w-3 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
               </div>
 
             </div>
 
-            {/* Photo metadata and controls flattened for direct interaction */}
-            <CardContent className="p-4 flex flex-col gap-3">
-              {/* Row 1: Name & Score */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="max-w-[70%]">
-                  <p className="text-xs font-bold text-white truncate" title={photo.name}>{photo.name}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">{photo.size} • {photo.resolution}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[9px] text-slate-500 uppercase tracking-wider">质量得分</p>
-                  <p className={`text-lg font-extrabold font-mono leading-none mt-0.5 ${getScoreColor(photo.score)}`}>
-                    {photo.score}
-                  </p>
-                </div>
+            {/* Info details */}
+            <CardContent className="p-2.5 flex flex-col gap-1.5 text-left">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[11px] font-bold text-[var(--dt-text-primary)] truncate flex-1" title={photo.name}>{photo.name}</p>
+                <span className="text-[8px] text-[var(--dt-text-soft)] shrink-0 font-mono">{photo.size}</span>
               </div>
 
-              {/* Row 2: Status & Recommendation Reason */}
-              <div className="flex items-center justify-between text-[10px] border-t border-white/5 pt-2 text-slate-300">
-                <span className="flex items-center gap-1 font-semibold shrink-0">
-                  {photo.status === 'keep' && <span className="text-emerald-400">🟢 建议保留</span>}
-                  {photo.status === 'review' && <span className="text-yellow-400">🟡 需要复核</span>}
-                  {photo.status === 'delete' && <span className="text-red-400">🔴 建议删除</span>}
-                </span>
-                <span className="text-slate-400 truncate max-w-[60%] select-none">
-                  原因: {photo.issue === 'good' ? '画质良好' : photo.issue === 'blurry' ? '画面模糊' : photo.issue === 'overexposed' ? '画面过曝' : photo.issue === 'underexposed' ? '画面欠曝' : '需要复核'}
+              {/* 简单原因标签 */}
+              <div className="flex items-center mt-0.5">
+                <span className="text-[8.5px] text-[var(--dt-text-secondary)] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/5 font-sans leading-none">
+                  {getReasonTags(photo)}
                 </span>
               </div>
 
-              {/* Row 3: Metrics & Diagnostics Button */}
-              <div className="flex items-center justify-between gap-1 border-t border-white/5 pt-2">
-                <div className="flex gap-1">
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-950 border border-white/5 text-slate-400 font-mono">
-                    对焦: {photo.sharpnessScore}
-                  </span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-950 border border-white/5 text-slate-400 font-mono">
-                    曝光: {photo.exposureScore}
-                  </span>
+              {/* 隐藏并折叠分值详情 */}
+              <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-0.5">
+                <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
+                  <span className="text-[8px]">▶</span> 查看技术详情
+                </summary>
+                <div className="pl-2 pt-1 font-mono space-y-0.5 border-l border-white/5 mt-1">
+                  <p>综合质量: {photo.score} / 100</p>
+                  <p>对焦清晰: {photo.sharpnessScore} / 100</p>
+                  <p>曝光得分: {photo.exposureScore} / 100</p>
+                  <div className="pt-1 flex items-center justify-end">
+                    <button 
+                      onClick={() => openDetail(photo)}
+                      className="text-[8px] text-yellow-400 hover:underline flex items-center gap-0.5"
+                    >
+                      <Maximize2 className="h-2 w-2" /> 开启像素诊断仪
+                    </button>
+                  </div>
                 </div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="h-6 px-2 text-[10px] text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-md gap-0.5 font-medium"
-                  onClick={() => openDetail(photo)}
-                >
-                  <Eye className="h-3 w-3" />
-                  像素诊断
-                </Button>
-              </div>
+              </details>
 
-              {/* Row 4: Status Correction Buttons (Substitute for hover mask, highly touch-friendly) */}
-              <div className="grid grid-cols-3 gap-1 mt-1 border-t border-white/5 pt-2.5">
+              {/* Row 4: Status Correction Buttons (Direct interaction) */}
+              <div className="grid grid-cols-2 gap-1 mt-1 border-t border-white/5 pt-1.5">
                 <Button
                   size="sm"
                   variant="outline"
                   className={cn(
-                    "h-7 px-0 text-[10px] flex items-center justify-center gap-1 rounded-md transition-all font-semibold",
-                    photo.status === 'keep' 
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]" 
-                      : "border-white/5 bg-slate-950/40 hover:bg-white/5 text-slate-400 hover:text-white"
+                    "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
+                    getUserVisibleBucket(photo) === 'keep'
+                      ? "bg-[#6FA887] text-white border-0" 
+                      : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
                   )}
                   onClick={() => updatePhotoStatus(photo.id, 'keep')}
                 >
@@ -351,27 +459,14 @@ export default function ResultsPage() {
                   size="sm"
                   variant="outline"
                   className={cn(
-                    "h-7 px-0 text-[10px] flex items-center justify-center gap-1 rounded-md transition-all font-semibold",
-                    photo.status === 'review' 
-                      ? "bg-yellow-600 hover:bg-yellow-700 text-white border-0 shadow-[0_0_10px_rgba(234,179,8,0.2)]" 
-                      : "border-white/5 bg-slate-950/40 hover:bg-white/5 text-slate-400 hover:text-white"
-                  )}
-                  onClick={() => updatePhotoStatus(photo.id, 'review')}
-                >
-                  复核
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={cn(
-                    "h-7 px-0 text-[10px] flex items-center justify-center gap-1 rounded-md transition-all font-semibold",
-                    photo.status === 'delete' 
-                      ? "bg-red-600 hover:bg-red-700 text-white border-0 shadow-[0_0_10px_rgba(239,68,68,0.2)]" 
-                      : "border-white/5 bg-slate-950/40 hover:bg-white/5 text-slate-400 hover:text-white"
+                    "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
+                    getUserVisibleBucket(photo) === 'cull'
+                      ? "bg-[#B96F68] text-white border-0" 
+                      : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
                   )}
                   onClick={() => updatePhotoStatus(photo.id, 'delete')}
                 >
-                  删除
+                  淘汰候选
                 </Button>
               </div>
             </CardContent>
@@ -382,459 +477,748 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen relative overflow-hidden bg-grid-pattern">
-      <div className="bg-grid-glow" />
-      <Header />
+    <div className="desktop-root">
+      {/* Toast 提示栏 */}
+      {toastMessage && (
+        <div className="fixed top-12 right-6 z-50 bg-[#12161A]/95 border border-emerald-500/30 text-emerald-400 text-xs px-4 py-2.5 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-2 animate-fade-in backdrop-blur-md">
+          <CheckCircle className="h-4 w-4" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+      <div className="desktop-window">
+        {/* Top Window Bar */}
+        <DesktopTopBar currentPhase="整理" />
 
-      <main className="flex-grow max-w-7xl mx-auto px-6 py-8 relative z-10 w-full">
-        
-        {totalPhotos === 0 ? (
-          <div className="max-w-3xl mx-auto py-12">
-            <Card className="glassmorphism-premium p-8 rounded-3xl text-center relative overflow-hidden">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
-              
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mb-6">
-                <AlertTriangle className="h-6 w-6" />
-              </div>
-              
-              <h2 className="text-2xl font-bold text-white mb-2">未检测到已导入的照片</h2>
-              <p className="text-slate-400 text-sm max-w-md mx-auto mb-8 leading-relaxed">
-                您的工作台当前是空的。请先前往上传页添加照片，或者直接加载系统预设的旅行测试包以体验 AI 本地分析功能。
-              </p>
-              
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button 
-                  onClick={handleRestart}
-                  variant="outline" 
-                  className="w-full sm:w-auto border-white/10 bg-slate-900/40 hover:bg-slate-900/80 text-white"
-                >
-                  <UploadCloud className="mr-2 h-4 w-4" />
-                  前往上传照片
-                </Button>
-                <Button 
-                  onClick={loadDemoPhotos}
-                  className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold border-0"
-                >
-                  <FolderSync className="mr-2 h-4 w-4" />
-                  查看演示数据
-                </Button>
-              </div>
-            </Card>
-          </div>
-        ) : (
-          <>
-            {/* Results Dashboard Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              
-              {/* Main Hero Stat */}
-              <Card className="glassmorphism p-6 rounded-2xl md:col-span-2 flex flex-col justify-between bg-gradient-to-br from-indigo-950/15 via-slate-900/10 to-slate-950/10 border-indigo-500/10">
-                <div>
-                  <span className="text-xs text-indigo-300 font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-                    AI 整理报告已生成
-                  </span>
-                  <h2 className="text-2xl font-bold text-white mt-2">一键优化图库内存</h2>
-                  <p className="text-xs text-slate-400 mt-1">AI 帮您检测出了 {deletePhotos.length} 张低画质或异常曝光的相片。</p>
-                </div>
-                
-                <div>
-                  <div className="flex flex-wrap gap-3 mt-6">
-                    {deletePhotos.length > 0 && (
-                      <Button 
-                        onClick={deleteSuggestedPhotos}
-                        className="bg-red-500 hover:bg-red-600 text-white font-semibold text-xs py-5 px-5 shadow-lg shadow-red-500/25"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        一键删除所有废片 ({spaceSavedMB} MB)
-                      </Button>
-                    )}
-                    
-                    <Button
-                      onClick={downloadKeepPhotosZip}
-                      disabled={keepPhotos.length === 0 || isZipping}
-                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs py-5 px-5 shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                    >
-                      <Download className="h-4 w-4" />
-                      {isZipping 
-                        ? '正在打包 ZIP...' 
-                        : keepPhotos.length === 0 
-                        ? '暂无保留照片可供下载' 
-                        : `下载精选照片 ZIP (${keepPhotos.length} 张)`}
-                    </Button>
+        {/* Main Workspace Area */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Sidebar Navigation */}
+          <DesktopSidebar activeId="review" />
 
-                    <Button 
+          {/* Right Workstation Content */}
+          <div className="flex-1 flex flex-col overflow-hidden relative">
+            <main className="flex-1 overflow-y-auto p-5 bg-[var(--dt-workspace-bg)] pb-24">
+              
+              {totalPhotos === 0 ? (
+                <div className="max-w-xl mx-auto py-16 text-center select-none desktop-panel p-8">
+                  <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 mb-3">
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  
+                  <h2 className="text-sm font-bold text-[var(--dt-text-primary)] mb-1">未检测到已导入的照片</h2>
+                  <p className="text-[var(--dt-text-soft)] text-xs max-w-xs mx-auto mb-5 leading-relaxed">
+                    工作台当前为空。请先返回选择本地照片文件夹以开始分析，或载入预设演示项目。
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <button 
                       onClick={handleRestart}
-                      variant="outline" 
-                      className="border-white/10 hover:bg-white/5 text-xs text-slate-300 py-5"
+                      className="desktop-button-secondary text-xs h-8"
                     >
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      重新导入
-                    </Button>
-                  </div>
-                  
-                  <p className="text-[10px] text-slate-500 mt-4 flex items-center gap-1 select-none">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                    下载 ZIP 也在浏览器本地完成，照片不会上传到服务器。
-                  </p>
-                  
-                  {/* Free Local Analysis Mode Disclaimer */}
-                  <div className="mt-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 text-[10px] text-indigo-300 leading-relaxed max-w-2xl">
-                    💡 <strong>免费本地分析说明：</strong> 当前为本地快速分析模式，分析逻辑完全运行在您浏览器的沙盒内，复杂场景下可能存在一定偏差。未来 <strong>AI Vision Pro</strong> 会员版将提供更精准的画面主体识别、手抖细节诊断与美学价值筛选。
-                  </div>
-                </div>
-              </Card>
-
-              {/* Stat Box 1 */}
-              <Card className="glassmorphism p-6 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">建议清退空间</p>
-                  <p className="text-4xl font-extrabold text-red-400 font-mono mt-2">{spaceSavedMB} <span className="text-sm font-normal">MB</span></p>
-                </div>
-                <p className="text-[10px] text-slate-400">一键清空可为您拯救的相机/手机存储空间量</p>
-              </Card>
-
-              {/* Stat Box 2 */}
-              <Card className="glassmorphism p-6 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">相册健康率</p>
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <p className="text-4xl font-extrabold text-emerald-400 font-mono">{healthScore}%</p>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Progress value={healthScore} className="h-1.5 bg-slate-950 rounded-full" />
-                  <p className="text-[9px] text-slate-500 flex justify-between">
-                    <span>保留/复核: {keepPhotos.length + reviewPhotos.length}</span>
-                    <span>建议删除: {deletePhotos.length}</span>
-                  </p>
-                </div>
-              </Card>
-            </div>
-
-            {/* AI Vision Pro Promotion Banner Card */}
-            <Card className="glassmorphism-premium border-indigo-500/20 bg-gradient-to-r from-indigo-950/20 via-violet-950/15 to-slate-900/40 p-5 rounded-2xl mb-8 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
-              <div className="space-y-1.5 z-10">
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider select-none">
-                  <Sparkles className="h-3 w-3" />
-                  AI Vision Pro (即将推出)
-                </span>
-                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                  解锁专业级云端美学与主体对焦分析
-                </h3>
-                <p className="text-[11px] text-slate-400 max-w-3xl leading-relaxed">
-                  本地算力不够用？AI Vision Pro 将接入云端万亿参数视觉大模型分析，彻底告别单边缘强度的局限，实现更懂人类视觉审美的智能管理。
-                </p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-indigo-300/80 pt-1 font-semibold">
-                  <span className="flex items-center gap-1">✓ 主体识别</span>
-                  <span className="flex items-center gap-1">✓ AI 手抖检测</span>
-                  <span className="flex items-center gap-1">✓ 分享价值分析</span>
-                  <span className="flex items-center gap-1">✓ 人像质量判断</span>
-                  <span className="flex items-center gap-1">✓ AI 审美筛选</span>
-                </div>
-              </div>
-              <Button className="shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs py-4 px-6 rounded-xl border-0 shadow-lg shadow-indigo-500/25 z-10 flex items-center gap-1.5 transition-all">
-                <Sparkles className="h-3.5 w-3.5" />
-                升级 Pro
-              </Button>
-            </Card>
-
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col w-full space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4">
-                <TabsList className="bg-slate-900/60 border border-white/10 p-1 rounded-xl flex flex-wrap sm:flex-nowrap gap-1">
-                  <TabsTrigger value="all" className="rounded-lg text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
-                    全部 ({totalPhotos})
-                  </TabsTrigger>
-                  <TabsTrigger value="keep" className="rounded-lg text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-2 data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-400">
-                    保留 ({keepPhotos.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="review" className="rounded-lg text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-2 data-[state=active]:bg-yellow-500/10 data-[state=active]:text-yellow-400">
-                    复核 ({reviewPhotos.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="delete" className="rounded-lg text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-2 data-[state=active]:bg-red-500/10 data-[state=active]:text-red-400">
-                    删除 ({deletePhotos.length})
-                  </TabsTrigger>
-                </TabsList>
-                
-                <p className="text-xs text-slate-500">
-                  💡 技巧：点击卡片可开启「AI 智能像素诊断仪」，调整保留权重
-                </p>
-              </div>
- 
-              {/* Multi-select Control Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/40 border border-white/5 rounded-xl px-4 py-3">
-                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-                  <span className="text-xs text-slate-400">
-                    已选择 <strong className="text-indigo-400 font-mono">{selectedIds.length}</strong> 张照片
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-white/10 hover:bg-white/5 text-xs h-8"
-                      onClick={handleSelectAll}
+                      <FolderOpen className="mr-1.5 h-3.5 w-3.5 inline text-[var(--dt-text-soft)]" />
+                      返回选择本地文件夹
+                    </button>
+                    <button 
+                      onClick={loadDemoPhotos}
+                      className="desktop-button-primary text-xs h-8"
                     >
-                      {(() => {
-                        const currentTabIds = getTabPhotos().map(p => p.id);
-                        const isAllSelected = currentTabIds.length > 0 && currentTabIds.every(id => selectedIds.includes(id));
-                        return isAllSelected ? "取消全选" : "全选当前分类";
-                      })()}
-                    </Button>
-                    {selectedIds.length > 0 && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-slate-400 hover:text-white text-xs h-8 px-2"
-                        onClick={handleClearSelection}
+                      <FolderSync className="mr-1.5 h-3.5 w-3.5 inline" />
+                      载入 Demo 项目
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  
+                  {/* PK 流程进度条与指示 */}
+                  <div className={cn(
+                    "p-3 rounded-lg border flex items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300",
+                    pendingGroupsCount > 0 
+                      ? "bg-amber-500/5 border-amber-500/10 text-amber-300/95"
+                      : "bg-emerald-500/5 border-emerald-500/10 text-emerald-400/95"
+                  )}>
+                    <div className="flex items-center gap-2">
+                      {pendingGroupsCount > 0 ? (
+                        <>
+                          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                          <span>还有相似照片未完成 A/B 对比，建议先完成筛选以获得最佳整理效果。当前待处理：<strong>{pendingGroupsCount} 组</strong></span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <span>整理完成，没有需要 A/B 对比的相似照片。照片已完全分类，您可以放心且安全地进行打包导出！</span>
+                        </>
+                      )}
+                    </div>
+                    {pendingGroupsCount > 0 && (
+                      <button
+                        onClick={() => {
+                          const group = similarGroups.find(g => !g.battleCompleted);
+                          if (group) startBattleForGroup(group.id);
+                        }}
+                        className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1 rounded text-[10px] flex items-center gap-1 transition-all"
                       >
-                        取消选择
-                      </Button>
+                        <GitCompare className="h-3 w-3" />
+                        继续 A/B 对比
+                      </button>
                     )}
                   </div>
-                </div>
- 
-                {selectedIds.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end border-t border-white/5 pt-3 sm:border-t-0 sm:pt-0">
-                    <span className="text-xs text-slate-500">批量操作:</span>
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-300 text-emerald-400 text-xs h-8"
-                        onClick={() => handleBatchStatusChange('keep')}
-                      >
-                        批量保留
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-yellow-500/20 hover:bg-yellow-500/10 hover:text-yellow-300 text-yellow-400 text-xs h-8"
-                        onClick={() => handleBatchStatusChange('review')}
-                      >
-                        批量复核
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-500/20 hover:bg-red-500/10 hover:text-red-300 text-red-400 text-xs h-8"
-                        onClick={() => handleBatchStatusChange('delete')}
-                      >
-                        批量删除
-                      </Button>
+
+                  {/* Workspace Summary & Secure Export Row */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Left: Secure Export Console with Buckets */}
+                    <div className="lg:col-span-2 p-4 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between space-y-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                          <span className="text-[10px] text-[var(--dt-text-secondary)] font-bold uppercase tracking-wider">
+                            安全导出结果
+                          </span>
+                        </div>
+                        <p className="text-[11.5px] mt-1.5 leading-relaxed font-medium text-amber-400/90">
+                          {pendingGroupsCount > 0 
+                            ? "💡 还有相似照片需要 A/B 对比，建议完成后再导出。" 
+                            : "🟢 整理完成，可以安全导出。"} 
+                          <span className="text-[var(--dt-text-soft)] font-normal">导出只会复制或打包整理结果，不会直接处理原图。</span>
+                        </p>
+                      </div>
+
+                      {/* Two Buckets Columns */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        {/* Bucket 1: Keep */}
+                        <div className="bg-black/15 p-3 rounded-lg border border-white/5 flex flex-col justify-between min-h-[110px]">
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
+                                <span className="text-emerald-400 text-[10px]">🟢</span> 保留区
+                              </span>
+                              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
+                                {keepPhotos.length} 张
+                              </span>
+                            </div>
+                            <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-1.5 leading-relaxed">
+                              准备保留的照片 (共约 {keepSpaceMB} MB)
+                            </p>
+                          </div>
+                          <div className="mt-3">
+                            <button
+                              onClick={() => downloadPhotosZip('keep')}
+                              disabled={keepPhotos.length === 0 || isZipping}
+                              className="desktop-button-primary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {keepPhotos.length === 0 ? "暂无保留照片" : "导出保留区 ZIP"}
+                            </button>
+                            {pendingGroupsCount > 0 && (
+                              <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
+                                💡 还有相似照片需要 A/B 对比，建议完成后再导出。
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bucket 2: Delete Cull */}
+                        <div className="bg-black/15 p-3 rounded-lg border border-white/5 flex flex-col justify-between min-h-[110px]">
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
+                                <span className="text-red-400 text-[10px]">🔴</span> 淘汰候选区
+                              </span>
+                              <span className="text-[10px] font-mono text-red-400 font-bold bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10">
+                                {deletePhotos.length} 张
+                              </span>
+                            </div>
+                            <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-1.5 leading-relaxed">
+                              建议暂时移出的照片 (约 {spaceSavedMB} MB)。淘汰候选不是删除原图，导出后须由您人工处理。
+                            </p>
+                          </div>
+                          <div className="mt-3">
+                            <button
+                              onClick={() => downloadPhotosZip('delete')}
+                              disabled={deletePhotos.length === 0 || isZipping}
+                              className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 border border-white/5 font-bold transition-all"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-amber-500/80" />
+                              {deletePhotos.length === 0 ? "暂无淘汰候选" : "导出淘汰候选区 ZIP"}
+                            </button>
+                            {pendingGroupsCount > 0 && (
+                              <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
+                                💡 还有相似照片需要 A/B 对比，建议完成后再导出。
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Security Strategy Card */}
+                    <div className="p-4 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--dt-text-primary)]">
+                          <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                          <span>🔒 安全策略声明</span>
+                        </div>
+                        <div className="mt-2.5 space-y-2 text-[9.5px] text-[var(--dt-text-soft)] leading-relaxed font-mono">
+                          <p>
+                            ⚡ <strong className="text-[var(--dt-text-primary)]">只复制不修改</strong>：默认仅在浏览器中打包下载，不直接在您磁盘上物理修改或删除原片。
+                          </p>
+                          <p>
+                            📂 <strong className="text-[var(--dt-text-primary)]">淘汰候选安全</strong>：淘汰区仅代表整理建议，在您确认前绝不会发生任何物理磁盘文件变更。
+                          </p>
+                          <p>
+                            💻 <strong className="text-[var(--dt-text-primary)]">未来桌面支持</strong>：后续桌面版客户端将支持“直接复制到文件夹”和“物理移动”（物理剪切必有二次弹框确认）。
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2 border-t border-white/5">
+                        {pendingGroupsCount > 0 ? (
+                          <button
+                            onClick={() => {
+                              const group = similarGroups.find(g => !g.battleCompleted);
+                              if (group) startBattleForGroup(group.id);
+                            }}
+                            className="flex-1 desktop-button-secondary text-[10px] py-1.5 border border-yellow-500/20 text-yellow-400 hover:text-yellow-300 flex items-center justify-center gap-1"
+                          >
+                            <GitCompare className="h-3 w-3" />
+                            继续 PK 对比
+                          </button>
+                        ) : null}
+                        <button 
+                          onClick={handleRestart}
+                          className={cn(
+                            "desktop-button-secondary text-[10px] py-1.5 border border-white/5 flex items-center justify-center gap-1",
+                            pendingGroupsCount > 0 ? "w-1/2" : "w-full"
+                          )}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          重新导入
+                        </button>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  {/* Partition List Areas */}
+                  <div className="space-y-6">
+                    {/* Partition A: Keep list */}
+                    <div className="space-y-2 text-left">
+                      <div className="border-b border-white/5 pb-1 flex items-baseline justify-between">
+                        <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
+                          <span className="text-emerald-400">🟢</span> 保留区
+                        </h3>
+                        <span className="text-[9px] text-[var(--dt-text-soft)]">准备保留的照片 ({keepPhotos.length} 张)</span>
+                      </div>
+                      {renderPartitionGrid(keepPhotos, 'keep')}
+                    </div>
+
+                    {/* Partition B: Delete Candidate List */}
+                    <div className="space-y-2 text-left">
+                      <div className="border-b border-white/5 pb-1 flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                        <div className="flex items-center gap-1">
+                          <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
+                            <span className="text-red-400">🔴</span> 淘汰候选区
+                          </h3>
+                          <span className="text-[9px] text-red-400/80 bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10 scale-90">
+                            淘汰候选不是删除原图
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-[var(--dt-text-soft)]">淘汰候选照片 ({deletePhotos.length} 张，共约 {spaceSavedMB} MB)</span>
+                      </div>
+                      {renderPartitionGrid(deletePhotos, 'cull')}
+                    </div>
+
+                  </div>
+                </div>
+              )}
+            </main>
+          </div>
+        </div>
+
+        {/* Status Bar */}
+        <DesktopStatusBar statusText={statusText} />
+      </div>
+
+      {/* Photo Diagnostics Detail Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent 
+          style={{
+            background: 'linear-gradient(135deg, rgba(30, 35, 42, 0.96), rgba(40, 46, 54, 0.98))',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)'
+          }}
+          className="sm:max-w-3xl w-[90vw] max-h-[85vh] flex flex-col text-[var(--dt-text-primary)] p-5 rounded-xl border-white/5"
+        >
+          {selectedPhoto && (
+            <>
+              <DialogHeader className="shrink-0">
+                <DialogTitle className="text-sm font-bold text-[var(--dt-text-primary)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2">
+                  <span className="truncate max-w-full sm:max-w-[70%] block text-left" title={selectedPhoto.name}>
+                    像素分析诊断: {selectedPhoto.name}
+                  </span>
+                  <span className="shrink-0 text-left">
+                    {renderIssueBadge(selectedPhoto)}
+                  </span>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="overflow-y-auto pr-1 my-3 flex-grow max-h-[50vh] scrollbar-thin">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-1">
+                  <div className="relative aspect-square rounded-lg overflow-hidden border border-white/5 bg-black/25 flex items-center justify-center">
+                    <img
+                      src={selectedPhoto.url}
+                      alt={selectedPhoto.name}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  <div className="space-y-4 flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-[10px] font-bold text-[var(--dt-text-soft)] uppercase tracking-wider mb-2 flex items-center gap-1">
+                        <Sliders className="h-3 w-3 text-yellow-400" />
+                        AI 深度评分参数
+                      </h4>
+                      
+                      <div className="space-y-1 mb-3">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-[var(--dt-text-soft)]">综合质量得分</span>
+                          <span className={cn("font-bold font-mono", getScoreColor(selectedPhoto.score))}>
+                            {selectedPhoto.score} / 100
+                          </span>
+                        </div>
+                        <Progress value={selectedPhoto.score} className="h-1.5 bg-white/5 rounded-full" />
+                      </div>
+
+                      <div className="space-y-1 mb-3">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-[var(--dt-text-soft)]">图像对焦清晰度</span>
+                          <span className={cn(
+                            "font-bold font-mono",
+                            selectedPhoto.sharpnessScore < 40 ? 'text-[#B96F68]' :
+                            selectedPhoto.sharpnessScore < 60 ? 'text-[#B89A58]' :
+                            'text-[#6FA887]'
+                          )}>
+                            {selectedPhoto.sharpnessScore} / 100
+                          </span>
+                        </div>
+                        <Progress 
+                          value={selectedPhoto.sharpnessScore} 
+                          className={cn(
+                            "h-1.5 bg-white/5 rounded-full",
+                            selectedPhoto.sharpnessScore < 40 ? 'bg-[#B96F68]/20' :
+                            selectedPhoto.sharpnessScore < 60 ? 'bg-[#B89A58]/20' :
+                            ''
+                          )} 
+                        />
+                        
+                        <div className="mt-1 text-[10px] leading-relaxed text-[var(--dt-text-primary)]">
+                          <span className="text-[var(--dt-text-soft)] font-semibold">对焦诊断: </span>
+                          {(() => {
+                             const fs = selectedPhoto.focusStatus || (
+                               selectedPhoto.sharpnessScore >= 85 ? 'Excellent / Share-ready' :
+                               selectedPhoto.sharpnessScore >= 60 ? 'Acceptable / Casual use' :
+                               selectedPhoto.sharpnessScore >= 40 ? 'Soft Focus Detected' :
+                               'Not recommended'
+                             );
+                             switch (fs) {
+                               case 'Excellent / Share-ready':
+                                 return <span className="text-emerald-400">🟢 基础清晰度良好，检测到丰富的边缘高频细节 (Excellent / Share-ready)。</span>;
+                               case 'Acceptable / Casual use':
+                                 return <span className="text-emerald-400/80">🟢 基础清晰度良好，本地算法未检测到明显失焦 (Acceptable / Casual use)。</span>;
+                               case 'Soft Focus Detected':
+                               case 'Slightly Soft':
+                                 return <span className="text-yellow-400">🟡 检测到高频细节轻微流失，可能存在轻微散焦或虚化，建议人工对比 (Soft Focus Detected)。</span>;
+                               case 'Directional Blur Detected':
+                                 return <span className="text-red-400 font-medium">🔴 检测到高对比度边缘出现严重的单向位移拉影，可能存在运动模糊 (Directional Blur Detected)。</span>;
+                               case 'Motion Blur Detected':
+                                 return <span className="text-red-400 font-medium">🔴 检测到边缘细节呈现一致的方向性拖尾，可能存在手抖或运动模糊 (Motion Blur Detected)。</span>;
+                               case 'Edge Smear Detected':
+                                 return <span className="text-red-400 font-medium">🔴 检测到边缘对比度被高度抹平，可能存在镜头污渍或过度降噪涂抹 (Edge Smear Detected)。</span>;
+                               case 'Insufficient Subject Sharpness':
+                                 return <span className="text-red-400 font-medium">🔴 本地算法评估画面中心区域细节不足，可能存在主体对焦偏差 (Insufficient Subject Sharpness)。</span>;
+                               case 'Not recommended':
+                               case 'Blurry':
+                               default:
+                                 return <span className="text-red-400">🔴 本地算法检测到高频边缘信息极少，可能存在严重失焦或虚焦，建议清理 (Not recommended)。</span>;
+                             }
+                          })()}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 mb-3">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-[var(--dt-text-soft)]">曝光偏好指数得分</span>
+                          <span className={cn("font-bold font-mono", selectedPhoto.exposureScore < 60 ? 'text-[#B96F68]' : 'text-emerald-400')}>
+                            {selectedPhoto.exposureScore} / 100
+                          </span>
+                        </div>
+                        <Progress value={selectedPhoto.exposureScore} className="h-1.5 bg-white/5 rounded-full" />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-[var(--dt-text-soft)]">曝光亮度偏差值</span>
+                          <span className="font-bold font-mono text-[var(--dt-text-primary)]">
+                            {selectedPhoto.exposureValue > 0 ? `+${selectedPhoto.exposureValue}` : selectedPhoto.exposureValue}
+                          </span>
+                        </div>
+                        
+                        <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white/20 z-10" />
+                          <div 
+                            className={`absolute top-0 bottom-0 ${
+                              selectedPhoto.exposureValue > 0 ? 'bg-amber-500' : 'bg-blue-500'
+                            }`}
+                            style={{
+                              left: selectedPhoto.exposureValue > 0 ? '50%' : `${50 + (selectedPhoto.exposureValue / 2)}%`,
+                              width: `${Math.abs(selectedPhoto.exposureValue / 2)}%`
+                            }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[8px] text-[var(--dt-text-soft)]">
+                          <span>过暗 (-100)</span>
+                          <span>完美 (0)</span>
+                          <span>过亮 (+100)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-black/20 border border-white/5 space-y-0.5 text-[10px] text-[var(--dt-text-soft)] font-mono">
+                      <p>尺寸: {selectedPhoto.resolution}</p>
+                      <p>大小: {selectedPhoto.size}</p>
+                      <p>类型: {selectedPhoto.category}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <TabsContent value="all" className="focus-visible:outline-none min-h-[480px]">
-                {renderPhotoGrid(photos)}
-              </TabsContent>
-              
-              <TabsContent value="keep" className="focus-visible:outline-none min-h-[480px]">
-                {renderPhotoGrid(keepPhotos)}
-              </TabsContent>
+              <DialogFooter className="border-t border-white/5 pt-3 shrink-0">
+                <button 
+                  onClick={() => setDialogOpen(false)}
+                  className="desktop-button-secondary text-xs h-8 px-4 rounded"
+                >
+                  关闭
+                </button>
+                
+                <button
+                  className={cn(
+                    "text-white font-bold text-xs h-8 rounded px-4",
+                    getUserVisibleBucket(selectedPhoto) === 'keep'
+                      ? 'bg-[#B96F68] hover:bg-[#B96F68]/90'
+                      : 'bg-[#6FA887] hover:bg-[#6FA887]/90'
+                  )}
+                  onClick={() => {
+                    const nextStatus = getUserVisibleBucket(selectedPhoto) === 'keep' ? 'delete' : 'keep';
+                    updatePhotoStatus(selectedPhoto.id, nextStatus);
+                    setDialogOpen(false);
+                  }}
+                >
+                  {getUserVisibleBucket(selectedPhoto) === 'keep' ? '标为淘汰候选' : '恢复建议保留'}
+                </button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
-              <TabsContent value="review" className="focus-visible:outline-none min-h-[480px]">
-                {renderPhotoGrid(reviewPhotos)}
-              </TabsContent>
-              
-              <TabsContent value="delete" className="focus-visible:outline-none min-h-[480px]">
-                {renderPhotoGrid(deletePhotos)}
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
+      {/* Photo Battle Overlay (A/B Compare) */}
+      {activeBattle && (() => {
+        const leftId = activeBattle.currentCandidateId;
+        const rightId = activeBattle.contenderIds[activeBattle.nextIndex];
+        const leftPhoto = photos.find(p => p.id === leftId);
+        const rightPhoto = photos.find(p => p.id === rightId);
+        const isBattleCompleted = activeBattle.nextIndex >= activeBattle.contenderIds.length;
+        const activeGroup = similarGroups.find(g => g.id === activeBattle.groupId);
+        const groupPhotos = photos.filter(p => activeGroup?.photoIds.includes(p.id));
 
-        {/* Photo Diagnostics Detail Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-4xl w-[90vw] max-h-[85vh] flex flex-col bg-slate-900 border border-white/10 text-white p-6 rounded-2xl">
-            {selectedPhoto && (
-              <>
-                <DialogHeader className="shrink-0">
-                  <DialogTitle className="text-base font-bold text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3">
-                    <span className="truncate max-w-full sm:max-w-[70%] block text-left" title={selectedPhoto.name}>
-                      像素分析诊断: {selectedPhoto.name}
-                    </span>
-                    <span className="shrink-0 text-left">
-                      {renderIssueBadge(selectedPhoto)}
-                    </span>
+        if (isBattleCompleted) return null;
+
+        return (
+          <Dialog open={true} onOpenChange={handleCloseBattle}>
+            <DialogContent 
+              style={{
+                background: 'linear-gradient(135deg, rgba(30, 35, 42, 0.98), rgba(40, 46, 54, 0.99))',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: '0 24px 50px rgba(0, 0, 0, 0.55)'
+              }}
+              className="sm:max-w-6xl w-[96vw] max-h-[85vh] flex flex-col text-[var(--dt-text-primary)] p-0 overflow-hidden rounded-xl border-white/5"
+            >
+              <DialogHeader className="p-3.5 border-b border-white/5 flex flex-row items-center justify-between space-y-0 shrink-0">
+                <div className="flex flex-col text-left">
+                  <DialogTitle className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
+                    <GitCompare className="h-4 w-4 text-yellow-400" />
+                    选择更想保留的一张
                   </DialogTitle>
-                </DialogHeader>
- 
-                {/* Scrollable diagnostic content wrapper */}
-                <div className="overflow-y-auto pr-1.5 my-4 flex-grow max-h-[50vh] scrollbar-thin">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-1">
-                    {/* Photo Preview Pane */}
-                    <div className="relative aspect-square rounded-xl overflow-hidden border border-white/10 bg-slate-950 flex items-center justify-center">
-                      <img
-                        src={selectedPhoto.url}
-                        alt={selectedPhoto.name}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
- 
-                    {/* AI Diagnosis Diagnostics Pane */}
-                    <div className="space-y-5 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1">
-                          <Sliders className="h-3.5 w-3.5" />
-                          AI 深度评分参数
-                        </h4>
+                  <span className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">
+                    这组照片较相似，请直接选择你想保留的结果。未选照片不会被自动删除，只会进入淘汰候选区。
+                  </span>
+                </div>
+                <div className="bg-black/25 border border-white/5 rounded px-2.5 py-1 text-[10px] text-[var(--dt-text-primary)] font-mono font-bold">
+                  当前组: {activeBattle.roundIndex} / {activeBattle.totalRounds}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="desktop-pill text-[9px] scale-90 border-white/5 bg-white/5">
+                    Esc 关闭
+                  </span>
+                  <Button 
+                    size="icon" 
+                    className="h-7 w-7 text-[var(--dt-text-soft)] bg-transparent hover:bg-white/5 hover:text-[var(--dt-text-primary)] border-0"
+                    onClick={handleCloseBattle}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-between min-h-0 bg-[var(--dt-workspace-bg)]">
+                
+                {/* Zoom Instructions */}
+                <div className="text-center text-[10px] text-[var(--dt-text-soft)] mb-2 select-none">
+                  💡 提示：鼠标悬停在左/右图上滚动 **鼠标滚轮** 可进行 **1x - 4x** 独立缩放，按住 **鼠标左键拖动** 平移细节。
+                </div>
+
+                <div className="desktop-battle-stage">
+                  {/* Left Photo (current best candidate) */}
+                  {leftPhoto ? (
+                    <div className="desktop-battle-photo-card">
+                      <div 
+                        className={cn(
+                          "desktop-battle-photo-wrapper overflow-hidden relative",
+                          leftScale > 1 ? (isLeftDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
+                        )}
+                        onWheel={(e) => handleWheel(e, 'left')}
+                        onMouseDown={(e) => handleMouseDown(e, 'left')}
+                        onMouseMove={(e) => handleMouseMove(e, 'left')}
+                        onMouseUp={() => handleMouseUpOrLeave('left')}
+                        onMouseLeave={() => handleMouseUpOrLeave('left')}
+                      >
+                        <img 
+                          src={leftPhoto.url} 
+                          alt={leftPhoto.name} 
+                          style={{ 
+                            transform: `translate(${leftX}px, ${leftY}px) scale(${leftScale})`,
+                            transition: isLeftDragging ? 'none' : 'transform 0.1s ease-out'
+                          }}
+                          className="max-w-full max-h-full object-contain p-1 select-none pointer-events-none" 
+                        />
+                        <div className="absolute top-2 left-2 z-10">
+                          <Badge className="bg-[#6FA887] text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm">
+                            👑 当前优选 [ ← ] ({leftScale.toFixed(1)}x)
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="p-2.5 border-t border-white/5 shrink-0 flex flex-col gap-1 bg-black/10">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="max-w-[70%]">
+                            <p className="text-xs font-bold text-[var(--dt-text-primary)] truncate" title={leftPhoto.name}>{leftPhoto.name}</p>
+                            <p className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">{leftPhoto.size} • {leftPhoto.resolution}</p>
+                          </div>
+                          <span className="text-[10px] text-emerald-400 font-semibold">
+                            {leftPhoto.issue === 'good' ? '质量良好' : '相似推荐'}
+                          </span>
+                        </div>
                         
-                        {/* Metric 1: Quality Score */}
-                        <div className="space-y-1.5 mb-4">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-slate-400">综合质量得分</span>
-                            <span className={cn("font-bold font-mono", getScoreColor(selectedPhoto.score))}>
-                              {selectedPhoto.score} / 100
-                            </span>
+                        <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-1 text-left">
+                          <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
+                            <span>▶</span> 查看技术详情
+                          </summary>
+                          <div className="pl-2 pt-1 font-mono space-y-0.5 border-l border-white/5 mt-0.5">
+                            <p>综合质量: {leftPhoto.score} / 100</p>
+                            <p>清晰对焦: {leftPhoto.sharpnessScore} / 100</p>
+                            <p>曝光亮度: {leftPhoto.exposureScore} / 100</p>
                           </div>
-                          <Progress value={selectedPhoto.score} className="h-2 bg-slate-950 rounded-full" />
-                        </div>
- 
-                        {/* Metric 2: Sharpness Score */}
-                        <div className="space-y-1.5 mb-4">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-slate-400">图像对焦清晰度</span>
-                            <span className={cn(
-                              "font-bold font-mono",
-                              selectedPhoto.sharpnessScore < 40 ? 'text-red-400' :
-                              selectedPhoto.sharpnessScore < 60 ? 'text-yellow-400' :
-                              'text-emerald-400'
-                            )}>
-                              {selectedPhoto.sharpnessScore} / 100
-                            </span>
-                          </div>
-                          <Progress 
-                            value={selectedPhoto.sharpnessScore} 
-                            className={cn(
-                              "h-2 bg-slate-950 rounded-full",
-                              selectedPhoto.sharpnessScore < 40 ? 'bg-red-500/20' :
-                              selectedPhoto.sharpnessScore < 60 ? 'bg-yellow-500/20' :
-                              ''
-                            )} 
-                          />
-                          
-                          {/* focus explanation */}
-                          <div className="mt-1.5 text-[10px] leading-relaxed">
-                            <span className="text-slate-500 font-semibold">对焦诊断: </span>
-                            {(() => {
-                              const fs = selectedPhoto.focusStatus || (
-                                selectedPhoto.sharpnessScore >= 85 ? 'Excellent / Share-ready' :
-                                selectedPhoto.sharpnessScore >= 60 ? 'Acceptable / Casual use' :
-                                selectedPhoto.sharpnessScore >= 40 ? 'Soft Focus Detected' :
-                                'Not recommended'
-                              );
-                              switch (fs) {
-                                case 'Excellent / Share-ready':
-                                  return <span className="text-emerald-400">🟢 基础清晰度良好，检测到丰富的边缘高频细节 (Excellent / Share-ready)。</span>;
-                                case 'Acceptable / Casual use':
-                                  return <span className="text-emerald-500/80">🟢 基础清晰度良好，本地算法未检测到明显失焦 (Acceptable / Casual use)。</span>;
-                                case 'Soft Focus Detected':
-                                case 'Slightly Soft':
-                                  return <span className="text-yellow-400">🟡 检测到高频细节轻微流失，可能存在轻微散焦或虚化，建议人工复核 (Soft Focus Detected)。</span>;
-                                case 'Directional Blur Detected':
-                                  return <span className="text-red-400 font-medium">🔴 检测到高对比度边缘出现严重的单向位移拉影，可能存在运动模糊 (Directional Blur Detected)。</span>;
-                                case 'Motion Blur Detected':
-                                  return <span className="text-red-400 font-medium">🔴 检测到边缘细节呈现一致的方向性拖尾，可能存在手抖或运动模糊 (Motion Blur Detected)。</span>;
-                                case 'Edge Smear Detected':
-                                  return <span className="text-red-400 font-medium">🔴 检测到边缘对比度被高度抹平，可能存在镜头污渍或过度降噪涂抹 (Edge Smear Detected)。</span>;
-                                case 'Insufficient Subject Sharpness':
-                                  return <span className="text-red-400 font-medium">🔴 本地算法评估画面中心区域细节不足，可能存在主体对焦偏差 (Insufficient Subject Sharpness)。</span>;
-                                case 'Not recommended':
-                                case 'Blurry':
-                                default:
-                                  return <span className="text-red-400">🔴 本地算法检测到高频边缘信息极少，可能存在严重失焦或虚焦，建议清理 (Not recommended)。</span>;
-                              }
-                            })()}
-                          </div>
-                        </div>
- 
-                        {/* Metric 3: Exposure Score */}
-                        <div className="space-y-1.5 mb-4">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-slate-400">曝光偏好指数得分</span>
-                            <span className={cn("font-bold font-mono", selectedPhoto.exposureScore < 60 ? 'text-red-400' : 'text-emerald-400')}>
-                              {selectedPhoto.exposureScore} / 100
-                            </span>
-                          </div>
-                          <Progress value={selectedPhoto.exposureScore} className="h-2 bg-slate-950 rounded-full" />
-                        </div>
- 
-                        {/* Metric 4: Exposure deviation value */}
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-slate-400">曝光亮度偏差值</span>
-                            <span className="font-bold font-mono text-slate-200">
-                              {selectedPhoto.exposureValue > 0 ? `+${selectedPhoto.exposureValue}` : selectedPhoto.exposureValue}
-                            </span>
-                          </div>
-                          
-                          {/* Custom exposure bar centered on 0 */}
-                          <div className="relative h-2 bg-slate-950 rounded-full overflow-hidden">
-                            {/* Anchor point 0 */}
-                            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-slate-600 z-10" />
-                            {/* Dev / Deviation bar */}
-                            <div 
-                              className={`absolute top-0 bottom-0 ${
-                                selectedPhoto.exposureValue > 0 ? 'bg-amber-500 left-1/2' : 'bg-blue-500'
-                              }`}
-                              style={{
-                                left: selectedPhoto.exposureValue > 0 ? '50%' : `${50 + (selectedPhoto.exposureValue / 2)}%`,
-                                width: `${Math.abs(selectedPhoto.exposureValue / 2)}%`
-                              }}
-                            />
-                          </div>
-                          <div className="flex justify-between text-[9px] text-slate-600">
-                            <span>过暗 (-100)</span>
-                            <span>完美 (0)</span>
-                            <span>过亮 (+100)</span>
-                          </div>
-                        </div>
-                      </div>
- 
-                      {/* Metadata specs */}
-                      <div className="p-3 rounded-xl bg-slate-950 space-y-1 text-[11px] text-slate-400 font-mono">
-                        <p>尺寸: {selectedPhoto.resolution}</p>
-                        <p>大小: {selectedPhoto.size}</p>
-                        <p>类型: {selectedPhoto.category}</p>
+                        </details>
                       </div>
                     </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center bg-black/25 text-[var(--dt-text-soft)] rounded-lg">找不到左图</div>
+                  )}
+
+                  {/* VS 中间分隔 */}
+                  <div className="flex flex-col items-center justify-center relative w-2 shrink-0">
+                    <div className="absolute top-0 bottom-0 w-px bg-white/5" />
+                    <div className="desktop-battle-vs-badge z-10">VS</div>
+                  </div>
+
+                  {/* Right Photo (challenger) */}
+                  {rightPhoto ? (
+                    <div className="desktop-battle-photo-card">
+                      <div 
+                        className={cn(
+                          "desktop-battle-photo-wrapper overflow-hidden relative",
+                          rightScale > 1 ? (isRightDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
+                        )}
+                        onWheel={(e) => handleWheel(e, 'right')}
+                        onMouseDown={(e) => handleMouseDown(e, 'right')}
+                        onMouseMove={(e) => handleMouseMove(e, 'right')}
+                        onMouseUp={() => handleMouseUpOrLeave('right')}
+                        onMouseLeave={() => handleMouseUpOrLeave('right')}
+                      >
+                        <img 
+                          src={rightPhoto.url} 
+                          alt={rightPhoto.name} 
+                          style={{ 
+                            transform: `translate(${rightX}px, ${rightY}px) scale(${rightScale})`,
+                            transition: isRightDragging ? 'none' : 'transform 0.1s ease-out'
+                          }}
+                          className="max-w-full max-h-full object-contain p-1 select-none pointer-events-none" 
+                        />
+                        <div className="absolute top-2 right-2 z-10">
+                          <Badge className="bg-[#6F8FA8] text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm">
+                            ⚔️ 挑战照片 [ → ] ({rightScale.toFixed(1)}x)
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="p-2.5 border-t border-white/5 shrink-0 flex flex-col gap-1 bg-black/10">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="max-w-[70%]">
+                            <p className="text-xs font-bold text-[var(--dt-text-primary)] truncate" title={rightPhoto.name}>{rightPhoto.name}</p>
+                            <p className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">{rightPhoto.size} • {rightPhoto.resolution}</p>
+                          </div>
+                          <span className="text-[10px] text-yellow-400 font-semibold">
+                            {rightPhoto.issue === 'good' ? '质量良好' : rightPhoto.issue === 'blurry' ? '画面模糊' : rightPhoto.issue === 'overexposed' ? '画面过曝' : rightPhoto.issue === 'underexposed' ? '画面欠曝' : '相似重复'}
+                          </span>
+                        </div>
+
+                        <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-1 text-left">
+                          <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
+                            <span>▶</span> 查看技术详情
+                          </summary>
+                          <div className="pl-2 pt-1 font-mono space-y-0.5 border-l border-white/5 mt-0.5">
+                            <p>综合质量: {rightPhoto.score} / 100</p>
+                            <p>清晰对焦: {rightPhoto.sharpnessScore} / 100</p>
+                            <p>曝光亮度: {rightPhoto.exposureScore} / 100</p>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center bg-black/25 text-[var(--dt-text-soft)] rounded-lg">找不到右图</div>
+                  )}
+                </div>
+
+                {/* Photo Battle Filmstrip */}
+                <div className="mt-3 border-t border-white/5 pt-2 shrink-0">
+                  <div className="flex items-center justify-between text-[9px] text-[var(--dt-text-soft)] mb-1 px-1">
+                    <span>相似组胶片带 ({groupPhotos.length} 张)</span>
+                    <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-0.5">🟢 保留</span>
+                      <span className="flex items-center gap-0.5">🔴 淘汰候选</span>
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto py-1 px-2 bg-black/35 rounded border border-white/5 scrollbar-thin">
+                    {groupPhotos.map((photo) => {
+                      const isLeft = photo.id === leftId;
+                      const isRight = photo.id === rightId;
+                      const isKeep = activeBattle.recommendedKeepIds.includes(photo.id);
+                      const isReview = activeBattle.similarBackupIds.includes(photo.id);
+                      const isDelete = activeBattle.cullCandidateIds.includes(photo.id);
+
+                      return (
+                        <div
+                          key={photo.id}
+                          className={cn(
+                            "relative shrink-0 rounded overflow-hidden border transition-all duration-200",
+                            isLeft 
+                              ? "border-[#6FA887] ring-1 ring-[#6FA887]/30 scale-95"
+                              : isRight
+                              ? "border-yellow-500 ring-1 ring-yellow-500/30 scale-95"
+                              : "border-white/10"
+                          )}
+                          style={{ width: '44px', height: '33px' }}
+                        >
+                          <img
+                            src={photo.url}
+                            alt={photo.name}
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Status Dot */}
+                          <div 
+                            className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full" 
+                            style={{ 
+                              backgroundColor: (isKeep || isReview) ? '#6FA887' : isDelete ? '#B96F68' : '#7E8588' 
+                            }} 
+                          />
+                          {isLeft && (
+                            <div className="absolute bottom-0 inset-x-0 bg-[#6FA887] text-white text-[6px] font-bold text-center leading-none py-0.5">
+                              左图
+                            </div>
+                          )}
+                          {isRight && (
+                            <div className="absolute bottom-0 inset-x-0 bg-yellow-500 text-black text-[6px] font-bold text-center leading-none py-0.5">
+                              右图
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
- 
-                <DialogFooter className="border-t border-white/5 pt-4 shrink-0">
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => setDialogOpen(false)}
-                    className="text-slate-400 hover:text-white"
-                  >
-                    取消
-                  </Button>
-                  
-                  <Button
-                    variant={selectedPhoto.status === 'keep' ? 'destructive' : 'default'}
-                    className={
-                      selectedPhoto.status === 'keep'
-                        ? 'bg-red-500 hover:bg-red-600 text-white'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    }
-                    onClick={() => {
-                      togglePhotoStatus(selectedPhoto.id);
-                      setDialogOpen(false);
-                    }}
-                  >
-                    {selectedPhoto.status === 'keep' ? '标为建议删除' : '恢复为建议保留'}
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
 
-      </main>
+                {/* Battle Actions Bar */}
+                <div className="mt-3.5 pt-2.5 border-t border-white/5 flex flex-col gap-2 shrink-0 animate-fade-in">
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                    <button
+                      className="bg-[#6FA887] hover:bg-[#6FA887]/90 text-white font-bold text-xs py-2 px-1.5 rounded border border-white/5 flex flex-col items-center justify-center gap-0.5"
+                      onClick={() => applyBattleDecision('keep_left')}
+                    >
+                      <span>保留左图</span>
+                      <kbd className="desktop-battle-kbd">←</kbd>
+                    </button>
+                    <button
+                      className="bg-[#6FA887] hover:bg-[#6FA887]/90 text-white font-bold text-xs py-2 px-1.5 rounded border border-white/5 flex flex-col items-center justify-center gap-0.5"
+                      onClick={() => applyBattleDecision('keep_right')}
+                    >
+                      <span>保留右图</span>
+                      <kbd className="desktop-battle-kbd">→</kbd>
+                    </button>
+                    <button
+                      className="bg-white/5 hover:bg-white/10 text-[var(--dt-text-primary)] font-bold text-xs py-2 px-1.5 rounded border border-white/5 flex flex-col items-center justify-center gap-0.5"
+                      onClick={() => applyBattleDecision('keep_both')}
+                    >
+                      <span>两张都保留</span>
+                      <kbd className="desktop-battle-kbd">B</kbd>
+                    </button>
+                    <button
+                      className="border border-[#B96F68]/35 text-[#B96F68] hover:text-[#B96F68]/95 bg-[#B96F68]/10 hover:bg-[#B96F68]/15 font-bold text-xs py-2 px-1.5 rounded flex flex-col items-center justify-center gap-0.5"
+                      onClick={() => applyBattleDecision('cull_both')}
+                    >
+                      <span>标记为淘汰候选</span>
+                      <kbd className="desktop-battle-kbd">C</kbd>
+                    </button>
+                    
+                    {/* 重置缩放按钮：仅在有任意一侧放大时亮起 */}
+                    <button
+                      disabled={leftScale === 1 && rightScale === 1}
+                      className={cn(
+                        "font-bold text-xs py-2 px-1.5 rounded border flex flex-col items-center justify-center gap-0.5 transition-all",
+                        leftScale > 1 || rightScale > 1
+                          ? "bg-yellow-500/15 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20"
+                          : "border-white/5 bg-white/5 text-[var(--dt-text-faint)] opacity-40 cursor-not-allowed"
+                      )}
+                      onClick={handleResetZoom}
+                    >
+                      <span>重置缩放</span>
+                      <span className="text-[7.5px] opacity-75 font-mono">Zoom:1x</span>
+                    </button>
 
-      <Footer />
+                    <button
+                      className="border border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-primary)] font-bold text-xs py-2 px-1.5 rounded flex flex-col items-center justify-center gap-0.5"
+                      onClick={() => applyBattleDecision('skip')}
+                    >
+                      <span>跳过</span>
+                      <kbd className="desktop-battle-kbd">S</kbd>
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-[var(--dt-text-soft)] text-center select-none leading-relaxed mt-1">
+                    💡 提示：滚轮缩放，按住左键拖动查看细节。
+                  </p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
