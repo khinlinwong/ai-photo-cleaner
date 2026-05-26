@@ -56,7 +56,15 @@ setSimilarGroups(signalGroups as unknown as SimilarGroup[]);
 - **Step 1：只读确认字段 (已完成)**：确认了 `SimilarGroup` 的全部必填字段，包括 `battleUpdatedAt: number`。
 - **Step 2：新增显式适配器 (已完成 - CORE-DUPLICATE-8)**：在 `src/lib/analysis/local/duplicate.ts` 中编写并导出了 `adaptSignalGroupsToLegacySimilarGroups` 适配函数及 `SimilarGroupCompatible` 类型。
 - **Step 3：无强转安全接入 (已完成 - CORE-DUPLICATE-8)**：在 Context `initializeSimilarGroups` 的 true 分支中，用 `adaptSignalGroupsToLegacySimilarGroups(signalGroups, Date.now())` 彻底替代了 `as unknown as SimilarGroup[]` 强转，消除了强转技术债。
-- **Step 4：Codex 只读审查 (当前阶段)**：
+- **Step 4：Codex 只读审查 (已完成 - CORE-DUPLICATE-8-QA)**：
   - 确认强转已完全移除，已无 `as unknown as SimilarGroup[]` 残留。
   - 确认当前 Feature Flag 开关极值依然为 `false`，主流程安全未变。
 - **Step 5：小批量本地测试回归 (下一阶段)**：重新在开发环境手动开启进行 20-50 张非隐私本地图片测试。
+- **Step 6：CORE-DUPLICATE-9-PLANNING 进展**：
+  - 类型适配器已完成并通过了 QA 验证。
+  - 下一步将适配器应用于 20-50 张非隐私本地图片 true 分支回归测试验证，以全面评估类型匹配的健壮性。
+- **Step 7：CORE-DUPLICATE-9 测试验证结果**：
+  - 适配器已通过 Demo 与 35 张本地非隐私图片 true 分支测试。
+  - 当前仍不建议 production 启用 true。
+  - 下一步应做中批量测试，观察性能与队列稳定性。
+

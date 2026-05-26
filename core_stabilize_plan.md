@@ -264,3 +264,12 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 ### 24. `CORE-DUPLICATE-8` (类型适配实现 - 当前已完成)
 - 新增并导出了显式纯适配器函数 `adaptSignalGroupsToLegacySimilarGroups`，消除强转使得类型适配在编译层面更加安全。
 - **状态与主流程约束**：当前正式主流程依然保持为 legacy 稳定路径，不对用户主工作流进行任何侵入修改，最终的用户分类保持为“保留”与“淘汰候选”。
+
+### 25. `CORE-DUPLICATE-9-PLANNING` (20-50 张非隐私本地图片测试规划 - 当前已完成)
+- 本轮制定了 20-50 张非隐私本地图片 true 分支的灰度回归测试方案，并在项目根目录下新建了 [duplicate_local_photo_test_checklist.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_local_photo_test_checklist.md)。
+- **状态与主流程约束**：本轮只做规划，不修改任何 src 代码，不运行本地图片测试。当前正式主流程仍保持稳定 legacy，USE_SIGNAL_GROUPS_FOR_BATTLE 保持默认为 false，用户的最终分类二值化收敛为“保留”与“淘汰候选”。
+
+### 26. `CORE-DUPLICATE-9` (20-50 张本地图片 true 分支灰度回归测试 - 当前已完成)
+- 成功执行了 35 张非隐私本地图片在开发环境下的临时 true 分支回归测试，测试通过且开关已归位恢复为 false。
+- **状态与主流程约束**：当前主流程仍保持 legacy。下一步建议 `CORE-DUPLICATE-10-PLANNING`：规划 100-300 张中批量非隐私图片测试。用户最终分类仍只有保留 / 淘汰候选。
+

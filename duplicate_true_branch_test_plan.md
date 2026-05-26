@@ -282,3 +282,18 @@
 随着 `CORE-DUPLICATE-8` 显式类型适配函数 `adaptSignalGroupsToLegacySimilarGroups` 开发的完毕，编译层面的强转债务已经完全移除。
 - **下一阶段测试推进**：下一轮可正式重新推进这 20-50 张非敏感本地图片的测试。
 - **测试前提强调**：测试开始前，必须再次确认 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值为 `false`。仅在本地开发环境中临时将其手动修改为 `true` 进行测试，测试完毕后必须无条件恢复为 `false`，不留下任何脏配置提交。
+
+## 十二、 CORE-DUPLICATE-9-PLANNING 进展更新
+
+本轮 `CORE-DUPLICATE-9-PLANNING` 已细化 20-50 张非隐私本地图片测试清单，并在项目根目录下新建了 [duplicate_local_photo_test_checklist.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_local_photo_test_checklist.md)。
+下一步在下一轮 `CORE-DUPLICATE-9` 中将严格按照该清单执行 20-50 张非隐私本地图片的 true 分支测试。本轮不执行测试，不修改任何 src 代码，开关默认仍为 `false`。
+
+## 十三、 CORE-DUPLICATE-9 实测状态
+
+- 35 张非隐私本地图片 true 分支测试已通过。
+- old/new group count 为 9 / 9。
+- old/new grouped photo count 为 22 / 22。
+- leaderMismatchCount 为 0。
+- Photo Battle、skip、reset、ZIP 导出均正常。
+- 当前结论只覆盖小批量测试，尚未覆盖 100-300 张中批量或 500+ 大批量。
+- USE_SIGNAL_GROUPS_FOR_BATTLE 已恢复 false。

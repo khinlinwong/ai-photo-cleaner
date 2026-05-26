@@ -144,3 +144,15 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - **限值保护约束**：在小批量本地非敏感照片测试尚未完成前，绝不允许将此开关默认启用为 `true`。
 - **技术债与灰度状态**：类型强转的技术债务已在灰度切换前彻底消除，但 Feature Flag 配置常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 在代码中仍然强制默认为 `false`，确保生产环境绝对稳定。
 - **技术债处理约束**：在 true 分支全量合并和扩大测试前，必须首先解决类型强转的编译安全隐患，不允许长期依赖 `as unknown as SimilarGroup[]` 强转。
+
+## 九、 CORE-DUPLICATE-9-PLANNING 进展更新与实测结果
+
+本轮 `CORE-DUPLICATE-9-PLANNING` 完成了对 20-50 张非隐私本地图片的 true 分支灰度回归测试的规划，并在项目根目录下新建了 [duplicate_local_photo_test_checklist.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_local_photo_test_checklist.md)。
+- **灰度开关状态**：灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然强制为 `false`，生产环境依旧强制使用 legacy。本轮未进行任何 src 代码改动。
+- **本地图片测试前置**：在未来下一阶段 `CORE-DUPLICATE-9` 执行本地图片回归测试时，将遵循“即测即回”的原则，测试结束后必须立刻物理恢复为 `false`。
+
+## 十、 CORE-DUPLICATE-9 实测状态与开关控制
+
+- 小批量 true 测试通过后，开关已恢复 false。
+- 默认 false 仍必须保持。
+- 中批量测试通过前，不允许默认启用 true。

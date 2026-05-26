@@ -129,3 +129,14 @@ if (canUseSignalGroups) {
 - **本地图片测试状态**：小批量本地图片尚未测试。
 - **结论限制**：由于本地图片集尚未进行测试验证，当前结论不能扩大到真实本地图片集。
 - **后续方向**：随着类型适配的完毕，后续应正式执行 20-50 张本地非隐私图片的 true 灰度分支测试（`CORE-DUPLICATE-7` 本地回归测试阶段）。
+
+## 十、 CORE-DUPLICATE-9-PLANNING 进展更新
+
+本轮 `CORE-DUPLICATE-9-PLANNING` 已经制定了 20-50 张非隐私本地图片 true 分支的灰度回归测试方案，并新建了专门的测试清单文档 [duplicate_local_photo_test_checklist.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_local_photo_test_checklist.md)。
+- **测试状态说明**：下一步在下一轮 `CORE-DUPLICATE-9` 执行测试，当前仍保持默认 `false` 极值，无 src 代码改动。
+
+## 十一、 CORE-DUPLICATE-9 测试验证结果
+
+- true 分支已完成小批量 35 张非隐私图片测试。
+- 测试通过，但不代表可扩大启用。
+- 下一步应规划 100-300 张中批量测试。
