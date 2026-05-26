@@ -1,0 +1,250 @@
+# AI Photo Cleaner 核心逻辑稳定化规划 - CORE-STABILIZE-2
+
+本规划旨在为 AI Photo Cleaner 从网页原型向稳定本地桌面软件过渡提供核心逻辑分层规划。当前 Next.js 浏览器原型已实现了核心的快速筛选工作流，但为了后续能无缝迁移至 Tauri + Rust 架构并确保代码的高内聚、低耦合，必须对现有的分析、决策、数据流和 UI 展示边界进行清晰的模块化拆分。
+
+---
+
+## 一、 稳定化目标
+
+CORE-STABILIZE-2 的核心目标**不是引入新功能**，而是为未来的重构确立代码物理边界。
+
+目前的代码中，共享上下文 `PhotoWorkspaceContext`、感知哈希聚类 `duplicate.ts` 和评分算法 `localScore.ts` 与前端 UI 展示逻辑、中文文案存在不同程度的耦合。为了实现长期的稳定性，未来稳定版系统将严格划分以下四层：
+1. **分析层 (Analysis Layer)**：客观算力输出，无状态判断，无 UI 词汇。
+2. **决策层 (Decision Layer)**：输出决策建议，不决定最终状态，不含中文文案。
+3. **UI 派生层 (UI Mapping Layer)**：单向将内部建议翻译为用户可见的中文词汇和状态。
+4. **用户决定层 (User Decision Layer)**：管理最终持久化分类，用户意志绝对优先于算法建议。
+
+---
+
+## 二、 分析层 (Analysis Layer)
+
+### 1. 职责边界
+分析层只负责客观物理信号的提取与计算，不带有任何关于用户分类的逻辑倾向。
+
+- **可以做**：
+  - 提取图片的焦距、边缘高频细节以评估清晰度。
+  - 读取亮度、通道分布以评估曝光状态。
+  - 计算图片的 dHash 或 perceptualHash (pHash)。
+  - 对比哈希距离，输出相似照片组 (Similar Groups)。
+  - 输出基础 Metadata（尺寸、文件大小、格式类型等）。
+- **绝对禁止**：
+  - 绝对禁止包含 `displayLabel` 或 `reasonLabel` 字段。
+  - 绝对禁止包含任何中文 UI 提示词。
+  - 绝对禁止直接设置或修改照片的最终归属状态。
+  - 绝对禁止决定照片是应该“保留”还是“淘汰”。
+
+### 2. 建议未来目录结构
+```
+src/lib/analysis/
+  local/
+    sharpness.ts        # 图像清晰度分析
+    exposure.ts         # 图像曝光度分析
+    duplicate.ts        # 相似/连拍分组聚类（仅输出相似组）
+  scoring/
+    localScore.ts       # 内部辅助综合质量评分
+  decision/
+    photoDecision.ts    # 决策层：生成建议
+  ui/
+    photoLabels.ts      # UI 派生层：中文文案翻译
+```
+
+### 3. 分析层输出数据示例
+```typescript
+type AnalysisSignal = {
+  sharpnessScore: number;
+  exposureScore: number;
+  perceptualHash?: string;
+  duplicateGroupId?: string;
+  resolution: string;
+  fileSizeBytes: number;
+  riskFlags: {
+    blur: boolean;
+    exposure: boolean;
+    similar: boolean;
+  };
+};
+```
+
+---
+
+## 三、 决策层 (Decision Layer)
+
+### 1. 职责边界
+决策层充当分析信号与业务状态的翻译官，根据客观分析指标生成“内部倾向性建议”。
+
+- **可以做**：
+  - 根据清晰度得分和曝光偏差，建议将照片移入哪个倾向区。
+  - 标识某张照片是否因为连拍相似需要进入 Photo Battle 比对。
+  - 生成标准化的内部原因代号 (Reason Codes)。
+- **绝对禁止**：
+  - 绝对禁止包含任何中文 UI 文本。
+  - 绝对禁止强行覆盖用户的显式操作决定。
+  - 绝对禁止将建议状态作为最终且不可变更的数据状态。
+
+### 2. 决策层核心定义与原则
+- **优先度**：用户决定层 `userDecision` 优先于任何 status 或算法建议。
+- **返回值建议**：
+```typescript
+type SuggestedBucket = "keep" | "cullCandidate" | "needsBattle";
+
+type DecisionSuggestion = {
+  suggestedBucket: SuggestedBucket;
+  reasonCodes: Array<"userSelected" | "userCulled" | "similarGroup" | "blurRisk" | "exposureRisk" | "initialKeep">;
+  confidence?: "low" | "medium" | "high";
+};
+```
+
+---
+
+## 四、 UI 派生层 (UI Mapping Layer)
+
+### 1. 职责边界
+UI 派生层属于前端纯展示层，负责以单向依赖的方式将决策层的内部代码、代号和建议转译为符合产品设计的高可读性中文标签。
+
+- **可以做**：
+  - 将 `SuggestedBucket` 映射为“保留”、“淘汰候选”和“需要 PK”（注意：在二值分类状态中，“需要 PK”临时作为 `keep` 在 `getUserVisibleBucket` 中呈现，防止误删，但 UI 必须提示用户）。
+  - 将 `reasonCodes` 转换成“模糊候选”、“曝光异常”、“相似照片”、“用户选择”等中文 Badges。
+  - 控制按钮的激活状态、安全导出的文案警告以及技术详情折叠区域的图表绘制。
+- **绝对禁止**：
+  - 绝对禁止直接修改状态机或 Context 内部的存储数据。
+  - 绝对禁止越权计算照片的物理指标或直接判定照片是否相似。
+
+### 2. UI 状态映射工具示例
+```typescript
+function getUserVisibleLabel(bucket: SuggestedBucket): string {
+  switch (bucket) {
+    case "keep":
+      return "保留";
+    case "cullCandidate":
+      return "淘汰候选";
+    case "needsBattle":
+      return "需要 PK";
+    default:
+      return "待处理";
+  }
+}
+```
+
+---
+
+## 五、 用户决定层 (User Decision Layer)
+
+### 1. 职责边界
+用户决定层负责记录并持久化用户的显式操作结果。
+
+- **核心原则**：
+  - **用户决定绝对优先**：一旦用户进行了手动标定（如点击“保留”、“淘汰候选”或在 A/B PK 中做出选择），算法建议即刻失效，一切以用户的最终意图为准。
+  - **二值分类收敛**：用户可见的最终导出状态只有“保留”和“淘汰候选”。
+  - **跳过规则**：跳过（Skip）操作仅仅是将比对回合推迟，不属于最终第三种状态。跳过的照片在内部保持待决状态。
+- **用户指令支持**：
+  - 保留左图
+  - 保留右图
+  - 两张都保留
+  - 两张都标记为淘汰候选
+  - 跳过当前组
+
+---
+
+## 六、 历史兼容策略 (review / delete 等遗留字段)
+
+为了避免大范围重构引发的逻辑崩塌，针对当前原型代码中残留的 SaaS 过渡字段，我们采取以下逐步收敛策略：
+
+1. **`review` / `undecided` 兼容**：
+   底层仍可以使用 `review` 表示“初步筛选中”或“待 PK”，但 UI 层面应当将其统归入“需要 PK”或“初步保留”，不再对用户暴露这些技术词汇。
+2. **`delete` 状态兼容**：
+   底层代码中的 `status === 'delete'` 依然可以用作删除标记，但在所有的 UI 文案、按钮标签和导出 Zip 文件名上，必须统一映射显示为“淘汰候选”。
+3. **`displayLabel` / `reasonLabel` 的移出**：
+   在后续重构中，彻底把分析模块和 Context 内返回的 `displayLabel` 清理干净，改成在前端组件中通过 UI Mapping 派生生成，还分析算法层以纯净。
+4. **`duplicate.ts` 的移出**：
+   后续重构时需要调整 `duplicate.ts` 使其仅输出相似关系，不直接修改底层 status 等状态信息。
+
+---
+
+## 七、 后续重构路线图
+
+后续的重构工作划分为以下几个 Checkpoints 进行：
+
+### 1. `CORE-MAPPING-1` (UI 状态映射重构 - 已完成)
+- 新建独立文件 `src/lib/utils/photoLabelMapping.ts`。
+- 将 results 页面里的 `getUserVisibleBucket` 和 `getReasonTags` 移出到独立文件中。
+
+### 2. `CORE-MAPPING-1.1` (UI 导出统一 - 已完成)
+- 修正 `photoLabelMapping.ts` 的依赖方向，移除对 Context 的直接导入，改用轻量级 type。
+- 统一 ZIP 导出分区规则，使其复用 `getUserVisibleBucket`。
+
+### 3. `CORE-DECISION-1` (独立决策层引入 - 已完成)
+- 创建 `src/lib/analysis/decision/photoDecision.ts`。
+- 引入决策层逻辑，提供 `getDecisionSuggestion` 函数以输出客观的建议状态与代号，且此文件内不包含任何中文 UI 字眼。
+
+### 4. `CORE-DECISION-1.1` (用户决定优先级与导出强化 - 当前已完成)
+- 修正 `photoDecision.ts` 中 `userDecision` 判定逻辑使其成为最高优先级，能够覆盖默认状态和算法识别结果。
+- 重写 results 导出文案提示，强化 needsBattle（未 PK 完照片）的建议警示。
+
+### 5. `CORE-DUPLICATE-PLANNING-1` (相似聚类解耦规划 - 已完成)
+- 规划了 `duplicate.ts` 相似检测逻辑与状态决策的物理拆分边界。
+- 确立原则：`duplicate.ts` 后续仅归为分析层（Analysis Layer），只输出客观的相似组信号（`SimilarityGroupSignal`），不再向照片写入 `status` / `displayLabel` / `reasonLabel`。
+- 确立决策映射规则：`needsBattle` 状态由决策层根据客观相似信号逻辑生成；中文“需要 PK”文本和翻译职责完全交由 UI Mapping 层的 `photoLabelMapping.ts` 接管。
+
+### 6. `CORE-DUPLICATE-READ-1` (相似检测职责与风险只读分析 - 已完成)
+- Codex 对当前 `duplicate.ts` 的代码职责进行了只读审查与 diff 分析，确认其当前处于正常运行状态，但明确了需要移出及可以保留的具体职能边界。
+
+### 7. `CORE-DUPLICATE-1` (新增纯相似组信号函数 - 当前已完成)
+- 在 `duplicate.ts` 中新增并导出了 `buildDuplicateSignals` 纯计算函数与相关类型，不写入照片任何 `status`、`suggestedStatus` 等业务分类，也不涉及任何中文文案和 `displayLabel`/`reasonLabel`。
+- 保留旧有的 `detectDuplicates` 函数，当前主流程不发生任何实际生效的改变，提供安全的向后兼容保障。
+
+### 8. `CORE-DUPLICATE-2` (双路生成对比 - 当前已完成)
+- 在 `PhotoWorkspaceContext.tsx` 中实现了对旧版 `detectDuplicates` 与新版 `buildDuplicateSignals` 的双路生成，通过比对方法计算并在开发模式下用 `console.debug` 打印出了相似组对比摘要。本步骤完全不影响用户流程、状态机和导出，成功固化了双路校验层。
+
+### 9. `CORE-DUPLICATE-2.1` (QA 双路安全收敛 - 当前已完成)
+- 标注了 `duplicateSignalResult` 字段为 dev-only 专属，限制其绝不参与 UI、结果显示与 ZIP 导出流程。
+- 限制 `runDuplicateQA` 异常分支的日志仅在开发阶段以 `console.warn` 输出，杜绝在生产中打印非必要 QA 日志。
+- 在后续 `CORE-DUPLICATE-3` 规划实施前，继续确认并保持旧的 `detectDuplicates` 驱动主流程。
+
+### 10. `CORE-DUPLICATE-3-PLANNING` (接入路径规划 - 当前已完成)
+- 新增项目根目录文档 `duplicate_signal_integration_plan.md`，深度规划了新信号如何分阶段平滑接入 Context。
+- 提出了 `buildSimilarGroupsFromSignals` 无副作用转换函数的设计，避免引入中文文案与状态污染。
+- 细化了双路保存 `similarGroups` 对比验证、灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 的引入，并分析了潜在的 O(n²) 性能风险与 O(n) group 漂移风险。
+- 本阶段完全未改动任何 React / JS 代码，主流程和 QA 字段性质均保持原封不动。
+
+### 11. `CORE-DUPLICATE-3` (新增转换函数 - 当前已完成)
+- 新增并导出了不使用 `Date.now()` 的 `buildSimilarGroupsFromSignals` 纯转换函数。
+- 在 `PhotoWorkspaceContext.tsx` 中局部还原出旧相似组数据并在不改写主流程的前提下生成 `newSimilarGroupsForQA`，顺利计算出了双路分组长度与照片成员数对比差额，扩展了 QA 对比摘要指标。
+
+### 12. `CORE-DUPLICATE-3.1` (QA 命名与注释收敛 - 当前已完成)
+- 将旧的兼容类型 `SimilarGroupSignalForBattle` 重命名为 `QASimilarGroupSignalForBattle`，明确了 QA 专用的语义隔离。
+- 强化了 Context 暴露的 `duplicateSignalResult` 属性 and `newSimilarGroupsForQA` 局部变量的隔离注释与警告声明，防范主流程代码、结果渲染及 ZIP 导出非预期误用。
+- 双路分析数据仅作调试校验，不属于正式产品模型，旧路径驱动主流程保持不变。
+
+### 13. `CORE-DUPLICATE-4-PLANNING` (双路保存规划 - 当前已完成)
+- 新建了 `duplicate_context_dual_group_plan.md` 规划文档，制定了双路 `similarGroups` 对比数据在 Context 中持久化存储的接口（`duplicateGroupQA`）与规则。
+- 确立了隔离警告规范、调试对比日志标准，并重申了 O(n²) 性能与 needsBattle 导出兜底等红线规范。
+- 本轮只撰写规划文档，未改动任何业务和 React 源码。
+
+### 14. `CORE-DUPLICATE-4` (双路保存实现 - 当前已完成)
+- 在 `PhotoWorkspaceContext.tsx` 中实现了只读的 `duplicateGroupQA` 调试状态并对外暴露。
+- 状态中运行时保存了还原出的 `oldSimilarGroupsForQA`、转换出的 `newSimilarGroupsForQA` 及比对摘要 `comparison`，完成了比对数据的持久化，并且未对主流程做任何改动。
+
+### 15. `CORE-DUPLICATE-4-QA` (双路保存只读审查 - 当前已完成)
+- Codex 完成了只读审查，确认 `duplicateGroupQA` 仅作为开发期 QA 只读调试状态，results 视图、PK 对局与 ZIP 导出未对其产生任何引用依赖，且主流程构建正常。
+
+### 16. `CORE-DUPLICATE-5-PLANNING` (灰度切换规划 - 当前已完成)
+- 新增项目根目录文档 `duplicate_gray_switch_plan.md`，深度规划了 `USE_SIGNAL_GROUPS_FOR_BATTLE` 开关控制架构。
+- 规定了在 `src/lib/config/featureFlags.ts` 中声明灰度开关、默认极值保持为 `false` 以确保兼容性、在 QA 验收前禁止切换主流程、以及一键开关回退容灾策略。
+
+### 17. `CORE-DUPLICATE-5` (灰度开关集成 - 当前已完成)
+- 在 `src/lib/config` 下创建了 `featureFlags.ts` 配置文件，导出并硬编码声明了 `USE_SIGNAL_GROUPS_FOR_BATTLE = false`，配有详细的 QA 限制说明。
+- 未把此开关接入任何 Context 和整理逻辑，主流程维持原状。
+
+### 18. `CORE-DUPLICATE-5-QA` (开关隔离只读审查 - 当前已完成)
+- 经 Codex 进行只读性审查，确保 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值绝对为 `false`，无非预期的业务引用。
+
+### 19. `CORE-DUPLICATE-6-PLANNING` (true 分支接入规划 - 当前已完成)
+- 规划了 `true` 分支的接入路径和验收红线。Feature Flag `true` 分支规划必须遵守四大原则：
+  - **默认 false**：生产配置默认关闭，走 legacy 稳定路径。
+  - **development-only**：在代码和运行时进行 NODE_ENV 阻断，仅在开发和 QA 环境生效。
+  - **用户最终决定优先**：Photo Battle 中用户的手动点击决断永远拥有最高优先级，覆盖算法预判。
+  - **可快速回退**：发生任何异常时，可一键将开关改回 `false` 实现秒级无感回退，不影响照片状态和导出。
+
+### 20. `CORE-DUPLICATE-6` (开发环境灰度接入 - 当前已完成)
+- 在 Context 中正式读取了 Feature Flag，并加上了 canUseSignalGroupsForBattle 物理限流保护。
+- **状态约束**：当前 false 分支必须继续保持稳定主流程。因为开关默认值为 `false`，所以最终用户的整理流程、A/B 擂台以及 ZIP 导出数据流 100% 保持原有遗留逻辑不变。用户最终分类依然只收敛为“保留”与“淘汰候选”两类。
