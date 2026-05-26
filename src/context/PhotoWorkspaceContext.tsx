@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { analyzeImage } from '@/lib/imageAnalysis';
 import { AnalysisMode, SimilarGroup, BattleDecision } from '@/lib/analysis/vision/types';
-import { detectDuplicates, buildDuplicateSignals, DuplicateAnalysisResult, buildSimilarGroupsFromSignals, QASimilarGroupSignalForBattle } from '@/lib/analysis/local/duplicate';
+import { detectDuplicates, buildDuplicateSignals, DuplicateAnalysisResult, buildSimilarGroupsFromSignals, QASimilarGroupSignalForBattle, adaptSignalGroupsToLegacySimilarGroups } from '@/lib/analysis/local/duplicate';
 import { USE_SIGNAL_GROUPS_FOR_BATTLE } from '@/lib/config/featureFlags';
 
 export interface ActiveBattleState {
@@ -488,7 +488,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       }));
       const newResult = buildDuplicateSignals(signalInputs);
       const signalGroups = buildSimilarGroupsFromSignals(newResult);
-      setSimilarGroups(signalGroups as unknown as SimilarGroup[]);
+      setSimilarGroups(adaptSignalGroupsToLegacySimilarGroups(signalGroups, Date.now()));
     } else {
       // 稳定分支：继续使用 legacy 相似组逻辑来初始化和驱动
       const groupsMap: { [groupId: string]: string[] } = {};

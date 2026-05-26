@@ -483,4 +483,36 @@ export function buildSimilarGroupsFromSignals(
     });
 }
 
+export interface SimilarGroupCompatible {
+  id: string;
+  photoIds: string[];
+  recommendedPhotoIds: string[];
+  backupPhotoIds: string[];
+  cullCandidateIds: string[];
+  undecidedPhotoIds: string[];
+  battleCompleted: boolean;
+  battleUpdatedAt: number;
+}
+
+/**
+ * Adapter function that maps QASimilarGroupSignalForBattle[] to the full SimilarGroupCompatible shape,
+ * filling in the battleUpdatedAt field with a timestamp provided by the caller.
+ * This is a pure function that does not use Date.now() internally.
+ */
+export function adaptSignalGroupsToLegacySimilarGroups(
+  groups: QASimilarGroupSignalForBattle[],
+  battleUpdatedAt: number
+): SimilarGroupCompatible[] {
+  return groups.map(group => ({
+    id: group.id,
+    photoIds: [...group.photoIds],
+    recommendedPhotoIds: [...group.recommendedPhotoIds],
+    backupPhotoIds: [...group.backupPhotoIds],
+    cullCandidateIds: [...group.cullCandidateIds],
+    undecidedPhotoIds: [...group.undecidedPhotoIds],
+    battleCompleted: group.battleCompleted,
+    battleUpdatedAt: battleUpdatedAt
+  }));
+}
+
 

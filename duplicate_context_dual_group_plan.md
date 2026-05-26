@@ -135,3 +135,16 @@ if (process.env.NODE_ENV === "development") {
 - 在 Context 中正式读取了灰度开关，并添加了 `canUseSignalGroupsForBattle` 的 development-only 强条件校验。
 - 确认 `duplicateGroupQA` 仍然只是只读的 dev-only QA 数据，未在任何 UI 或导出模块中消费。
 - 当前由于开关默认关闭，正式的 `similarGroups` 对局数据源依然走的是 legacy 旧流程，主流程逻辑完全没有改变。
+
+### 7. `CORE-DUPLICATE-7-PLANNING` (本地测试流程规划 - 当前已完成)
+- 新建了 `duplicate_true_branch_test_plan.md`，规划了本地开发环境下的 true 灰度分支测试细则。
+
+### 8. `CORE-DUPLICATE-7` (本地灰度开发调试 - 当前已完成)
+- 本地临时开启开关并进行流转回归，Demo 数据比对完全对齐，测试结束后开关已恢复为 `false` 极值。
+
+### 9. `CORE-DUPLICATE-8-PLANNING` (适配规划与去强转 - 当前已完成)
+- 规划了 `duplicate_signal_type_adapter_plan.md`。
+- **安全规范**：Context 未来 true 分支必须通过显式适配函数（`adaptSignalGroupsToLegacySimilarGroups`）接收并补全客观相似信号，彻底消除 `as unknown as SimilarGroup[]` 强转，确保类型安全。
+
+### 10. `CORE-DUPLICATE-8` (类型适配与去强转 - 当前已完成)
+- 实现了 `adaptSignalGroupsToLegacySimilarGroups` 适配函数，Context 在 true 灰度分支中通过它显式重映射客观相似信号，移除了 `as unknown as SimilarGroup[]` 强转以恢复正常的静态编译期检查，主流程依然由默认 `false` 开关安全隔离。

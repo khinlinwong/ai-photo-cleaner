@@ -113,8 +113,13 @@ if (canUseSignalGroups) {
    - 强调 `true` 只能本地 `development` 环境临时测试，测试结束后必须立刻恢复为 `false`，绝不把 `true` 默认值提交到远程仓库。
 4. **`CORE-DUPLICATE-7` (本地灰度开发调试 - 当前已完成)**：
    - 本地将开关改为 `true` 进行测试流转，记录 Demo 与小批量图片的一致性。测试结束后已恢复 `false` 默认值，不提交 `true` 默认值。
-5. **`CORE-DUPLICATE-7-QA` (灰度测试回归)**：
-   - 针对 Photo Battle、ZIP 导出以及多回合重置数据流进行深度定量分析与回归。
+5. **`CORE-DUPLICATE-7-QA` (灰度测试回归 - 当前已完成)**：
+   - 针对 Photo Battle、ZIP 导出以及多回合重置数据流进行深度定量分析与回归，确认无异常。
+6. **`CORE-DUPLICATE-8-PLANNING` (本地图片测试与类型适配规划 - 当前已完成)**：
+   - 规划了 20-50 张非隐私本地图片 true 分支测试方案。
+   - 规划了 `adaptSignalGroupsToLegacySimilarGroups` 显式类型适配器，用于彻底拔除 `as unknown as SimilarGroup[]` 强转技术债。
+7. **`CORE-DUPLICATE-8` (类型适配逻辑实现 - 当前已完成)**：
+   - 新增显式类型适配器 `adaptSignalGroupsToLegacySimilarGroups` 并定义 `SimilarGroupCompatible` 接口，在 Context 初始化 true 分支里彻底移除了 `as unknown as SimilarGroup[]` 强转，由适配器在编译期保障类型安全性。
 
 ---
 
@@ -123,4 +128,4 @@ if (canUseSignalGroups) {
 - **Demo 实测结果**：在 `true` 灰度分支下，Demo 数据集的双路校验 100% 对齐一致，所有对决、跳过、重置与 ZIP 导出流程均通过验证。
 - **本地图片测试状态**：小批量本地图片尚未测试。
 - **结论限制**：由于本地图片集尚未进行测试验证，当前结论不能扩大到真实本地图片集。
-- **后续方向**：下一步应进入小批量本地图片测试规划或 `CORE-DUPLICATE-8-PLANNING`（类型适配）。
+- **后续方向**：随着类型适配的完毕，后续应正式执行 20-50 张本地非隐私图片的 true 灰度分支测试（`CORE-DUPLICATE-7` 本地回归测试阶段）。

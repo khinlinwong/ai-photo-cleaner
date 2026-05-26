@@ -125,10 +125,15 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 6. **`CORE-DUPLICATE-7-PLANNING` (灰度测试规划 - 当前已完成)**：
    - 新增了 `duplicate_true_branch_test_plan.md`。
    - 确立了灰度开关临时测试规范：默认 `false`，本地 development 环境临时 `true` 测试，测试完毕立刻归位 `false`，绝不提交 `true`，也绝不 push `true` 的默认值。
+   - 确立了 灰度开关临时测试规范：默认 `false`，本地 development 环境临时 `true` 测试，测试完毕立刻归位 `false`，绝不提交 `true`，也绝不 push `true` 的默认值。
 7. **`CORE-DUPLICATE-7` (本地灰度开发调试 - 当前已完成)**：
    - 本地临时将开关改为 `true` 进行测试流转，记录 Demo 与小批量图片的一致性。测试结束后已将其彻底恢复为 `false`，不提交 `true` 默认值。
-8. **`CORE-DUPLICATE-7-QA` (灰度测试回归)**：
+8. **`CORE-DUPLICATE-7-QA` (灰度测试回归 - 当前已完成)**：
    - 针对 Photo Battle、ZIP 导出以及多回合重置数据流进行深度定量分析与回归。
+9. **`CORE-DUPLICATE-8-PLANNING` (类型适配与本地图片测试规划 - 当前已完成)**：
+   - 规划了 `adaptSignalGroupsToLegacySimilarGroups` 类型适配方案以及 20-50 张非隐私本地图片的灰度测试细节。
+10. **`CORE-DUPLICATE-8` (类型适配逻辑实现 - 当前已完成)**：
+    - 新增并导出了显式纯类型适配器 `adaptSignalGroupsToLegacySimilarGroups`，并在 Context 的 true 灰度分支里调用其接收 signal-derived groups，成功移除了 `as unknown as SimilarGroup[]` 强转。
 
 ---
 
@@ -137,4 +142,5 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - **Demo 验证情况**：临时在本地开发环境手动开启 `true` 后，Demo 旅行照片集测试顺利跑通所有流程，双路校验的组数、总张数及 Leader 推荐 100% 对齐。
 - **状态恢复**：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为默认 `false`。
 - **限值保护约束**：在小批量本地非敏感照片测试尚未完成前，绝不允许将此开关默认启用为 `true`。
-
+- **技术债与灰度状态**：类型强转的技术债务已在灰度切换前彻底消除，但 Feature Flag 配置常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 在代码中仍然强制默认为 `false`，确保生产环境绝对稳定。
+- **技术债处理约束**：在 true 分支全量合并和扩大测试前，必须首先解决类型强转的编译安全隐患，不允许长期依赖 `as unknown as SimilarGroup[]` 强转。

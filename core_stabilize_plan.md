@@ -256,3 +256,11 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 ### 22. `CORE-DUPLICATE-7` (本地灰度开发调试 - 当前已完成)
 - 经在本地开发环境临时开启开关，Demo 流程与双路算法校验 100% 对齐一致，流转测试完全通过。测试结束后开关已归位恢复为 `false`。
 - **状态与主流程约束**：当前正式主流程依然保持为 legacy 方案，以确保安全稳定。下一步工作流建议是推进 20-50 张非隐私本地图片 true 分支测试与新信号类型适配开发（`CORE-DUPLICATE-8-PLANNING`）。最终的用户可见分类依然保持二值化收敛为“保留”与“淘汰候选”。
+
+### 23. `CORE-DUPLICATE-8-PLANNING` (类型适配与本地测试规划 - 当前已完成)
+- 新建了 `duplicate_signal_type_adapter_plan.md` 类型适配方案，并设计了 20-50 张非隐私本地图片的 true 分支手动灰度测试细节。
+- **状态与主流程约束**：下一阶段的重点为：本地小批量 true 分支测试与 signal group 显式类型适配；依然严禁扩大 production 启用范围，当前主流程 100% 保持稳定 legacy 分流，用户分类依然为“保留”与“淘汰候选”。
+
+### 24. `CORE-DUPLICATE-8` (类型适配实现 - 当前已完成)
+- 新增并导出了显式纯适配器函数 `adaptSignalGroupsToLegacySimilarGroups`，消除强转使得类型适配在编译层面更加安全。
+- **状态与主流程约束**：当前正式主流程依然保持为 legacy 稳定路径，不对用户主工作流进行任何侵入修改，最终的用户分类保持为“保留”与“淘汰候选”。
