@@ -347,9 +347,16 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 正式主流程仍保持 legacy 稳定分支运行，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值强制为 `false`。
   - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值。
 
-### 38. `CORE-PERFORMANCE-2-PLANNING` (虚拟网格与懒加载缩略图规划 - 当前已完成)
+### 38. `CORE-PERFORMANCE-2-PLANNING` (虚拟网格与懒加载缩略图规划 - 已完成)
 - **局部重构规划**：已在项目根目录下新建了 [results_virtual_grid_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_plan.md) 规划结果展示页面（Results Page）的自研轻量级虚拟化滚动网格与缩略图离屏懒加载机制。此优化可在不引入任何第三方复杂依赖的前提下，有效降低 results 卡片 DOM 树节点个数和内存驻留开销，改善滚动性能。
 - **状态与主流程约束**：
   - 本阶段规划属于纯 UI 展示层的局部渲染优化，不改动核心决策与 Context 状态机，亦不触碰感知聚类分析算法。
   - 正式主流程仍强制由 legacy 方案驱动，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值保持 `false`。
   - 用户可见的最终决策归档依旧强制收敛为“保留”与“淘汰候选”二值分类。
+
+### 39. `CORE-PERFORMANCE-3-PLANNING` (results 虚拟网格代码接入点规划 - 当前已完成)
+- **接入点重构规划**：已在项目根目录下新建了 [results_virtual_grid_integration_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_integration_plan.md)，对 `src/app/results/page.tsx` 页面结构、照片列表变量名、操作按钮及解耦关系进行深度分析，明确定义了 `VirtualPhotoGrid` 的通用泛型 props 与滚动撑开、resize 重算逻辑，并强调第一版不做 objectURL 离屏回收以防解码闪烁。
+- **状态与主流程约束**：
+  - 本阶段只做代码接入点规划，不修改任何 src 代码与 Context。
+  - 正式主流程仍保持 legacy，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
+  - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值分类。

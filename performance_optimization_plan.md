@@ -13,7 +13,7 @@
    - `/processing` 图像解码与分析阶段总耗时：26.04 秒。
    - 双路聚类算法比对指标完全一致（old/new group count: 45 / 45，photo count: 180 / 180，leaderMismatchCount: 0）。
    - **出现性能预警**：跳转并首次渲染 `/results` 网格大列表卡片时，主线程占用率极高，滚动网格时出现了轻微掉帧，表明浏览器原型性能已触及舒适交互上限。
-4. **功能闭环情况**：Photo Battle 擂台对决、skip 决断、reset 恢复以及 ZIP 打包压缩在三档测试中均功能完好，且导出的 ZIP 保留了原始图片的 JPG / PNG / WebP 后缀与物理格式。
+4. **功能闭环情况**：Photo Battle 擂台对决、skip 决断、reset 恢复以及 ZIP 打包压缩在三档测试中均功能完合，且导出的 ZIP 保留了原始图片的 JPG / PNG / WebP 后缀与物理格式。
 5. **用户可见分类约束**：用户可见的最终整理归宿依然强制收敛为“保留”与“淘汰候选”两类。
 
 ### 结论
@@ -29,7 +29,7 @@
 在中批量（200 / 300 张）真实图片压测中，浏览器的潜在性能瓶颈主要集中在以下 7 个物理层面：
 
 1. **主线程负担过载**：浏览器主线程同时承担着文件读取、图片异步解码、Canvas 画布绘制重绘、dHash 感知哈希聚类、综合清晰度算分、React 状态更新以及 DOM 节点渲染重绘任务，极易引发事件响应排队与假死。
-2. **Canvas 像素高频读取**：通过 Canvas 获取图像的 `ImageData` 是物理同步操作。在大批量图片短时间内排队调用 `getImageData` 时，主线程会被硬性阻塞。
+2. **Canvas 像素高频读取**：通过 Canvas 获取图像的 `ImageData` 是物理同步操作。在大批量图片电光石火间排队调用 `getImageData` 时，主线程会被硬性阻塞。
 3. **O(n²) 级连通图聚类查找**：在检测相似对决组时，汉明距离两两比对在最坏情况下的计算复杂度为 $O(n^2)$。当照片规模增加到 300+ 甚至 500+ 时，两两比对的次数将急剧增长。
 4. ** results 页面 DOM 节点树膨胀**：对于 300 张图片，页面在一瞬间会生成超过 300 个包含多重控制按钮、信息标签和高清晰度大缩略图的卡片 DOM，重绘压力极大，导致滚动掉帧。
 5. **缩略图瞬间解码与装载**：在扫描分析结束后，结果页面一次性拉取并渲染全部图片的 base64 缩略图，导致浏览器瞬间产生巨大的物理内存波峰。
@@ -163,15 +163,15 @@ graph TD
 
 性能优化路线应通过以下 Checkpoint 逐步规划与推进：
 
-1. **`CORE-PERFORMANCE-1-QA`（性能规划审查）**：
+1. **`CORE-PERFORMANCE-1-QA`（性能规划审查 - 已完成）**：
    - Codex 对本规划文件进行只读安全性与实施边界审计，确认无 src 代码变动且 flag 极值保持 `false`。
-2. **`CORE-PERFORMANCE-2-PLANNING`（ results 虚拟网格设计）**：
-   - 规划 results 页面的虚拟网格（Virtual Grid）及懒加载缩略图方案，定义滚动检测边界，绝不改写业务状态机。
-3. **`CORE-PERFORMANCE-3-PLANNING`（分批处理与进度条优化设计）**：
-   - 设计分批导入文件、时间分片让出主线程、以及取消分析队列的状态流转设计。
-4. **`CORE-PERFORMANCE-WORKER-1-PLANNING`（计算 Worker 消息通道规划）**：
-   - 设计 Web Worker 离线计算层和 Transferable Objects 传输协议，规划双向数据交互信道（Message Channel）。
-5. **`CORE-EXPORT-PERFORMANCE-1-PLANNING`（异步 Worker 打包设计）**：
-   - 设计后台 Worker 压缩打包方案与打包中途进度条 UI 反馈，确保 UI 全程可控。
+2. **`CORE-PERFORMANCE-2-PLANNING`（ results 虚拟网格设计 - 已完成）**：
+   - 规划了 results 页面的虚拟网格（Virtual Grid）及懒加载缩略图方案，确定性能优化第一落点为 results 虚拟网格，不先做风险更大的后台 Web Worker 多线程计算。
+3. **`CORE-PERFORMANCE-3-PLANNING`（results 虚拟网格代码接入点规划 - 当前已完成）**：
+   - 对 `src/app/results/page.tsx` 中保留区和淘汰候选区列表进行了接入点只读分析，设计了独立无业务逻辑的 `VirtualPhotoGrid` 接口，并确定第一版不做 objectURL 回收以保证渲染流畅度。
+4. **`CORE-PERFORMANCE-3-QA`（虚拟网格接入点设计审查）**：
+   - 审查新建的 [results_virtual_grid_integration_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_integration_plan.md)，确保没有任何 src 代码脏改动。
+5. **`CORE-PERFORMANCE-4`（自研虚拟滚动组件实现与接入）**：
+   - 编写 `VirtualPhotoGrid` 并在 results 页面中进行替换接入。
 
-- **`CORE-PERFORMANCE-2-PLANNING` 进展更新**：目前已正式启动并完成了对 results 结果页虚拟网格（Virtual Grid）与缩略图懒加载方案的独立专项设计，新建了规划文件 [results_virtual_grid_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_plan.md)。本阶段确立了优先解决 results 网格滚动渲染卡顿与 DOM 树过载的核心痛点，而不优先进行风险和开销更大的后台 Web Worker 开发，主线程逻辑和 Context 状态层维持绝对纯净隔离。
+- **进展更新**：目前已确定性能优化的第一落点是 **results 自研虚拟网格**，且为了将风险控制在 UI 渲染层，当前**不先做 Web Worker**。在 `CORE-PERFORMANCE-3-PLANNING` 阶段，我们完成了 results 页面卡片的 DOM 结构只读分析与组件接入设计，为下一阶段的实际组件编码扫清了障碍。
