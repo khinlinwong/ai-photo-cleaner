@@ -251,3 +251,5 @@ QA 实测指标对齐：
 后续要求：
 - 仿真元数据测试的成功不代表主线程物理 I/O 及渲染压力的消除。
 - 下一步必须规划真实 100-300 张物理图片文件的压力测试，在完成该项测试前，绝对不允许在 production 或默认主流程中启用 `true` 开关。
+- **CORE-DUPLICATE-11-PLANNING 进展更新**：下一阶段将测试真实 100-300 张图片文件，测试重点从算法数据链路正式扩展到物理 I/O、解码、Canvas 以及 ZIP 打包和 DOM 重绘等系统物理性能瓶颈。详细规划文件已新建于 [duplicate_real_file_stress_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_real_file_stress_test_plan.md)。
+- **CORE-DUPLICATE-11 真实 BMP 文件测试已通过**：使用仿真生成的 300 张无隐私、非敏感物理 BMP 图片（位于项目外部 `D:\ai-photo-cleaner-test-photos`），在开发环境下进行了 true 分支压力测试。结果表明 100/200/300 张各档位流程流转、双路比对一致性、Photo Battle 及 ZIP 打包逻辑完全正常。测试完成后已将该外部测试图片物理删除，测试图片未进入 Git，且 Feature flag 常量已恢复为默认 `false`。

@@ -317,4 +317,23 @@
 - **性能与安全边界说明**：
   - 核心提醒：本轮测试为**仿真元数据测试**，并不等于真实 200 张物理大图的读取、解码、Canvas 分析、UI 渲染以及 ZIP 打包压缩等物理压力测试。
   - 开关状态：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已恢复为 `false`，无任何 true 脏配置。
-  - 下一步规划：明确下一步应规划**真实 100-300 张图片文件**的压力测试。在完成物理图片文件测试前，绝不允许在生产环境或默认主流程中启用 `true` 开关。
+- 下一步规划：明确下一步应规划**真实 100-300 张图片文件**的压力测试。在完成物理图片文件测试前，绝不允许在生产环境或默认主流程中启用 `true` 开关。
+
+---
+
+## 十六、 CORE-DUPLICATE-11-PLANNING 进展更新
+
+- **真实图片文件压力测试规划**：已在项目根目录新建 [duplicate_real_file_stress_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_real_file_stress_test_plan.md) 规划真实 100-300 张物理图片文件的压力测试。
+- **三档推进原则**：测试将分为 100 张、200 张和 300 张三档逐步递增测试。如果在 100 张或 200 张阶段已产生明显的浏览器假死或性能卡顿，则立刻中止测试，不继续扩大规模，坚决遵守即测即恢复 `false` 的防线。
+
+---
+
+## 十七、 CORE-DUPLICATE-11 实测状态
+
+- **真实 BMP 图片文件 true 分支测试已通过**：分三档完成了真实物理 BMP 格式图片的压力回归测试。
+- **双路 parity 校验审计数据**：
+  - **100 张**：4 / 4 groups，16 / 16 grouped photos，leaderMismatchCount 0。分析耗时 947.95 ms。
+  - **200 张**：7 / 7 groups，28 / 28 grouped photos，leaderMismatchCount 0。分析耗时 1653.18 ms。
+  - **300 张**：7 / 7 groups，28 / 28 grouped photos，leaderMismatchCount 0。分析耗时 2469.56 ms。
+- **对决、跳过、重置与 ZIP 导出**：各档位核心功能通畅无误，ZIP 物理分区一致性校验 100% 成功，开关已归位恢复为 `false`。
+- **测试局限与下一步规划**：本测试仅覆盖小尺寸 24-bit 无压缩 BMP 格式（300 张总计约 108 MB 物理数据）。不能代表 JPG / PNG / WebP 压缩图片格式的解码压力，也不代表 RAW / HEIC 或 10MB 级手机大图的承载瓶颈。下一步不能直接默认或生产启用 true，仍需要规划 500+ BMP 大批量分档压测，或进行混合压缩格式真实图片测试规划。

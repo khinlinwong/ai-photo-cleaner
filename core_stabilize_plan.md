@@ -286,3 +286,17 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 分类约束：最终的用户分类依然二值化收敛为“保留”与“淘汰候选”。
   - 下一步方向：建议进入 `CORE-DUPLICATE-11-PLANNING`，规划真实 100-300 张物理图片文件的压力测试，解决主线程物理 I/O 和渲染负载验证。
 
+### 29. `CORE-DUPLICATE-11-PLANNING` (真实 100-300 张图片文件压力测试规划 - 当前已完成)
+- 已在项目根目录新建 [duplicate_real_file_stress_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_real_file_stress_test_plan.md) 规划真实 100-300 张物理图片文件的压力测试。
+- **状态与主流程约束**：
+  - 测试重点从算法逻辑对齐扩展到真实物理文件处理压力（I/O 读取、Canvas 解析、缩略图渲染及 ZIP 大队列打包）。
+  - 主流程与分类锁定：正式主流程依然保持为 legacy 方案，最终用户可见的分类仍只有“保留”与“淘汰候选”两类。
+
+### 30. `CORE-DUPLICATE-11` (真实 100-300 张物理 BMP 图片压力测试 - 当前已完成)
+- 成功分三档执行了 100/200/300 张真实 BMP 图片文件 true 分支的压力测试，双路 parity 一致性对齐通过，ZIP 打包及操作符合预期，开关已复位为 `false`。
+- **状态与主流程约束**：
+  - 测试局限：本轮测试仅覆盖小尺寸 24-bit 无压缩 BMP 物理大图，未直接覆盖 JPG/PNG/WebP 解码压强或手机原图及 HEIC/RAW。
+  - 开关复位：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为 `false`，生产环境绝对禁启用。
+  - 主流程与分类锁定：正式主流程依然保持为 legacy 方案，最终用户可见的分类仍只有“保留”与“淘汰候选”两类。
+  - 下一步方向：建议进入 `CORE-DUPLICATE-12-PLANNING`，规划 500+ BMP 大批量分档压测，或进行混合压缩格式（JPG/PNG/WebP）物理图片测试的规划。
+
