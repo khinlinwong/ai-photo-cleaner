@@ -327,3 +327,16 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 正式主流程依然维持 legacy 稳定处理，开关常量保持 `false` 不变。
   - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”。
   - **下一步方向**：建议进入 `CORE-DUPLICATE-13-PLANNING`，规划 200 / 300 张 JPG / PNG / WebP 混合格式的 true 分支压力测试。
+
+### 35. `CORE-DUPLICATE-13-PLANNING` (混合格式 200 / 300 张测试规划 - 当前已完成)
+- **测试规划**：已在项目根目录下新建了 [duplicate_mixed_format_200_300_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_mixed_format_200_300_plan.md) 规划中等批量 200 张与 300 张真实图片文件在 true 灰度分支下的物理压力测试。
+- **状态与主流程约束**：
+  - 正式主流程仍保持 legacy 稳定分支运行，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值必须保持为 `false`。
+  - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值。
+
+### 36. `CORE-DUPLICATE-13` (混合格式 200 / 300 张测试 - 当前已完成)
+- **测试实测**：在开发环境下临时启用 `true` 分支，成功完成了 200 张与 300 张混合格式真实图片的物理压力测试，新旧相似算法数据 Parity 100% 一致。但 300 张大网格在首次加载与滚动时触发了轻微的 DOM 掉帧，表明浏览器主线程已接近处理上限。
+- **状态与主流程约束**：
+  - 正式主流程仍保持 legacy 稳定分支运行，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然强制为 `false`。
+  - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值。
+  - **下一步方向**：建议进入 `CORE-PERFORMANCE-1-PLANNING`，规划针对大网格虚拟化列表渲染、Web Worker 异步解耦、分批加载和打包的系统性能优化路线。

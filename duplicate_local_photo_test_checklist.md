@@ -257,3 +257,5 @@ QA 实测指标对齐：
 - **CORE-DUPLICATE-12-ABORT-DOCS 进展更新**：JPG / PNG / WebP 混合格式测试在 100 张档位执行时因 React Fiber 内部状态读取超时而中止。此次中止表明当前物理测试不应依赖 React Fiber 内部树遍历来作为长期的 QA 验证手段。后续重试与测试方案中，应使用页面上可见的 UI 指标、控制台输出摘要或明确的 dev-only 调试输出，以提高测试的稳定性和兼容性。
 - **CORE-DUPLICATE-12-RETRY-PLANNING 进展更新**：已在项目根目录下新建了 [duplicate_mixed_format_retry_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_mixed_format_retry_plan.md)。针对第一次测试在无界面浏览器环境下读取 React Fiber 属性返回 `None` 导致的轮询超时，未来重试过程中禁止依赖 React Fiber 内部树遍历读取 QA 指标，改为使用更稳定的控制台日志摘要（Console Summary）或可见 UI 指标进行校验。
 - **CORE-DUPLICATE-12-RETRY 验证结果**：100 张 JPG / PNG / WebP 混合格式 retry 测试已顺利跑通并获得验证。本次测试印证了不依赖 React Fiber 进行长期 QA 指标读取的必要性，优先采用 `console summary` 或者是页面可见 UI（DOM）进行指标抓取。测试完成后开关已归位恢复为 `false`。
+- **CORE-DUPLICATE-13-PLANNING 进展更新**：混合格式测试下一阶段规划扩大到 200 / 300 张。测试将严守分档拦截原则，若 200 张测试发生失败或明显卡顿，绝不继续执行 300 张测试，避免主线程开销失控。详细规划见 [duplicate_mixed_format_200_300_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_mixed_format_200_300_plan.md)。
+- **CORE-DUPLICATE-13 验证结果**：混合格式真实照片测试已成功覆盖了 100 / 200 / 300 张三档压测，数据比对 Parity 达到 100%。但 300 张压测中在 `/results` 出现了轻微的滚动掉帧，后续应当停止盲目扩大测试，工作重点必须转向性能优化规划。

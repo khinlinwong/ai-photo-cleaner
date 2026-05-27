@@ -377,5 +377,7 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - **重试开关原则**：在未来的混合格式重试（RETRY）期间，`USE_SIGNAL_GROUPS_FOR_BATTLE` 常量必须继续遵循“即测即恢复 false”的极值限制，测试结束后无条件改回 `false`。
 - **生产锁死**：生产环境（production）依然 100% 锁死在 legacy 分支，确保主流程的稳定性和后向兼容性。
 - **CORE-DUPLICATE-12-RETRY 实测结论**：本轮 100 张混合格式 retry 压测后，开发环境下的灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已立即安全恢复为默认值 `false`，保证代码仓库无 `true` 配置残留。在混合格式大批量 200 张与 300 张等更广维度测试完全稳定跑通前，`true` 灰度开关绝不允许在生产环境（production）启用，生产环境依旧 100% 被 legacy 稳定主流程强制锁死。
+- **CORE-DUPLICATE-13-PLANNING 进展更新**：在未来规划的 200 / 300 张混合格式物理压测中，测试期间同样必须严格遵循“即测即恢复 false”的红线规程，绝对不允许将启用状态遗留在 `featureFlags.ts` 中。生产环境依然 100% 锁死在 legacy 分离机制中，不得启用 `true` 流程。
+- **CORE-DUPLICATE-13 实测结论**：200 / 300 张混合格式测试结束后，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已被物理恢复为默认 `false`，生产环境依然强制锁定于 legacy 方案。鉴于 300 张压测已经反映出浏览器原型的滚动掉帧等渲染负载隐患，在对其进行 Web Worker 离线计算与 DOM 虚拟化列表等性能优化重构前，严禁扩大 `true` 灰度开关的生产使用或测试范围。
 
 

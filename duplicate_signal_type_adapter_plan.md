@@ -79,3 +79,5 @@ setSimilarGroups(signalGroups as unknown as SimilarGroup[]);
 - **Step 11：CORE-DUPLICATE-11 真实 BMP 测试通过**：类型适配器已成功通过了真实 100 / 200 / 300 张物理图片文件的压力测试，证明在真实文件 I/O 载入与长生命周期 Photo Battle 对战表决状态转移中，各字段映射非常稳定。下一步可继续在更大批量的 BMP 或混合格式图片中验证其鲁棒性。
 - **Step 12：CORE-DUPLICATE-12-PLANNING 进展更新**：类型适配器已通过 BMP 文件测试，下一阶段将在 JPG / PNG / WebP 混合格式真实图片测试中验证其在复杂的压缩图片解码和多轮 Photo Battle 交互环境下的数据稳定性和一致性。
 - **Step 13：CORE-DUPLICATE-12-RETRY 实测结论**：类型适配器已成功通过了外部 100 张真实 JPG / PNG / WebP 混合格式图片的 retry 压力测试。结果表明，在处理混合压缩格式的文件流和 Photo Battle 对决状态机的多回合映射中，显式适配器类型定义和数据映射具有高稳定性。下一步应进一步验证 200 张和 300 张混合格式下该适配器的鲁棒性表现。
+- **Step 14：CORE-DUPLICATE-13-PLANNING 进展更新**：类型适配器已经在 100 张真实混合压缩格式中通过验证，下一阶段测试重点将移入中批量 200 张与 300 张 JPG / PNG / WebP 混合格式的对决驱动压力测试，以高标准检验适配器的映射正确度与数据状态更新一致性。
+- **Step 15：CORE-DUPLICATE-13 实测结论**：类型适配器已成功跑通了 200 张与 300 张混合格式真实大图的全部对局与 ZIP 导出测试，数据对齐校验完全一致。这证明在处理较大数量的多格式分组适配时，`adaptSignalGroupsToLegacySimilarGroups` 的性能与数据完整度十分稳定。目前系统稳定性的技术债已移出适配器和逻辑层，主要的瓶颈和下阶段痛点集中于浏览器的物理 I/O 和 DOM 网格的像素重绘渲染负载。
