@@ -298,5 +298,32 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 测试局限：本轮测试仅覆盖小尺寸 24-bit 无压缩 BMP 物理大图，未直接覆盖 JPG/PNG/WebP 解码压强或手机原图及 HEIC/RAW。
   - 开关复位：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为 `false`，生产环境绝对禁启用。
   - 主流程与分类锁定：正式主流程依然保持为 legacy 方案，最终用户可见的分类仍只有“保留”与“淘汰候选”两类。
-  - 下一步方向：建议进入 `CORE-DUPLICATE-12-PLANNING`，规划 500+ BMP 大批量分档压测，或进行混合压缩格式（JPG/PNG/WebP）物理图片测试的规划。
+  - **下一步方向**：建议进入 `CORE-DUPLICATE-12-PLANNING`，规划 500+ BMP 大批量分档压测，或进行混合压缩格式（JPG/PNG/WebP）物理图片测试的规划。
 
+### 31. `CORE-DUPLICATE-12-PLANNING` (混合格式真实图片测试规划 - 当前已完成)
+- 已在项目根目录新建 [duplicate_mixed_format_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_mixed_format_test_plan.md) 规划 JPG / PNG / WebP 混合格式真实图片的 true 分支测试方案。
+- **状态与主流程约束**：
+  - 测试重点聚焦于浏览器解码性能、Canvas 重绘、缩略图大列表渲染、Photo Battle 以及混合格式下的 ZIP 导出归档。
+  - 正式主流程依然保持为 legacy 方案不变。
+  - 开关在测试期间严格遵循“即测即恢复 false”的规范。
+  - 最终用户可见的分类仍只有“保留”与“淘汰候选”两类。
+
+### 32. `CORE-DUPLICATE-12-ABORT-DOCS` (混合格式真实图片测试中止 - 当前已完成)
+- **状态记录**：CORE-DUPLICATE-12 测试当前处于**中止**状态，而非通过。100 张混合图片测试已跳转至 `/results`，但由于测试脚本提取 React QA 状态时发生超时被中止。200 与 300 张测试未执行。
+- **状态与主流程约束**：
+  - 正式主流程仍保持 legacy 稳定分支运行，开关已恢复为默认 `false`。
+  - 用户最终整理决策分类依然强制收敛为“保留”与“淘汰候选”二值。
+  - 下一步将进入 `CORE-DUPLICATE-12-RETRY-PLANNING`，重新规划对混合格式测试的 QA 校验提取机制。
+
+### 33. `CORE-DUPLICATE-12-RETRY-PLANNING` (混合格式重试规划 - 当前已完成)
+- **重试规划**：针对第一次测试依赖 React Fiber 树遍历造成的超时故障，重新设计了不依赖 React Fiber 内部属性的 QA 指标读取重试方案，并在项目根目录下新建了 [duplicate_mixed_format_retry_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_mixed_format_retry_plan.md)。
+- **状态与主流程约束**：
+  - 正式主流程仍强锁定为 legacy 分流，开关常量默认值必须保持为 `false`。
+  - 用户最终分类依旧强制二值收敛为“保留”与“淘汰候选”，不产生任何新的业务分类或状态改变。
+
+### 34. `CORE-DUPLICATE-12-RETRY` (混合格式 100 张 retry 测试 - 当前已完成)
+- **重试实测**：在开发环境下临时启用 `true` 分支，完成了 100 张混合格式 retry 物理压测，使用不依赖 React Fiber 的 console summary 读取方案顺利跑通全部数据，校验指标完全对齐。测试结束后开关已无残留复位为 `false`。
+- **状态与主流程约束**：
+  - 正式主流程依然维持 legacy 稳定处理，开关常量保持 `false` 不变。
+  - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”。
+  - **下一步方向**：建议进入 `CORE-DUPLICATE-13-PLANNING`，规划 200 / 300 张 JPG / PNG / WebP 混合格式的 true 分支压力测试。

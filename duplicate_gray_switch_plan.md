@@ -354,4 +354,28 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - **实测通过**：真实 100/200/300 张 BMP 文件 true 分支测试已通过，双路分组算法对齐，未发生任何逻辑死锁或崩溃。
 - **生产与测试隔离边界**：
   - 本轮测试仅覆盖小尺寸 24-bit 无压缩 BMP，不能代表 JPG / PNG / WebP 压缩解码或 RAW / HEIC 及手机大图的瓶颈。
-  - **production 生产环境仍绝对禁止启用 true**。扩大测试前必须继续分档进行大批量或混合格式物理图片测试。
+- **production 生产环境仍绝对禁止启用 true**。扩大测试前必须继续分档进行大批量或混合格式物理图片测试。
+
+---
+
+## 十五、 CORE-DUPLICATE-12-PLANNING 进展更新
+
+- **开关安全规范**：在规划和未来的 JPG / PNG / WebP 混合格式真实图片测试中，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 必须在测试期间严格遵循“即测即恢复 false”的规范。
+- **生产环境限制**：无论测试表现如何，production 环境依然绝对禁止启用 `true` 分支，主流程始终强锁定为 legacy。
+
+---
+
+## 十六、 CORE-DUPLICATE-12-ABORT-DOCS 进展更新
+
+- **开关状态确认**：测试已安全中止，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为默认极值 `false`，无任何 true 脏代码残留。
+- **生产与测试隔离边界**：
+  - production 环境依然绝对禁止启用 `true` 分支。
+  - 在 JPG / PNG / WebP 混合格式测试完全稳定通过前，绝对不得扩大 `true` 灰度开关的使用范围。
+
+## 十七、 CORE-DUPLICATE-12-RETRY-PLANNING 进展更新
+
+- **重试开关原则**：在未来的混合格式重试（RETRY）期间，`USE_SIGNAL_GROUPS_FOR_BATTLE` 常量必须继续遵循“即测即恢复 false”的极值限制，测试结束后无条件改回 `false`。
+- **生产锁死**：生产环境（production）依然 100% 锁死在 legacy 分支，确保主流程的稳定性和后向兼容性。
+- **CORE-DUPLICATE-12-RETRY 实测结论**：本轮 100 张混合格式 retry 压测后，开发环境下的灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已立即安全恢复为默认值 `false`，保证代码仓库无 `true` 配置残留。在混合格式大批量 200 张与 300 张等更广维度测试完全稳定跑通前，`true` 灰度开关绝不允许在生产环境（production）启用，生产环境依旧 100% 被 legacy 稳定主流程强制锁死。
+
+

@@ -77,3 +77,5 @@ setSimilarGroups(signalGroups as unknown as SimilarGroup[]);
 - **Step 10：CORE-DUPLICATE-11-PLANNING 进展更新**：
   - 类型适配器已通过元数据链路仿真验证。下一阶段将通过真实图片文件压力测试，验证在真实的异步 File / Blob 物理图片处理和长周期擂台 PK 状态转移下，类型适配器的数据稳定性。
 - **Step 11：CORE-DUPLICATE-11 真实 BMP 测试通过**：类型适配器已成功通过了真实 100 / 200 / 300 张物理图片文件的压力测试，证明在真实文件 I/O 载入与长生命周期 Photo Battle 对战表决状态转移中，各字段映射非常稳定。下一步可继续在更大批量的 BMP 或混合格式图片中验证其鲁棒性。
+- **Step 12：CORE-DUPLICATE-12-PLANNING 进展更新**：类型适配器已通过 BMP 文件测试，下一阶段将在 JPG / PNG / WebP 混合格式真实图片测试中验证其在复杂的压缩图片解码和多轮 Photo Battle 交互环境下的数据稳定性和一致性。
+- **Step 13：CORE-DUPLICATE-12-RETRY 实测结论**：类型适配器已成功通过了外部 100 张真实 JPG / PNG / WebP 混合格式图片的 retry 压力测试。结果表明，在处理混合压缩格式的文件流和 Photo Battle 对决状态机的多回合映射中，显式适配器类型定义和数据映射具有高稳定性。下一步应进一步验证 200 张和 300 张混合格式下该适配器的鲁棒性表现。
