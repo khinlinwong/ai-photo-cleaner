@@ -273,3 +273,16 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - 成功执行了 35 张非隐私本地图片在开发环境下的临时 true 分支回归测试，测试通过且开关已归位恢复为 false。
 - **状态与主流程约束**：当前主流程仍保持 legacy。下一步建议 `CORE-DUPLICATE-10-PLANNING`：规划 100-300 张中批量非隐私图片测试。用户最终分类仍只有保留 / 淘汰候选。
 
+### 27. `CORE-DUPLICATE-10-PLANNING` (100-300 张中批量本地图片测试规划 - 当前已完成)
+- 本轮制定了 100-300 张非隐私本地图片 true 分支的性能与稳定性测试方案，并在项目根目录下新建了 [duplicate_medium_batch_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_medium_batch_test_plan.md)。
+- **状态与主流程约束**：本轮只做规划，不修改任何运行代码，不运行图片测试。当前正式主流程仍保持稳定 legacy，USE_SIGNAL_GROUPS_FOR_BATTLE 保持默认为 false，用户的最终分类二值化收敛为“保留”与“淘汰候选”。
+
+### 28. `CORE-DUPLICATE-10` (100-300 张中批量本地图片仿真测试 - 当前已完成)
+- 成功执行了 200 张非隐私本地仿真图片在开发环境下的临时 true 分支元数据链路测试，两路算法比对指标一致性 100% 校验通过，状态机流转正常，开关已恢复为 `false`。
+- **状态与主流程约束**：
+  - 本轮测试为**仿真元数据测试**，并不等于真实大图读取、解码、Canvas 像素分析、UI 重绘及 ZIP 打包压缩等物理压力测试。
+  - 开关复位：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为 `false`。
+  - 主流程锁定：当前正式主流程仍保持稳定 legacy。
+  - 分类约束：最终的用户分类依然二值化收敛为“保留”与“淘汰候选”。
+  - 下一步方向：建议进入 `CORE-DUPLICATE-11-PLANNING`，规划真实 100-300 张物理图片文件的压力测试，解决主线程物理 I/O 和渲染负载验证。
+

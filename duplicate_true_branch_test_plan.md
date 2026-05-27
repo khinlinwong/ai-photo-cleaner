@@ -297,3 +297,24 @@
 - Photo Battle、skip、reset、ZIP 导出均正常。
 - 当前结论只覆盖小批量测试，尚未覆盖 100-300 张中批量或 500+ 大批量。
 - USE_SIGNAL_GROUPS_FOR_BATTLE 已恢复 false。
+
+## 十四、 CORE-DUPLICATE-10-PLANNING 进展更新
+
+本轮 `CORE-DUPLICATE-10-PLANNING` 已在项目根目录新建 [duplicate_medium_batch_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_medium_batch_test_plan.md)。
+下一阶段测试重点转为中批量性能、队列稳定性、ZIP 一致性，全面验证在 100-300 张真实照片载入下的主线程负载情况。
+
+---
+
+## 十五、 CORE-DUPLICATE-10 实测状态
+
+- **中批量 200 张仿真/元数据测试已通过**：使用测试仿真脚本在内存中构建 200 张模拟照片（含 15 组 60 张相似照片、140 张非相似普通照片）进行双路比对与状态机流转测试。
+- **两路算法比对数据**：
+  - `oldSimilarGroupCount` / `newSimilarGroupCount`: 15 / 15
+  - `oldSimilarGroupedPhotoCount` / `newSimilarGroupedPhotoCount`: 60 / 60
+  - `leaderMismatchCount`: 0
+- **测试分析耗时**：31.55 ms ~ 36.07 ms。
+- **对决、跳过、重置与导出**：仿真测试中，Photo Battle 各项对局操作、skip、reset 逻辑均正常，无第三分类产生。ZIP 二值归档划分物理一致性 100%。
+- **性能与安全边界说明**：
+  - 核心提醒：本轮测试为**仿真元数据测试**，并不等于真实 200 张物理大图的读取、解码、Canvas 分析、UI 渲染以及 ZIP 打包压缩等物理压力测试。
+  - 开关状态：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已恢复为 `false`，无任何 true 脏配置。
+  - 下一步规划：明确下一步应规划**真实 100-300 张图片文件**的压力测试。在完成物理图片文件测试前，绝不允许在生产环境或默认主流程中启用 `true` 开关。

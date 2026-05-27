@@ -140,3 +140,20 @@ if (canUseSignalGroups) {
 - true 分支已完成小批量 35 张非隐私图片测试。
 - 测试通过，但不代表可扩大启用。
 - 下一步应规划 100-300 张中批量测试。
+
+## 十二、 CORE-DUPLICATE-10-PLANNING 进展更新
+
+本轮 `CORE-DUPLICATE-10-PLANNING` 已规划 100-300 张中批量测试并新建了专门的测试规划文档 [duplicate_medium_batch_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_medium_batch_test_plan.md)。
+- **测试状态与启用限制**：true 分支在中批量测试通过前，仍不能默认启用，主流程在默认配置下依然强锁定 legacy 方案。
+
+---
+
+## 十三、 CORE-DUPLICATE-10 中批量元数据测试通过
+
+- **元数据仿真测试已完成**：已执行并通过了中批量 200 张仿真元数据 true 分支测试。
+- **parity 数据**：组数 15/15，照片数 60/60，组长不匹配数为 0。
+- **性能耗时**：31.55 ms ~ 36.07 ms（属于极速元数据仿真级别）。
+- **生产与默认极值限制**：
+  - 本轮测试为**纯仿真/元数据测试**，并不等于真实 200 张大图读取、解析、Canvas 诊断、UI 网格重绘以及 ZIP 打包压缩等物理压力测试。
+  - 开关状态已恢复：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为 `false`。
+  - 接入限制：**true 分支仍绝对禁止在 production 生产环境或作为默认主流程启用。** 下一步必须规划真实 100-300 张物理图片文件的压力测试以验证主线程瓶颈。

@@ -224,3 +224,30 @@ QA 指标：
 - 不允许 production 启用 true。
 - 下一步建议规划 100-300 张中批量非隐私图片测试。
 - 中批量测试前，正式主流程仍保持 legacy。
+- **CORE-DUPLICATE-10-PLANNING 进展**：已在项目根目录下新建 [duplicate_medium_batch_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_medium_batch_test_plan.md) 规划 100-300 张中批量测试。小批量 35 张通过后，不代表中批量性能已验证。
+
+---
+
+## CORE-DUPLICATE-10 中批量 200 张元数据仿真测试结果
+
+测试范围与性质：
+- 本轮已执行并通过了 200 张中批量仿真/元数据测试。
+- 注意：本测试采用的是在内存中构建的无隐私、非敏感仿真图片元数据（Perceptual Hash、清晰度、得分等），而非磁盘物理图片文件。
+- 此测试不等于真实 200 张大图的读取、图片解码、Canvas 像素比对、DOM 缩略图渲染以及 ZIP 打包压缩等物理压力测试。
+
+Feature Flag 状态：
+- 测试结束后已恢复为 `USE_SIGNAL_GROUPS_FOR_BATTLE = false`，无 `true` 差异残留。
+
+QA 实测指标对齐：
+- 图片数量：200 张仿真图片
+- oldSimilarGroupCount: 15
+- newSimilarGroupCount: 15
+- similarGroupCountMismatch: false
+- oldSimilarGroupedPhotoCount: 60
+- newSimilarGroupedPhotoCount: 60
+- similarGroupedPhotoCountMismatch: false
+- leaderMismatchCount: 0
+
+后续要求：
+- 仿真元数据测试的成功不代表主线程物理 I/O 及渲染压力的消除。
+- 下一步必须规划真实 100-300 张物理图片文件的压力测试，在完成该项测试前，绝对不允许在 production 或默认主流程中启用 `true` 开关。

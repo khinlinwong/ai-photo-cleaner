@@ -156,3 +156,19 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - 小批量 true 测试通过后，开关已恢复 false。
 - 默认 false 仍必须保持。
 - 中批量测试通过前，不允许默认启用 true。
+
+## 十一、 CORE-DUPLICATE-10-PLANNING 进展更新
+
+本轮 `CORE-DUPLICATE-10-PLANNING` 已在项目根目录新建了 [duplicate_medium_batch_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_medium_batch_test_plan.md)。
+- **灰度开关硬性约束**：灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 必须继续默认强制为 `false`。即使在未来的中批量本地图片测试中，也必须遵循“即测即恢复 false”的规范，禁止把 `true` 的默认值提交或推送。
+
+---
+
+## 十二、 CORE-DUPLICATE-10 中批量测试结论与开关复位
+
+- **开关状态确认**：测试已结束，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为默认极值 `false`，无任何 true 脏代码残留。
+- **仿真测试通过**：中批量 200 张仿真/元数据 true 分支测试已通过，两路算法分组一致性对齐无偏。
+- **准入红线强调**：
+  - 本轮测试为**仿真元数据测试**，并不等于真实 100-300 张大图读取、Canvas 分析、主线程渲染与 ZIP 导出的压力测试。
+  - **元数据仿真测试通过绝对不等于 production 生产准入。** 灰度开关默认强制为 `false` 这一安全红线必须继续坚守。
+  - 下一步必须规划真实 100-300 张物理图片文件的压力测试，在此之前，绝对禁止在生产环境或作为默认主流程启用。

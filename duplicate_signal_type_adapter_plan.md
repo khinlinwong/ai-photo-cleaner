@@ -67,4 +67,10 @@ setSimilarGroups(signalGroups as unknown as SimilarGroup[]);
   - 适配器已通过 Demo 与 35 张本地非隐私图片 true 分支测试。
   - 当前仍不建议 production 启用 true。
   - 下一步应做中批量测试，观察性能与队列稳定性。
-
+- Step 8：CORE-DUPLICATE-10-PLANNING 进展更新：
+  - 类型适配器已通过小批量验证，下一步将在中批量（100-300张）测试中进行更大维度的稳定性验证。
+- **Step 9：CORE-DUPLICATE-10 中批量元数据测试结论**：
+  - 类型适配器（`adaptSignalGroupsToLegacySimilarGroups`）已通过 200 张仿真图片元数据的状态链路测试。
+  - 数据转换及字段映射正确无误，双路校验完全对齐，没发生任何 TS/运行时类型错配。
+  - 核心限制：此测试为**元数据仿真测试**，并不等于真实 100-300 张物理图片文件的压力测试。类型转换的正确性不能代表物理 I/O 及 Canvas 分析性能。
+  - 下一步必须规划真实 100-300 张物理图片文件的压力测试，在完成该测试前，灰度开关必须保持 `false`。
