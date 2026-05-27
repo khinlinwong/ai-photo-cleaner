@@ -340,3 +340,9 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 正式主流程仍保持 legacy 稳定分支运行，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然强制为 `false`。
   - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值。
   - **下一步方向**：建议进入 `CORE-PERFORMANCE-1-PLANNING`，规划针对大网格虚拟化列表渲染、Web Worker 异步解耦、分批加载和打包的系统性能优化路线。
+
+### 37. `CORE-PERFORMANCE-1-PLANNING` (性能优化规划 - 当前已完成)
+- **性能优化规划**：已在项目根目录下新建了 [performance_optimization_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/performance_optimization_plan.md) 规划了浏览器原型后台分析 Web Worker、分批处理、虚拟列表、懒加载缩略图以及流式 ZIP 导出打包等深度重构性能优化路线。基于 300 张物理压测出现的轻微滚动掉帧，决定不再继续进行 500+ 大批量的盲目压测，全面转型至性能结构性优化。
+- **状态与主流程约束**：
+  - 正式主流程仍保持 legacy 稳定分支运行，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值强制为 `false`。
+  - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值。

@@ -373,3 +373,4 @@
 - 延迟缩略图。
 - ZIP 分批或流式导出。
 - 后续 Tauri / native engine。
+- **CORE-PERFORMANCE-1-PLANNING 进展更新**：鉴于 300 张物理压测出现的轻微掉帧及浏览器性能瓶颈瓶颈，本阶段决定不再继续进行 500+ 图片大批量的盲目压测。工作重点已正式转移到性能优化规划上，已在项目根目录下新建了专门的规划文件 [performance_optimization_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/performance_optimization_plan.md)。

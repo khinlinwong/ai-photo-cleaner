@@ -344,3 +344,4 @@ Feature Flag 状态：
 - 本轮不能代表 10MB 手机大图。
 - 本轮不能代表高分辨率相册。
 - 下一步如继续测试，应规划 500+ BMP 分档测试，或另行规划 JPG / PNG / WebP 混合真实图片测试。
+- **CORE-DUPLICATE-12-PLANNING 进展更新**：已规划 JPG / PNG / WebP 混合格式真实图片的 true 分支压力测试，详细方案参阅项目根目录下的 [duplicate_mixed_format_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_mixed_format_test_plan.md)。BMP 文件测试通过不能代表混合压缩格式下的安全通过，由于编解码算法不同，压缩格式测试依然必须进行分档验证，且坚守即测即恢复 `false` 的规范。

@@ -259,3 +259,4 @@ QA 实测指标对齐：
 - **CORE-DUPLICATE-12-RETRY 验证结果**：100 张 JPG / PNG / WebP 混合格式 retry 测试已顺利跑通并获得验证。本次测试印证了不依赖 React Fiber 进行长期 QA 指标读取的必要性，优先采用 `console summary` 或者是页面可见 UI（DOM）进行指标抓取。测试完成后开关已归位恢复为 `false`。
 - **CORE-DUPLICATE-13-PLANNING 进展更新**：混合格式测试下一阶段规划扩大到 200 / 300 张。测试将严守分档拦截原则，若 200 张测试发生失败或明显卡顿，绝不继续执行 300 张测试，避免主线程开销失控。详细规划见 [duplicate_mixed_format_200_300_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_mixed_format_200_300_plan.md)。
 - **CORE-DUPLICATE-13 验证结果**：混合格式真实照片测试已成功覆盖了 100 / 200 / 300 张三档压测，数据比对 Parity 达到 100%。但 300 张压测中在 `/results` 出现了轻微的滚动掉帧，后续应当停止盲目扩大测试，工作重点必须转向性能优化规划。
+- **CORE-PERFORMANCE-1-PLANNING 进展更新**：鉴于 300 张物理图片压测中 results 页面展现的轻微掉帧隐患，后续优化方向确定为引入 Web Worker 异步计算、虚拟网格卡片渲染及按需缩略图生成等性能优化路线。详细优化规划文案见 [performance_optimization_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/performance_optimization_plan.md)。
