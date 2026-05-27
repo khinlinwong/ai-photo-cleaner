@@ -346,3 +346,10 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **状态与主流程约束**：
   - 正式主流程仍保持 legacy 稳定分支运行，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值强制为 `false`。
   - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值。
+
+### 38. `CORE-PERFORMANCE-2-PLANNING` (虚拟网格与懒加载缩略图规划 - 当前已完成)
+- **局部重构规划**：已在项目根目录下新建了 [results_virtual_grid_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_plan.md) 规划结果展示页面（Results Page）的自研轻量级虚拟化滚动网格与缩略图离屏懒加载机制。此优化可在不引入任何第三方复杂依赖的前提下，有效降低 results 卡片 DOM 树节点个数和内存驻留开销，改善滚动性能。
+- **状态与主流程约束**：
+  - 本阶段规划属于纯 UI 展示层的局部渲染优化，不改动核心决策与 Context 状态机，亦不触碰感知聚类分析算法。
+  - 正式主流程仍强制由 legacy 方案驱动，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值保持 `false`。
+  - 用户可见的最终决策归档依旧强制收敛为“保留”与“淘汰候选”二值分类。

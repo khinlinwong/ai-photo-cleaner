@@ -374,3 +374,4 @@
 - ZIP 分批或流式导出。
 - 后续 Tauri / native engine。
 - **CORE-PERFORMANCE-1-PLANNING 进展更新**：鉴于 300 张物理压测出现的轻微掉帧及浏览器性能瓶颈瓶颈，本阶段决定不再继续进行 500+ 图片大批量的盲目压测。工作重点已正式转移到性能优化规划上，已在项目根目录下新建了专门的规划文件 [performance_optimization_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/performance_optimization_plan.md)。
+- **CORE-PERFORMANCE-2-PLANNING 进展更新**：性能优化的第一阶段已规划采用 results 自研虚拟网格与缩略图懒加载方案，用于安全、低风险地解决卡片 DOM 节点膨胀和内存消耗。已新建了专项方案文件 [results_virtual_grid_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_plan.md)，此阶段不涉及 Web Worker 消息通信以规避复杂的状态流转风险。

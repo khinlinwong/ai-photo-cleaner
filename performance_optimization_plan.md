@@ -173,3 +173,5 @@ graph TD
    - 设计 Web Worker 离线计算层和 Transferable Objects 传输协议，规划双向数据交互信道（Message Channel）。
 5. **`CORE-EXPORT-PERFORMANCE-1-PLANNING`（异步 Worker 打包设计）**：
    - 设计后台 Worker 压缩打包方案与打包中途进度条 UI 反馈，确保 UI 全程可控。
+
+- **`CORE-PERFORMANCE-2-PLANNING` 进展更新**：目前已正式启动并完成了对 results 结果页虚拟网格（Virtual Grid）与缩略图懒加载方案的独立专项设计，新建了规划文件 [results_virtual_grid_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_plan.md)。本阶段确立了优先解决 results 网格滚动渲染卡顿与 DOM 树过载的核心痛点，而不优先进行风险和开销更大的后台 Web Worker 开发，主线程逻辑和 Context 状态层维持绝对纯净隔离。
