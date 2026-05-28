@@ -401,7 +401,8 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 
 - **测试与开关复位确认**：100 / 300 张真实相册感样本测试已顺利完成。测试结束后，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已被物理恢复为默认 `false`，保证代码仓库无任何 `true` 的脏改动残留。
 - **验证手段有效性**：`window.__AI_PHOTO_CLEANER_QA__` 作为 parity 对齐指标读取通道的方案在本次大批量回归测试中表现极为稳定、有效，成功提供了零偏差的分组与照片指标验证。
-- **生产强制锁定**：尽管当前回归数据完全对齐，但在完成更大规模或包含 HEIC/RAW 格式的真实用户相册长期验证前，开发环境临时 true 测试后必须强制恢复 false。生产环境将 100% 锁定在 legacy 分支上，不启用 true 分流。
+- **生产强制锁定**：尽管当前回归数据完全对齐，但在完成更大规模或包含 HEIC/RAW 格式的真实用户相册长期验证前，开发环境临时 true 测试后应恢复 false。生产环境锁定在 legacy 分支上，不启用 true 分流。
+- **BETA-PLANNING 评估结论**：在当前就绪评估中，灰度开关的默认 `false` 属性保持不变。如果为了高频测试需要免去手动修改代码的成本，未来可规划在开发环境中读取 dev-only localStorage 开关（如 `localStorage.getItem('aiPhotoCleaner.useSignalGroupsForBattle')`），不建议直接修改 featureFlags.ts 的常量默认值，以防误提交 true 残留并导致生产环境故障。
 
 
 

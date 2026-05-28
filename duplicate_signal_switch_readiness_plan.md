@@ -48,11 +48,11 @@
     - leaderMismatchCount
     - Photo Battle 弹窗流转
     - ZIP 安全导出
-    - 是否出现第三分类（必须强制二值收敛于保留/淘汰候选）
+    - 是否出现第三分类（当前验证中已收敛于保留/淘汰候选）
     - production 不暴露属性
 - **阶段 C：考虑内部 beta 试用**
   - 只有在阶段 B 累积通过了更多样化的真实相册数据测试后，才考虑对内部白名单或开发者测试版默认开启。
-  - beta 状态必须具备一键热退回到 false（legacy）的灾备开关。
+  - beta 状态在规划中需具备一键热退回到 false（legacy）的灾备能力。
   - 绝不对普通生产用户默认开启。
 
 ## 四、 下一步测试建议
@@ -64,11 +64,11 @@
 3. **格式隔离**：在未有专门的 HEIC/RAW 解码与分析规划前，回归测试集仍不包含 HEIC / RAW 图片，保持格式隔离。
 4. **自动化读取**：继续使用 `window.__AI_PHOTO_CLEANER_QA__` 在 results 页面获取 parity 摘要。
 5. **测试完毕复原**：所有本地灰度开启测试结束后，必须立即把开关还原为 `false`。
-6. **非 production 默认开启**：本测试完全处于外部隔离的开发测试状态，production 生产环境禁止默认开启 `true`，以防带入线上环境。
+6. **非 production 默认开启**：本测试处于外部隔离的开发测试状态，production 生产环境不建议默认开启 `true`，以防带入线上环境。
 
 ## 五、 关于是否移除 legacy 逻辑的结论
 
-**结论：当前绝不应移除 legacy detectDuplicates 主流程。**
+**结论：当前暂不建议移除 legacy detectDuplicates 主流程。**
 
 原因在于：
 1. **生产基石**：legacy 逻辑是目前 production 环境的唯一基石，直接关系到线上业务的稳定与否。
@@ -87,5 +87,7 @@
    - 双路 parity 数据在当前样本下完成对齐，验证了 Photo Battle、ZIP 二值导出、虚拟滚动与二值分类等功能在此样本下均运转正常。
    - 测试完毕后，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已顺利恢复为 `false`。
    - 依然存在明确的测试边界（如：未覆盖真实客户相册长期验证、未覆盖 HEIC / RAW 格式、且测试 mock 图片总体积较小，不代表真实大图 I/O 压力），因此依然不建议 production 默认 true，且 legacy 稳定主流程必须全量保留。
-4. **`CORE-DUPLICATE-SIGNAL-BETA-PLANNING`**：
-   - 评估前述测试结果，并决定是否将开发环境的 true 开关长期默认开启，或进一步设计更复杂的场景适配。
+4. **`CORE-DUPLICATE-SIGNAL-BETA-PLANNING`**（已完成）：
+   - 评估前述 100 / 300 张真实相册感测试结果，并深入分析是否可以进入 development-only 常态灰度。明确仅评估开发环境常态灰度，不评估 production 默认 true。
+5. **`CORE-DUPLICATE-SIGNAL-BETA-QA`**：
+   - Codex 对 beta readiness 规划进行只读审查。

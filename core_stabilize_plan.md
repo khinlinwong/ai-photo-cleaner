@@ -414,5 +414,11 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 仍保持 production legacy 驱动主流程，不进入 production true。
   - 用户可见的最终决策归档依旧强制收敛为“保留”与“淘汰候选”二值分类。
 
+### 47. `CORE-DUPLICATE-SIGNAL-BETA-PLANNING` (常态灰度评估规划 - 当前已完成)
+- **就绪评估**：新建了 [duplicate_signal_beta_readiness_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_signal_beta_readiness_plan.md) 评估是否可以进入 development-only 常态灰度。
+- **状态与主流程约束**：
+  - 最终用户可见的分类依然收敛为“保留”与“淘汰候选”的二值分类，无中间态或其它分类。
+  - 生产环境将继续锁定于 legacy 稳定驱动方案（`USE_SIGNAL_GROUPS_FOR_BATTLE` 常量默认值保持为 `false`），不进入 production true。
+
 
 
