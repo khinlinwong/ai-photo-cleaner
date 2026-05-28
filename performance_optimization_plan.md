@@ -167,11 +167,14 @@ graph TD
    - Codex 对本规划文件进行只读安全性与实施边界审计，确认无 src 代码变动且 flag 极值保持 `false`。
 2. **`CORE-PERFORMANCE-2-PLANNING`（ results 虚拟网格设计 - 已完成）**：
    - 规划了 results 页面的虚拟网格（Virtual Grid）及懒加载缩略图方案，确定性能优化第一落点为 results 虚拟网格，不先做风险更大的后台 Web Worker 多线程计算。
-3. **`CORE-PERFORMANCE-3-PLANNING`（results 虚拟网格代码接入点规划 - 当前已完成）**：
+3. **`CORE-PERFORMANCE-3-PLANNING`（results 虚拟网格代码接入点规划 - 已完成）**：
    - 对 `src/app/results/page.tsx` 中保留区和淘汰候选区列表进行了接入点只读分析，设计了独立无业务逻辑的 `VirtualPhotoGrid` 接口，并确定第一版不做 objectURL 回收以保证渲染流畅度。
-4. **`CORE-PERFORMANCE-3-QA`（虚拟网格接入点设计审查）**：
-   - 审查新建的 [results_virtual_grid_integration_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_integration_plan.md)，确保没有任何 src 代码脏改动。
-5. **`CORE-PERFORMANCE-4`（自研虚拟滚动组件实现与接入）**：
-   - 编写 `VirtualPhotoGrid` 并在 results 页面中进行替换接入。
+4. **`CORE-PERFORMANCE-3-QA`（虚拟网格接入点设计审查 - 已完成）**：
+   - 审查了新建的 [results_virtual_grid_integration_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_integration_plan.md)，确保没有任何 src 代码脏改动。
+5. **`CORE-PERFORMANCE-4`（自研虚拟滚动组件实现与接入 - 当前已完成）**：
+   - 编写了 `VirtualPhotoGrid.tsx` 无状态通用组件，并在 results 页面中进行了局部替换接入，把卡片高度固定为 `295px`，将技术折叠改为绝对定位的悬浮气泡，确保列表滚动高度计算精准稳定。
+6. **`CORE-PERFORMANCE-4-QA`（代码实现只读审查）**：
+   - 让 Codex 审查实现结果，确保优化局限于 UI 展示层。
 
-- **进展更新**：目前已确定性能优化的第一落点是 **results 自研虚拟网格**，且为了将风险控制在 UI 渲染层，当前**不先做 Web Worker**。在 `CORE-PERFORMANCE-3-PLANNING` 阶段，我们完成了 results 页面卡片的 DOM 结构只读分析与组件接入设计，为下一阶段的实际组件编码扫清了障碍。
+- **进展更新**：目前结果页的自研虚拟网格已完成第一版开发并成功接入。经测试，300 张 results 滚动体验相比优化前有明显改善。但由于 headless 测试脚本在 SPA 路由跳转时注入 console 劫持时间点略晚，本轮的聚类 parity QA 指标未能被 console summary 捕获，不过核心页面流转、Photo Battle 及 ZIP 导出均正常。
+- **下一步建议**：建议进入代码提交与推送阶段，随后由 Codex 进行提交后的 QA 审查，或者继续规划更稳定的测试脚本读取方式。

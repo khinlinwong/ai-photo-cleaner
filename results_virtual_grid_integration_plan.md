@@ -1,4 +1,4 @@
-# AI Photo Cleaner Results 虚拟网格代码接入点规划 - CORE-PERFORMANCE-3-PLANNING
+# AI Photo Cleaner Results 虚拟网格代码接入与实现规划 - CORE-PERFORMANCE-4
 
 ## 一、 当前 results 页面结构分析
 
@@ -137,13 +137,87 @@ type VirtualPhotoGridProps<T> = {
 
 ## 八、 后续 Checkpoint 路线规划
 
-1. **`CORE-PERFORMANCE-3-QA`**：
-   - Codex 只读审查本接入规划文档的完备性与隔离性，确保没有 src 代码脏修改。
-2. **`CORE-PERFORMANCE-4`**：
-   - 创建无业务逻辑的 `src/components/desktop/VirtualPhotoGrid.tsx` 虚拟组件。
-   - 提取 results 页面的卡片渲染逻辑，并在 [src/app/results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中接入 `VirtualPhotoGrid` 渲染保留区和淘汰候选区列表。
-   - 确认整个过程中不引入第三方依赖、不改动核心算法和状态机。
-3. **`CORE-PERFORMANCE-4-QA`**：
-   - 审查修改是否确实仅影响 `/results` 渲染层，无其他逻辑泄露。
-4. **`CORE-PERFORMANCE-5`**：
-   - 临时开启 true 灰度分支，重新跑通 100/200/300 张混合格式真实图片的压测，对比滚动性能改进。
+1. **`CORE-PERFORMANCE-3-QA`（接入点规划审查 - 已完成）**：
+   - Codex 对接入点规划进行了只读审计，确认结构解耦清晰且无 src 代码脏修改。
+2. **`CORE-PERFORMANCE-4`（最小虚拟网格实现与挂载 - 当前已完成）**：
+   - 新建了独立无状态、泛型化的 `VirtualPhotoGrid.tsx` 组件，并将其集成 to results 页面中。
+   - 重构了 results 页面列表渲染，将卡片抽取为 `renderPhotoCard` 并保持高度固定（`280px`），折叠技术详情改为绝对定位的悬浮气泡，保证列表滚动计算不受动态高度干扰。
+   - 确认不改动 Context / 算法 / ZIP 导出 / Photo Battle，第一版不做 objectURL 懒销毁回收，无第三方依赖。
+
+---
+
+## CORE-PERFORMANCE-4 VirtualPhotoGrid 实现与回归结果
+
+### 实现内容
+- 新增 [VirtualPhotoGrid.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/components/desktop/VirtualPhotoGrid.tsx)。
+- VirtualPhotoGrid 是零外部依赖的泛型虚拟网格组件。
+- 组件不依赖 PhotoItem。
+- 组件不读取 Context。
+- 组件不理解 keep / cull。
+- 组件不调用 ZIP。
+- 组件不调用 Photo Battle。
+- 组件只负责 UI 层虚拟渲染。
+- results 页面将保留区 keepPhotos 与淘汰候选区 deletePhotos 分别传入 VirtualPhotoGrid。
+- renderPhotoCard 负责保留原卡片 UI 和按钮行为。
+- renderPartitionGrid 继续负责分区渲染入口。
+
+### 回归结果
+- Demo 流程正常。
+- /processing 正常。
+- /results 正常。
+- 保留区 / 淘汰候选区正常。
+- Photo Battle 正常。
+- 卡片按钮正常。
+- details 技术详情正常。
+- details 悬浮气泡无遮挡、无裁切。
+- ZIP 导出正常。
+- 无新增报错。
+
+### 100 张混合格式回归
+- /processing 正常。
+- /processing 耗时 9.39 秒。
+- /results 正常。
+- JPG / PNG / WebP 正常预览。
+- 滚动流畅。
+- 卡片无溢出。
+- details 无遮挡、无裁切。
+- Photo Battle 正常。
+- ZIP 正常。
+- 无第三最终分类。
+
+### 300 张混合格式回归
+- /processing 正常。
+- /processing 耗时 33.79 秒。
+- /results 正常。
+- results 首次渲染正常。
+- 滚动相比优化前更流畅。
+- 未出现白屏。
+- 卡片无溢出。
+- details 无遮挡、无裁切。
+- Photo Battle 正常。
+- ZIP 正常。
+- ZIP 和页面分区一致。
+- 无第三最终分类。
+
+### 布局检查
+- 2 列正常。
+- 3 列正常。
+- 4 列正常。
+- 无按钮挤压。
+- 无标签撑高。
+- 无 details 裁切。
+- rowHeight={280} 与固定图片高度表现正常。
+
+### 重要边界
+- 本轮 console summary 没有成功捕获 QA 指标。
+- oldSimilarGroupCount / newSimilarGroupCount / grouped photo count / leaderMismatchCount 本轮未读取。
+- 原因是 headless 测试脚本在 SPA 路由跳转时注入 console 劫持时间点略晚。
+- 因此本轮只确认 UI 虚拟网格、Photo Battle、ZIP 和二值分类流程正常。
+- 不把本轮记录为 duplicate signal parity 重新验证。
+- 后续如需再次验证 parity，应单独修复测试脚本注入时机或规划 dev-only summary 输出。
+
+### 安全状态
+- USE_SIGNAL_GROUPS_FOR_BATTLE 已恢复 false。
+- git diff -- src/lib/config/featureFlags.ts 无 true 残留。
+- 没有 package.json / package-lock.json 变动。
+- 没有测试图片进入 Git。

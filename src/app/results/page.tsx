@@ -34,6 +34,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from "@/lib/utils";
+import VirtualPhotoGrid from '@/components/desktop/VirtualPhotoGrid';
 
 export default function ResultsPage() {
   const {
@@ -368,7 +369,105 @@ export default function ResultsPage() {
     statusText = `照片已分入保留区与淘汰候选区，安全导出就绪`;
   }
 
-  // 渲染分区照片列表 (去掉主评分，增加 details 折叠)
+  // 渲染单张照片卡片（高度固定为 280px，详情折叠使用悬浮框以免改变卡片高度）
+  const renderPhotoCard = (photo: PhotoItem) => {
+    return (
+      <Card 
+        className={cn(
+          "w-full h-full overflow-visible rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md flex flex-col justify-between",
+          getUserVisibleBucket(photo) === 'cull'
+            ? "border-[#B96F68]/30 bg-[#B96F68]/5 hover:border-[#B96F68]/60 hover:bg-[#B96F68]/15" 
+            : "border-white/5 bg-[var(--dt-card-bg)] hover:border-[#6F8FA8]/40 hover:bg-[#6F8FA8]/5"
+        )}
+      >
+        {/* Image Section */}
+        <div className="relative h-[140px] w-full overflow-hidden bg-black/20 rounded-t-lg">
+          <img
+            src={photo.url}
+            alt={photo.name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute top-1.5 left-1.5 z-10 scale-90 origin-top-left">
+            {renderIssueBadge(photo)}
+          </div>
+        </div>
+
+        {/* Info details */}
+        <CardContent className="p-2.5 flex-1 flex flex-col justify-between text-left relative">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[11px] font-bold text-[var(--dt-text-primary)] truncate flex-1" title={photo.name}>{photo.name}</p>
+              <span className="text-[8px] text-[var(--dt-text-soft)] shrink-0 font-mono">{photo.size}</span>
+            </div>
+
+            {/* 简单原因标签 */}
+            <div className="flex items-center mt-0.5">
+              <span className="text-[8.5px] text-[var(--dt-text-secondary)] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/5 font-sans leading-none">
+                {getReasonTags(photo)}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-1 relative">
+            {/* 隐藏并折叠分值详情 */}
+            <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-0.5 relative">
+              <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
+                <span className="text-[8px]">▶</span> 查看技术详情
+              </summary>
+              <div className="absolute bottom-[30px] left-0 right-0 bg-[#12161A]/95 border border-white/10 p-2.5 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20 font-mono space-y-0.5 backdrop-blur-md">
+                <p>综合质量: {photo.score} / 100</p>
+                <p>对焦清晰: {photo.sharpnessScore} / 100</p>
+                <p>曝光得分: {photo.exposureScore} / 100</p>
+                <div className="pt-1.5 flex items-center justify-end border-t border-white/5 mt-1.5">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetail(photo);
+                    }}
+                    className="text-[8px] text-yellow-400 hover:underline flex items-center gap-0.5"
+                  >
+                    <Maximize2 className="h-2 w-2" /> 开启像素诊断仪
+                  </button>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          {/* Row 4: Status Correction Buttons (Direct interaction) */}
+          <div className="grid grid-cols-2 gap-1 mt-1.5 border-t border-white/5 pt-1.5 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn(
+                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
+                getUserVisibleBucket(photo) === 'keep'
+                  ? "bg-[#6FA887] text-white border-0" 
+                  : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
+              )}
+              onClick={() => updatePhotoStatus(photo.id, 'keep')}
+            >
+              保留
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn(
+                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
+                getUserVisibleBucket(photo) === 'cull'
+                  ? "bg-[#B96F68] text-white border-0" 
+                  : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
+              )}
+              onClick={() => updatePhotoStatus(photo.id, 'delete')}
+            >
+              淘汰候选
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // 渲染分区照片列表 (使用自研 VirtualPhotoGrid 以大幅优化渲染 DOM 节点数)
   const renderPartitionGrid = (items: PhotoItem[], partitionType: 'keep' | 'cull') => {
     if (items.length === 0) {
       return (
@@ -381,98 +480,26 @@ export default function ResultsPage() {
       );
     }
 
-    return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {items.map((photo) => (
-          <Card 
-            key={photo.id} 
-            className={cn(
-              "w-full overflow-hidden rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md",
-              getUserVisibleBucket(photo) === 'cull'
-                ? "border-[#B96F68]/30 bg-[#B96F68]/5 hover:border-[#B96F68]/60 hover:bg-[#B96F68]/15" 
-                : "border-white/5 bg-[var(--dt-card-bg)] hover:border-[#6F8FA8]/40 hover:bg-[#6F8FA8]/5"
-            )}
-          >
-            {/* Image Section */}
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/20">
-              <img
-                src={photo.url}
-                alt={photo.name}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-1.5 left-1.5 z-10 scale-90 origin-top-left">
-                {renderIssueBadge(photo)}
-              </div>
-
-            </div>
-
-            {/* Info details */}
-            <CardContent className="p-2.5 flex flex-col gap-1.5 text-left">
-              <div className="flex items-center justify-between gap-1">
-                <p className="text-[11px] font-bold text-[var(--dt-text-primary)] truncate flex-1" title={photo.name}>{photo.name}</p>
-                <span className="text-[8px] text-[var(--dt-text-soft)] shrink-0 font-mono">{photo.size}</span>
-              </div>
-
-              {/* 简单原因标签 */}
-              <div className="flex items-center mt-0.5">
-                <span className="text-[8.5px] text-[var(--dt-text-secondary)] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/5 font-sans leading-none">
-                  {getReasonTags(photo)}
-                </span>
-              </div>
-
-              {/* 隐藏并折叠分值详情 */}
-              <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-0.5">
-                <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
-                  <span className="text-[8px]">▶</span> 查看技术详情
-                </summary>
-                <div className="pl-2 pt-1 font-mono space-y-0.5 border-l border-white/5 mt-1">
-                  <p>综合质量: {photo.score} / 100</p>
-                  <p>对焦清晰: {photo.sharpnessScore} / 100</p>
-                  <p>曝光得分: {photo.exposureScore} / 100</p>
-                  <div className="pt-1 flex items-center justify-end">
-                    <button 
-                      onClick={() => openDetail(photo)}
-                      className="text-[8px] text-yellow-400 hover:underline flex items-center gap-0.5"
-                    >
-                      <Maximize2 className="h-2 w-2" /> 开启像素诊断仪
-                    </button>
-                  </div>
-                </div>
-              </details>
-
-              {/* Row 4: Status Correction Buttons (Direct interaction) */}
-              <div className="grid grid-cols-2 gap-1 mt-1 border-t border-white/5 pt-1.5">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={cn(
-                    "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
-                    getUserVisibleBucket(photo) === 'keep'
-                      ? "bg-[#6FA887] text-white border-0" 
-                      : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
-                  )}
-                  onClick={() => updatePhotoStatus(photo.id, 'keep')}
-                >
-                  保留
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={cn(
-                    "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
-                    getUserVisibleBucket(photo) === 'cull'
-                      ? "bg-[#B96F68] text-white border-0" 
-                      : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
-                  )}
-                  onClick={() => updatePhotoStatus(photo.id, 'delete')}
-                >
-                  淘汰候选
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+    const emptyState = (
+      <div className="text-center py-10 bg-black/10 rounded-lg border border-white/5">
+        <FolderSync className="h-7 w-7 text-[var(--dt-text-soft)] mx-auto mb-2" />
+        <p className="text-[var(--dt-text-soft)] text-xs">
+          {partitionType === 'keep' ? '暂无保留照片' : '暂无淘汰候选照片'}
+        </p>
       </div>
+    );
+
+    return (
+      <VirtualPhotoGrid<PhotoItem>
+        items={items}
+        getItemKey={(photo) => photo.id}
+        renderItem={renderPhotoCard}
+        minCardWidth={190}
+        rowHeight={280}
+        gap={12}
+        overscanRows={3}
+        emptyState={emptyState}
+      />
     );
   };
 

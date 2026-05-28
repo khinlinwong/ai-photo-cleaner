@@ -354,9 +354,16 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 正式主流程仍强制由 legacy 方案驱动，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值保持 `false`。
   - 用户可见的最终决策归档依旧强制收敛为“保留”与“淘汰候选”二值分类。
 
-### 39. `CORE-PERFORMANCE-3-PLANNING` (results 虚拟网格代码接入点规划 - 当前已完成)
-- **接入点重构规划**：已在项目根目录下新建了 [results_virtual_grid_integration_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_integration_plan.md)，对 `src/app/results/page.tsx` 页面结构、照片列表变量名、操作按钮及解耦关系进行深度分析，明确定义了 `VirtualPhotoGrid` 的通用泛型 props 与滚动撑开、resize 重算逻辑，并强调第一版不做 objectURL 离屏回收以防解码闪烁。
+### 39. `CORE-PERFORMANCE-3-PLANNING` (results 虚拟网格代码接入点规划 - 已完成)
+- **接入点重构规划**：已在项目根目录下新建了 [results_virtual_grid_integration_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_virtual_grid_integration_plan.md)，对 `src/app/results/page.tsx` 页面结构、照片列表变量名、操作按钮及解耦关系进行深度分析，明确定义了 `VirtualPhotoGrid` 的通用泛型 props 与滚动撑开、resize 重算逻辑，并强调第一版不做 objectURL 离屏回收以防解码闪烁.
 - **状态与主流程约束**：
   - 本阶段只做代码接入点规划，不修改任何 src 代码与 Context。
   - 正式主流程仍保持 legacy，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
   - 用户最终的分类体系仍旧强制收敛在“保留”与“淘汰候选”二值分类。
+
+### 40. `CORE-PERFORMANCE-4` (最小虚拟网格实现与挂载 - 当前已完成)
+- **局部重构实现与回归测试**：新建了独立无状态、泛型自适应的 [VirtualPhotoGrid.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/components/desktop/VirtualPhotoGrid.tsx) 组件，并在 results 页面将保留区与淘汰候选区列表接入。回归测试（Demo、100 张、300 张 JPG / PNG / WebP 混合格式图片文件压力测试）已全部通过。
+- **状态与主流程约束**：
+  - 本次改动纯属 UI 渲染层优化，完全不涉及 Context 决策层、聚类分析算法、Photo Battle 擂台与 ZIP 打包底座。
+  - 正式主流程依旧由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 强制保持为 `false`。
+  - 用户可见决策分类依旧只有“保留”与“淘汰候选”两类。
