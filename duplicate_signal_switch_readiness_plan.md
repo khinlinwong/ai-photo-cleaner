@@ -64,6 +64,7 @@
 3. **格式隔离**：在未有专门的 HEIC/RAW 解码与分析规划前，回归测试集仍不包含 HEIC / RAW 图片，保持格式隔离。
 4. **自动化读取**：继续使用 `window.__AI_PHOTO_CLEANER_QA__` 在 results 页面获取 parity 摘要。
 5. **测试完毕复原**：所有本地灰度开启测试结束后，必须立即把开关还原为 `false`。
+6. **非 production 默认开启**：本测试完全处于外部隔离的开发测试状态，production 生产环境禁止默认开启 `true`，以防带入线上环境。
 
 ## 五、 关于是否移除 legacy 逻辑的结论
 
@@ -79,9 +80,9 @@
 
 1. **`CORE-DUPLICATE-SIGNAL-SWITCH-QA`**：
    - Codex 对本就绪度评估文档进行只读审查。
-2. **`CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING`**：
-   - 规划更真实的 100-300 张非隐私相册连拍与噪点测试样本集。
+2. **`CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING`**（当前已完成）：
+   - 已完成更真实的 100-300 张非隐私相册连拍与噪点测试样本集的测试规划，新建了专属规划文档。此规划明确了测试图片放在项目目录外（不被 Git 追踪），严禁使用隐私敏感图片，HEIC/RAW 暂不纳入，且测试后必须立即复原 feature flag。
 3. **`CORE-DUPLICATE-REALISTIC-ALBUM`**：
-   - 基于更真实的测试集运行 development true 分支下的灰度回归。
+   - 基于该更真实的测试集在外部文件夹运行 development true 分支下的灰度回归。
 4. **`CORE-DUPLICATE-SIGNAL-BETA-PLANNING`**：
    - 评估前述测试结果，并决定是否将开发环境的 true 开关长期默认开启。

@@ -165,4 +165,15 @@ if (canUseSignalGroups) {
 - **真实混合格式回归通过**：利用新增的 `window.__AI_PHOTO_CLEANER_QA__` 作为稳定的读取通道，已在 `USE_SIGNAL_GROUPS_FOR_BATTLE = true` 临时开启下，成功通过了 100 张和 300 张真实 JPG / PNG / WebP 混合格式物理图片测试，双路算法结果数据（老新组数、相似照片数）在当前回归中稳定一致，领队错配数为 0，滚动性能良好，无第三分类产生。
 - **生产不暴露与灰度限制**：生产包已通过防污染拦截守卫，`typeof window.__AI_PHOTO_CLEANER_QA__` 确认返回 `undefined`。由于目前尚未在真实的客户海量复杂相册以及 RAW / HEIC 等格式下进行深度实测，该 true 分支目前仅建议作为开发环境下的手动灰度（development-only 灰度测试），生产环境已锁定在 legacy 机制，并由 production 验证未暴露该全局对象。
 
+---
+
+## 十五、 CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING 进展更新
+
+- **真实相册感样本测试规划**：已在项目根目录下新建了 [duplicate_realistic_album_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_realistic_album_test_plan.md) 规划更贴近手机真实相册的 100-300 张非隐私样本测试。
+- **状态与主流程约束**：
+  - 测试不再是 500+ 的盲目数量压测，而是通过在项目目录外构建真实感照片集以提高样本多样性，且严禁隐私泄漏、HEIC/RAW 暂不纳入。
+  - 正式主流程仍由 legacy 稳定驱动，生产环境禁止启用 true 灰度分支，测试时临时 true，测试结束后必须恢复 `false`。
+  - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+
+
 

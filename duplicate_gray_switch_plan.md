@@ -84,10 +84,10 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 ## 五、 灰度切换前置验收标准
 
 在正式切换此 Feature Flag 为 `true` 驱动正式流程前，必须全数达成以下指标：
-- **Demo 数据完全对齐**：`oldGroupCount === newGroupCount` 且 `oldGroupedPhotoCount === newGroupedPhotoCount`。
-- **组长对齐**：`leaderMismatchCount === 0`，保证客观清晰度与综合算分算法做出的 Leader 推荐完全一致。
+- **Demo 数据当前样本下对齐**：`oldGroupCount === newGroupCount` 且 `oldGroupedPhotoCount === newGroupedPhotoCount`。
+- **组长对齐**：`leaderMismatchCount === 0`，保证客观清晰度与综合算分算法做出的 Leader 推荐期望一致。
 - **性能达标**：在导入本地 1000 张以上大批量图片时，感知哈希连通分量图处理与相似组转换不能引发浏览器卡顿或未响应。
-- **Photo Battle 状态闭环**：擂台可自动被激活，比对结果能完美归入对应物理区，且跳过对局能重回待 PK。
+- **Photo Battle 状态闭环**：擂台可自动被激活，比对结果能归入对应物理区，且跳过对局能重回待 PK。
 - **零日志污染**：在生产环境（production）构建中，无任何 QA 对比日志或错误 warn 信息输出。
 - **零误用风险**：`duplicateGroupQA` 字段绝对没有被任何 React UI 视图误用或越权消费。
 - **构建守卫**：`npm run build` 和 `npm run lint` 通过无阻。
@@ -250,10 +250,10 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 ## 五、 灰度切换前置验收标准
 
 在正式切换此 Feature Flag 为 `true` 驱动正式流程前，必须全数达成以下指标：
-- **Demo 数据完全对齐**：`oldGroupCount === newGroupCount` 且 `oldGroupedPhotoCount === newGroupedPhotoCount`。
-- **组长对齐**：`leaderMismatchCount === 0`，保证客观清晰度与综合算分算法做出的 Leader 推荐完全一致。
+- **Demo 数据当前样本下对齐**：`oldGroupCount === newGroupCount` 且 `oldGroupedPhotoCount === newGroupedPhotoCount`。
+- **组长对齐**：`leaderMismatchCount === 0`，保证客观清晰度与综合算分算法做出的 Leader 推荐期望一致。
 - **性能达标**：在导入本地 1000 张以上大批量图片时，感知哈希连通分量图处理与相似组转换不能引发浏览器卡顿或未响应。
-- **Photo Battle 状态闭环**：擂台可自动被激活，比对结果能完美归入对应物理区，且跳过对局能重回待 PK。
+- **Photo Battle 状态闭环**：擂台可自动被激活，比对结果能归入对应物理区，且跳过对局能重回待 PK。
 - **零日志污染**：在生产环境（production）构建中，无任何 QA 对比日志或错误 warn 信息输出。
 - **零误用风险**：`duplicateGroupQA` 字段绝对没有被任何 React UI 视图误用或越权消费。
 - **构建守卫**：`npm run build` 和 `npm run lint` 通过无阻。
@@ -386,6 +386,15 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 
 - **稳定比对读取就绪**：已实现开发环境专用的 `window.__AI_PHOTO_CLEANER_QA__` 作为稳定的聚类 Parity 数据抓取通道。在 100 张和 300 张的真实回归测试（`USE_SIGNAL_GROUPS_FOR_BATTLE = true` 临时开启）中，各组及照片的对比指标在当前样本下对齐（零错配），测试完成后开关已恢复为默认值 `false`。
 - **灰度策略确定**：根据最新评估，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然继续强制为 `false`，生产环境已锁定为 legacy，并且生产包通过防污染守卫在 production 验证中未暴露 `window.__AI_PHOTO_CLEANER_QA__` 对象。
+
+---
+
+## 十九、 CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING 进展更新
+
+- **真实相册感样本测试规划**：已在项目根目录下新建了 [duplicate_realistic_album_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_realistic_album_test_plan.md) 用于规划 100-300 张更接近手机相册的非隐私样本测试。
+- **灰度开关控制硬性约束**：在未来的真实相册感样本测试中，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值必须继续强制为 `false`。该测试仅允许在本地开发环境临时改为 `true` 进行灰度验证，测试结束后必须立刻物理恢复为 `false`，绝不允许将 `true` 作为默认值提交。
+- **生产锁死**：无论测试表现如何，production 环境依然 100% 锁死在 legacy 分支，灰度开关对生产环境完全关闭。
+
 
 
 

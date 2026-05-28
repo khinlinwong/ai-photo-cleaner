@@ -395,8 +395,16 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **就绪度评估与规划**：已在项目根目录下新建了 [duplicate_signal_switch_readiness_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_signal_switch_readiness_plan.md)，对是否可以开启 signal groups 开发环境灰度切换阶段进行了全面安全与稳定性评估。
 - **状态与主流程约束**：
   - 确认当前不直接开启 `USE_SIGNAL_GROUPS_FOR_BATTLE` 为 `true`，生产环境保持强制 legacy。
-  - 确认不移除 legacy `detectDuplicates` 及 `similarGroups` 主流程，以提供坚实的安全备份和快速回退能力。
+  - 确认不移除 legacy `detectDuplicates` 及 `similarGroups` 主流程，以提供坚实的安全备份和快速回退能力.
   - 明确后续测试需要采用更接近手机真实相册的 100-300 张真实测试样本进行开发灰度测试。
   - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+
+### 45. `CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING` (真实相册感样本测试规划 - 当前已完成)
+- **测试规划**：已在项目根目录下新建了 [duplicate_realistic_album_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_realistic_album_test_plan.md) 规划更贴近手机真实相册的 100-300 张非隐私样本测试方案。
+- **状态与主流程约束**：
+  - 测试重点转移至在项目外目录构建真实非隐私相册集（不污染 Git），坚守隐私红线，HEIC/RAW 格式暂不纳入。
+  - 正式主流程仍保持由 legacy 方案驱动，灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
+  - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+
 
 
