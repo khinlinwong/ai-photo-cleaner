@@ -406,9 +406,9 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 
 ---
 
-## 二十一、 CORE-DUPLICATE-LARGE-JPG-PLANNING 进展更新
+## 二十一、 CORE-DUPLICATE-LARGE-JPG-PLANNING 及 ZIP 补测进展更新
 
-- **大尺寸 JPG 测试开关规范**：在规划和未来的大尺寸手机原图（3MB-10MB）非隐私测试中，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 必须继续默认强制为 `false`，仅允许在本地开发环境（development）中临时手动改为 `true` 进行测试。
-- **即测即恢复**：测试结束后必须立刻物理恢复为 `false`，绝对禁止在提交或 push 中遗留 `true` 的配置。
-- **生产环境限制**：无论测试表现如何，production 环境依然 100% 强制锁定在 legacy 分支，灰度开关对生产环境完全关闭，不直接启用 `true` 流程。
-- **提交与推送阶段确认**：本轮大尺寸 JPG 测试规划已通过 Codex QA 审查。测试仍仅限在开发环境临时手动 true，测试后必须物理恢复 false。
+- **大尺寸 JPG 压测结果**：在开发环境下临时启用 `true` 分支，完成了 100 张和 200 张的大尺寸 JPG 物理压测。新旧相似算法的 Parity 指标 100% 一致对齐。
+- **ZIP 导出中断故障**：100 张相册（643MB）和 200 张保留区（15MB）的 ZIP 成功下载；但 200 张淘汰候选区大包（超 1GB）由于前端页面在触发下载后立即 `URL.revokeObjectURL(downloadUrl)` 同步销毁 Blob 导致异步下载中断（`DownloadInterrupted`）。
+- **即测即恢复与生产限制**：测试结束后，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已经完全安全恢复为默认 `false`，生产环境依然 100% 被 legacy 稳定主流程锁定。
+- **下一步规划**：由于 ZIP 导出存在大 Blob 内存释放过早的漏洞，全链路并未能完全通过测试。项目已进入 `CORE-ZIP-LARGE-FILE-FIX-PLANNING` 进行下载修复规划，修复阶段该灰度开关依然强制保持为默认 `false`。

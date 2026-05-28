@@ -433,5 +433,24 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 用户最终分类依旧强制收敛为“保留”与“淘汰候选”。
 - **下一步**：将正式执行 `CORE-DUPLICATE-LARGE-JPG` 100 / 200 张大尺寸 JPG 本地开发环境测试。
 
+### 49. `CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH` (提交大尺寸 JPG 测试规划文档 - 已完成)
+- **提交与推送**：补充执行记录模板、200张测试限制与测试边界，并提交推送规划文档。
+- **状态与主流程约束**：
+  - 开关常量默认值确认仍强制为 `false`，production 锁定 legacy 稳定路径不变。
+  - 用户最终分类依旧强制收敛为“保留”与“淘汰候选”。
+
+### 50. `CORE-DUPLICATE-LARGE-JPG` (大尺寸 JPG 灰度物理压测 - 已完成)
+- **测试实测**：在开发环境下临时启用 `true` 分支，完成了 100 张和 200 张的物理压测。算法 parity 与 Photo Battle 完全对齐，但在 200 张大尺寸测试中暴露了超 1GB 大文件 ZIP 导出中断（`DownloadInterrupted`）的缺陷。
+- **状态与主流程约束**：
+  - 正式主流程仍保持由 legacy 方案驱动，开关常量默认值强制为 `false`，不直接在生产环境启用 `true` 分支，production legacy 锁定状态不变。
+  - 用户最终分类依旧强制收敛为“保留”与“淘汰候选”。
+
+### 51. `CORE-ZIP-LARGE-FILE-FIX-PLANNING` (大文件 ZIP 下载中断修复规划 - 已完成)
+- **修复规划与审查**：已在项目根目录下新建了 [zip_large_file_fix_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_large_file_fix_plan.md) 规划大文件 ZIP 下载中断的修复方案。该规划已正式通过 Codex 只读性安全与规范审查（CORE-ZIP-LARGE-FILE-FIX-QA）。该下载中断缺陷属于底层 ObjectURL 生命周期提早释放问题，独立于新相似组的算法 parity 逻辑。
+- **状态与主流程约束**：
+  - 维持 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然强制为 `false`，生产环境锁定 legacy 稳定路径不变。
+  - 最终用户可见的分类依然收敛为“保留”与“淘汰候选”的二值分类。
+- **下一步**：将正式进入 `CORE-ZIP-LARGE-FILE-FIX` 阶段，仅对 ObjectURL 的生命周期与清理时机进行最小化延迟释放修复，不破坏 ZIP 逻辑与依赖，并完成全链路回归测试。
+
 
 

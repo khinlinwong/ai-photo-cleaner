@@ -361,8 +361,16 @@ if (canUseSignalGroups) {
 
 ---
 
-## 十七、 CORE-DUPLICATE-LARGE-JPG-PLANNING 进展更新
+## 十七、 CORE-DUPLICATE-LARGE-JPG-PLANNING 及 ZIP 补测进展更新
 
-- **true 分支状态限制**：在规划和未来的大尺寸手机原图测试中，`true` 灰度分支仅被允许在本地开发环境（development）中为了压测临时手动开启，且测试完毕后必须恢复为默认值 `false`。
+- **true 分支状态限制**：在规划和未来的大尺寸手机原图测试中，`true` 灰度分支仅被允许在本地开发环境（development）中为了压测临时手动开启，且测试完毕后恢复为默认值 `false`。
 - **灰度验证阶段**：由于本轮大图测试是专为补足浏览器物理性能瓶颈的验证，`true` 分支仍处于 development 灰度验证阶段，禁止 production 生产环境或默认开启。
 - **提交与推送阶段确认**：本轮大尺寸 JPG 测试规划已通过 Codex QA 审查。true 分支在未来测试中仍定位为 development 灰度验证，不改变 production 生产环境。
+
+---
+
+## 十八、 CORE-ZIP-LARGE-FILE-FIX-PLANNING 进展更新
+
+- **true 分支与 ZIP 修复隔离**：尽管新相似组在 `true` 分支下的 parity 比对数据已验证通过，但这绝对不等于大文件 ZIP 全链路验证通过。ZIP 下载中断问题（由于 Object URL 提前释放导致）与新相似组算法分支真伪无关，是一项独立的底座稳定性缺陷，必须进入专门的分支进行单独修复与处理。
+- **灰度开关状态**：在规划与未来进行 ZIP 修复时，开发环境灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 的默认值依然强制为 `false`，生产环境 100% 锁定为 legacy 主流程。
+- **下一步验证限制**：修复上线后需要再次开启临时 true 分支回归测试 100 张和 200 张大文件 JPG ZIP 下载，以验证修复效果。

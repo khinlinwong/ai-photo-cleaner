@@ -29,6 +29,8 @@
 6. **计算耗时限制**：前端 JS 线程在处理 300 张图片时，包含图像分析与聚类算法的总体处理耗时仍在 30 秒级别，存在卡顿或浏览器挂起风险。
 7. **Battle 接管路径偏年轻**：由 signal groups 完全接管 Photo Battle 流程的机制仍处于灰度阶段，代码复杂度较高，需要渐进式灰度发布。
 8. **Legacy 依然稳定**：传统的 detectDuplicates 主流程性能稳定，经历过线上验证，在没有把握的情况下不应对其强行替代或移除。
+9. **超大 ZIP 下载中断风险**：大尺寸 JPG 压测暴露出超大体积（1GB+）淘汰候选区大包在下载时被浏览器 `DownloadInterrupted` 中断的缺陷。该底层稳定性漏洞是灰度切换就绪度中必须优先克服的阻塞项，因此在未彻底解决前绝不能作为生产环境默认开启 `true` 分支的依据。
+
 
 ## 三、 下一阶段灰度切换策略规划
 
@@ -94,9 +96,13 @@
    - Codex 对 beta readiness 规划进行只读审查。
 6. **`CORE-DUPLICATE-LARGE-JPG-PLANNING`**（已完成）：
    - 规划 100 / 200 张 3MB-10MB 大尺寸 JPG 非隐私测试，用于补足浏览器 I/O、Canvas、内存和 ZIP 压力验证。此项规划已通过 Codex QA 审查，明确不作为 production true 的直接依据，当前不直接默认 true，且不进入正式的 beta 阶段。
-7. **`CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH`**（当前正在进行）：
-   - 补充并提交大尺寸 JPG 测试规划文档并推送至远程仓库。
-8. **`CORE-DUPLICATE-LARGE-JPG-QA`**：
-   - Codex 对最终大尺寸 JPG 测试规划进行只读审查。
-9. **`CORE-DUPLICATE-LARGE-JPG`**：
-   - 临时开启 true 分支，在项目目录外导入测试大图执行 100/200 张压力测试，测试完毕后恢复 false。
+7. **`CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH`**（已完成）：
+   - 补充并提交大尺寸 JPG 测试规划文档并推送。
+8. **`CORE-DUPLICATE-LARGE-JPG`**（已完成）：
+   - 运行大尺寸 JPG 物理压测，算法 parity 正常，但发现 200 张大文件 ZIP 导出中断（`DownloadInterrupted`）漏洞。
+9. **`CORE-ZIP-LARGE-FILE-FIX-PLANNING`**（当前正在进行）：
+   - 规划大文件 ZIP 下载中断修复方案，新建 `zip_large_file_fix_plan.md`。
+10. **`CORE-ZIP-LARGE-FILE-FIX-QA`**：
+    - Codex 对大文件 ZIP 下载修复方案进行只读审查。
+11. **`CORE-ZIP-LARGE-FILE-FIX`**：
+    - 在开发分支中实施最小低风险的 Object URL 延时释放修复，并进行全方位回归测试。

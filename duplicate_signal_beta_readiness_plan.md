@@ -34,16 +34,16 @@
 ## 三、 评估是否可以进入 development-only 常态灰度
 
 ### 建议结论
-**可以考虑进入更严格的 development-only 灰度规划，但不建议立即把 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认改为 true。**
+**目前强烈不建议进入 development-only 常态灰度，必须继续将 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认保持为 `false`。**
 
 ### 核心理由：
-1. **多轮测试通过**：目前在开发环境通过了多轮小、中批量及真实相册感样本回归测试，两路算法在此样本下表现一致。
-2. **校验手段健全**：`window.__AI_PHOTO_CLEANER_QA__` 提供了稳定的 Parity 自动校验闭环。
-3. **缺乏真实客户相册长期测试**：当前的 mock 样本仅能模拟部分特征，仍未经历真实用户在各种操作系统、不同硬件环境下，海量复杂相册行为的长期、多样性实测。
-4. **缺乏高分辨率手机原图压力**：目前的 mock 样本单张体积在 10KB~20KB，而手机真实照片（原图）单张可达数 MB 至十几 MB，在处理 300 张以上高分辨率手机原图时，Canvas 诊断与内存占用的物理压强尚未得到实测。
-5. **未覆盖 HEIC / RAW 格式**：移动端极其常见的苹果 HEIC 文件和相机 RAW 格式在测试中依旧被隔离排除。
-6. **production 稳定性优先**：在没有充分把握前，生产环境必须确保完全不出故障，不应盲目推进生产默认值。
-7. **legacy 仍是必要回退路径**：传统主流程稳定可靠，随时准备在灰度逻辑发生故障时提供秒级切换兜底。
+1. **暴露超大 ZIP 下载中断 Bug**：在大尺寸 JPG 压力测试中，虽然两路算法在逻辑上完全对齐，但在 200 张照片物理压测下，超 1GB 大文件的淘汰候选区 ZIP 下载发生 `DownloadInterrupted` 中断。这说明浏览器导出底座在处理超大体积 Blob 资源时存在释放时机缺陷。
+2. **不建议基于当前状态进入 Beta**：在解决 1GB+ 级别的超大 ZIP 导出下载中断问题之前，相册管理的全链路存在明显的体验崩溃漏洞。必须先在开发分支内对 Object URL 释放的生命周期进行精细化修复（`CORE-ZIP-LARGE-FILE-FIX`）。
+3. **校验手段健全**：`window.__AI_PHOTO_CLEANER_QA__` 提供了稳定的 Parity 自动校验闭环。
+4. **缺乏真实客户相册长期测试**：当前的 mock 样本仅能模拟部分特征，仍未经历真实用户在各种操作系统、不同硬件环境下，海量复杂相册行为的长期、多样性实测。
+5. **缺乏高分辨率手机原图压力**：在超大体量下 Canvas 诊断与内存占用的物理压强尚未在各种复杂硬件下得到广泛验证。
+6. **未覆盖 HEIC / RAW 格式**：移动端极其常见的苹果 HEIC 文件和相机 RAW 格式在测试中依旧被隔离排除。
+7. **production 稳定性优先**：生产环境必须确保完全不出故障，在没有彻底解决大包下载中断前，必须强制锁定 legacy 稳定路径。
 
 ---
 
@@ -124,16 +124,18 @@
 1. **`CORE-DUPLICATE-SIGNAL-BETA-QA`**（已完成）：
    - Codex 只读审查本 beta readiness 规划文档，核对规划的合理性。
 2. **`CORE-DUPLICATE-LARGE-JPG-PLANNING`**（已完成）：
-   - 规划 100 / 200 张大尺寸手机原图（3MB-10MB）非隐私测试的方案。大尺寸 JPG 测试规划已通过 Codex QA 审查，明确测试重点是物理压力验证。200 张不是必跑档位，需依据 100 张的表现决定。当前不直接将开发默认值改为 true，当前不进入 beta，测试结束后也必须恢复 false。
-3. **`CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH`**（当前正在进行）：
-   - 补充、提交大尺寸 JPG 测试规划文档并推送至远程仓库。
-4. **`CORE-DUPLICATE-LARGE-JPG-QA`**：
-   - Codex 只读审查最终大尺寸 JPG 测试规划文档。
-5. **`CORE-DUPLICATE-LARGE-JPG`**：
-   - 运行大尺寸 JPG true 分支本地开发环境测试，收集 Parity 和物理压强数据。
-6. **`CORE-DUPLICATE-LARGE-JPG-RESULT-QA`**：
-   - Codex 审查测试结果。
-7. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**：
+   - 规划大尺寸 JPG 测试方案。
+3. **`CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH`**（已完成）：
+   - 提交大尺寸 JPG 测试规划文档并推送。
+4. **`CORE-DUPLICATE-LARGE-JPG`**（已完成）：
+   - 运行大尺寸 JPG true 分支压力压测，算法 parity 对齐通过，但暴露了 200 张大文件 ZIP 导出中断故障。
+5. **`CORE-ZIP-LARGE-FILE-FIX-PLANNING`**（当前正在进行）：
+   - 规划大文件 ZIP 下载中断修复方案，制定 `zip_large_file_fix_plan.md`。
+6. **`CORE-ZIP-LARGE-FILE-FIX-QA`**：
+   - Codex 只读审查大文件 ZIP 修复规划。
+7. **`CORE-ZIP-LARGE-FILE-FIX`**：
+   - 实施最小化 Object URL 延时释放修复，并进行回归测试。
+8. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**：
    - 规划并设计同一测试集在 true 分支下的多轮重复性测试与内存监控方案。
-8. **`CORE-DUPLICATE-SIGNAL-DEV-TOGGLE-PLANNING`**：
+9. **`CORE-DUPLICATE-SIGNAL-DEV-TOGGLE-PLANNING`**：
    - 在完成上述验证后，若开发确实需要，再单独评估是否引入 dev-only localStorage 配置方式。
