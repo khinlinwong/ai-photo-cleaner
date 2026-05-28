@@ -207,4 +207,84 @@
 3. **`CORE-DUPLICATE-REALISTIC-ALBUM-RESULT-QA`**
    - **内容**：Codex 审查测试结果记录，判断是否完全符合通过标准。
 4. **`CORE-DUPLICATE-SIGNAL-BETA-PLANNING`**
-   - **内容**：如果测试完全通过且没有任何 Parity 偏差，则评估在 development 环境下常态化开启 true 分支的灰度计划（Production 依然保持 false）。
+    - **内容**：如果测试完全通过且没有任何 Parity 偏差，则评估在 development 环境下常态化开启 true 分支的灰度计划（Production 依然保持 false）。
+
+## CORE-DUPLICATE-REALISTIC-ALBUM 测试结果记录
+
+### 测试前状态
+- **git status 干净**：是，工作区状态完全干净。
+- **USE_SIGNAL_GROUPS_FOR_BATTLE 初始值是否为 false**：是，初始状态下为 false。
+- **测试图片是否在项目目录外**：是，存储在外部目录 `D:\ai-photo-cleaner-realistic-album-test`。
+- **测试图片是否非隐私 / 非敏感**：是，测试图片全由自动化算法生成（纯色块与测试字符），不含任何真实人脸或个人隐私。
+- **是否没有测试图片进入 Git**：是，项目 Git 未追踪任何测试图片。
+
+### 100 张测试结果
+- **图片数量**：100。
+- **JPG / PNG / WebP 数量**：75 / 20 / 5。
+- **总文件大小**：776,837 字节，约 758.63 KB。
+- **/desktop 正常**：是。
+- **/processing 正常**：是。
+- **/processing 耗时**：3.30s。
+- **/results 正常**：是。
+- **results 滚动正常**：是，流畅无卡顿。
+- **无白屏**：是。
+- **无浏览器无响应**：是。
+- **window.__AI_PHOTO_CLEANER_QA__ 成功读取**：是。
+- **oldSimilarGroupCount**：6。
+- **newSimilarGroupCount**：6。
+- **similarGroupCountMismatch**：false。
+- **oldSimilarGroupedPhotoCount**：84。
+- **newSimilarGroupedPhotoCount**：84。
+- **similarGroupedPhotoCountMismatch**：false。
+- **leaderMismatchCount**：0。
+- **generatedAt 存在**：是（生成时间戳：1779957463997）。
+- **source**：duplicateGroupQA。
+- **只包含安全字段**：是，仅包含比对指标，不包含任何图片 Base64 或本地敏感路径。
+- **Photo Battle 自动化测试**：自动化点击了 78 回合，流转和弹窗关闭完全正常，当前样本下无死锁。
+- **ZIP 正常**：是，导出 ZIP 功能正常工作（文件大小 49.71 KB），且已自动清理。
+- **ZIP 和页面分区一致**：是，只包含保留区胜出照片。
+- **无第三最终分类**：是。
+
+### 300 张测试结果
+- **图片数量**：300。
+- **JPG / PNG / WebP 数量**：225 / 60 / 15。
+- **总文件大小**：2,365,470 字节，约 2.26 MB。
+- **/desktop 正常**：是。
+- **/processing 正常**：是。
+- **/processing 耗时**：8.96s。
+- **/results 正常**：是。
+- **results 滚动正常**：是，流畅无卡顿。
+- **无白屏**：是。
+- **无浏览器无响应**：是。
+- **window.__AI_PHOTO_CLEANER_QA__ 成功读取**：是。
+- **oldSimilarGroupCount**：6。
+- **newSimilarGroupCount**：6。
+- **similarGroupCountMismatch**：false。
+- **oldSimilarGroupedPhotoCount**：255。
+- **newSimilarGroupedPhotoCount**：255。
+- **similarGroupedPhotoCountMismatch**：false。
+- **leaderMismatchCount**：0。
+- **generatedAt 存在**：是（生成时间戳：1779957521152）。
+- **source**：duplicateGroupQA。
+- **只包含安全字段**：是，无敏感字段。
+- **Photo Battle 自动化测试**：自动化点击了 249 回合，流转和弹窗关闭完全正常，当前样本下无死锁。
+- **ZIP 正常**：是，导出 ZIP 功能正常工作（文件大小 202.74 KB），且已自动清理。
+- **ZIP 和页面分区一致**：是，只包含保留区胜出照片。
+- **无第三最终分类**：是。
+
+### 恢复状态
+- **USE_SIGNAL_GROUPS_FOR_BATTLE 已恢复 false**：是。
+- **git diff -- src/lib/config/featureFlags.ts 为空**：是。
+- **npm run build 通过**：是。
+- **npm run lint 通过**：是。
+- **git status 干净**：是。
+- **没有 package 文件变动**：是。
+- **没有测试图片进入 Git**：是。
+
+### 测试边界
+- **本轮是 mock 真实相册感非隐私样本测试**：当前结果只能说明在当前所用样本及场景下 true 分支表现良好，指标与旧算法完全对齐。
+- **不能等同真实客户相册长期验证**：由于测试样本仍为人工模拟生成，不能覆盖真实客户千差万别的日常照片内容及极端重复情况。
+- **未覆盖 HEIC / RAW**：测试中暂不包含 HEIC、RAW、视频、GIF 动图等非主流及大体积文件类型。
+- **不能证明 production 可以默认 true**：因为真实客户端复杂的计算环境和多样的相册图像未完成长期全面的线上/灰度实测。
+- **测试图片总大小较小，不能代表大尺寸手机原图 I/O 压力**：mock 图片体积均小于 20KB，而在用户手机原图中单张多为数 MB 或十几 MB，尚未验证高强度的本地 I/O 和内存压力。
+- **仍应保持 USE_SIGNAL_GROUPS_FOR_BATTLE=false**：生产环境必须继续强制使用 legacy。

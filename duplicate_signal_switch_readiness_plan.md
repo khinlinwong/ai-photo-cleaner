@@ -80,9 +80,12 @@
 
 1. **`CORE-DUPLICATE-SIGNAL-SWITCH-QA`**：
    - Codex 对本就绪度评估文档进行只读审查。
-2. **`CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING`**（当前已完成）：
-   - 已完成更真实的 100-300 张非隐私相册连拍与噪点测试样本集的测试规划，新建了专属规划文档。此规划明确了测试图片放在项目目录外（不被 Git 追踪），严禁使用隐私敏感图片，HEIC/RAW 暂不纳入，且测试后必须立即复原 feature flag。
-3. **`CORE-DUPLICATE-REALISTIC-ALBUM`**：
-   - 基于该更真实的测试集在外部文件夹运行 development true 分支下的灰度回归。
+2. **`CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING`**（已完成）：
+   - 已完成更真实的 100-300 张非隐私相册测试集的规划，新建了专属规划文档。
+3. **`CORE-DUPLICATE-REALISTIC-ALBUM`**（已完成）：
+   - 在开发环境下临时开启 `true` 分支，成功完成了 100 张和 300 张真实相册感非隐私 mock 样本的测试。
+   - 双路 parity 数据在当前样本下完成对齐，验证了 Photo Battle、ZIP 二值导出、虚拟滚动与二值分类等功能在此样本下均运转正常。
+   - 测试完毕后，开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已顺利恢复为 `false`。
+   - 依然存在明确的测试边界（如：未覆盖真实客户相册长期验证、未覆盖 HEIC / RAW 格式、且测试 mock 图片总体积较小，不代表真实大图 I/O 压力），因此依然不建议 production 默认 true，且 legacy 稳定主流程必须全量保留。
 4. **`CORE-DUPLICATE-SIGNAL-BETA-PLANNING`**：
-   - 评估前述测试结果，并决定是否将开发环境的 true 开关长期默认开启。
+   - 评估前述测试结果，并决定是否将开发环境的 true 开关长期默认开启，或进一步设计更复杂的场景适配。

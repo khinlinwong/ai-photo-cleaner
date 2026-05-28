@@ -406,5 +406,13 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 正式主流程仍保持由 legacy 方案驱动，灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
   - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
 
+### 46. `CORE-DUPLICATE-REALISTIC-ALBUM` (真实相册感样本测试 - 当前已完成)
+- **测试结果**：成功在开发环境下临时启用 `true` 分支，完成了 100 / 300 张 mock 真实相册感非隐私样本在更真实相册结构下的 parity 测试，双路算法比对指标 100% 对齐。
+- **状态与主流程约束**：
+  - 功能保障：测试验证了 Photo Battle、ZIP 导出、results 网格虚拟滚动以及二值分类流程在此样本下均运转正常。
+  - 开关复位：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已恢复并继续保持为 `false`。
+  - 仍保持 production legacy 驱动主流程，不进入 production true。
+  - 用户可见的最终决策归档依旧强制收敛为“保留”与“淘汰候选”二值分类。
+
 
 

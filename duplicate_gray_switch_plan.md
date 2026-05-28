@@ -395,6 +395,14 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - **灰度开关控制硬性约束**：在未来的真实相册感样本测试中，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值必须继续强制为 `false`。该测试仅允许在本地开发环境临时改为 `true` 进行灰度验证，测试结束后必须立刻物理恢复为 `false`，绝不允许将 `true` 作为默认值提交。
 - **生产锁死**：无论测试表现如何，production 环境依然 100% 锁死在 legacy 分支，灰度开关对生产环境完全关闭。
 
+---
+
+## 二十、 CORE-DUPLICATE-REALISTIC-ALBUM 进展更新
+
+- **测试与开关复位确认**：100 / 300 张真实相册感样本测试已顺利完成。测试结束后，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已被物理恢复为默认 `false`，保证代码仓库无任何 `true` 的脏改动残留。
+- **验证手段有效性**：`window.__AI_PHOTO_CLEANER_QA__` 作为 parity 对齐指标读取通道的方案在本次大批量回归测试中表现极为稳定、有效，成功提供了零偏差的分组与照片指标验证。
+- **生产强制锁定**：尽管当前回归数据完全对齐，但在完成更大规模或包含 HEIC/RAW 格式的真实用户相册长期验证前，开发环境临时 true 测试后必须强制恢复 false。生产环境将 100% 锁定在 legacy 分支上，不启用 true 分流。
+
 
 
 

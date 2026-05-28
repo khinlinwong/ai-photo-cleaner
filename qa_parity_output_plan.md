@@ -193,5 +193,14 @@ production 不暴露验证：
 - **后续回归读取标准**：本 `window.__AI_PHOTO_CLEANER_QA__` 开发环境隐藏输出将作为后续 signal switch (灰度开关) 重新验证与大批量/混合格式回归的唯一标准数据提取和检验源，替代了时机不稳定的 console 拦截或 React 节点深探方案，确保回归结论在当前回归中稳定可信。
 - **真实相册感样本测试的应用**：在 `CORE-DUPLICATE-REALISTIC-ALBUM-PLANNING` 中规划的 100-300 张真实相册感非隐私样本测试，也将强制把 `window.__AI_PHOTO_CLEANER_QA__` 作为标准且唯一的 Parity 指标提取机制，验证双路算法结果的一致性。
 
+---
+
+## 十二、 CORE-DUPLICATE-REALISTIC-ALBUM 进展更新
+
+- **在真实相册感样本测试中的成功应用**：`window.__AI_PHOTO_CLEANER_QA__` 已成功应用于 100 张和 300 张真实相册感非隐私样本测试。测试脚本通过该通道稳定、无漏读地读取了全部 Parity 摘要数据。
+- **字段名与规范澄清**：
+  - 正式代码字段名必须是 `window.__AI_PHOTO_CLEANER_QA__`，且测试过程严格验证了其正确性和稳定性。
+  - 用户以及回归报告中所提到的 `window.AI_PHOTO_CLEANER_QA` 纯属文字性的通俗表述（即文字表述问题），而非实际代码所用字段，代码并未发生任何字段名的错写或混用。
+
 
 
