@@ -210,4 +210,9 @@
 2. **200张相册测试**：保留区较小体积 ZIP（15MB）成功下载；但淘汰候选区超大体积 ZIP（预计超过 1.2GB）下载发生中断，状态为 `DownloadInterrupted`。
 3. **故障原因**：业务代码 `src/app/results/page.tsx` 中在调用 `link.click()` 后，瞬间同步调用了 `URL.revokeObjectURL(downloadUrl)` 释放 Blob。当大包在浏览器底层异步写入磁盘尚未完成时，Blob URL 已经被强行销毁，导致大文件传输中断。
 
-**结论**：大尺寸 JPG 场景下的全链路并未能完全通过测试，ZIP 大包导出功能存在明显的资源提前释放 bug。需要进入专门的大文件 ZIP 下载修复分支（`CORE-ZIP-LARGE-FILE-FIX`）进行独立处理，此问题修复前无法进入下一阶段的 beta readiness。
+**结论**：
+在执行 `CORE-ZIP-LARGE-FILE-FIX` 最小化延迟释放 Object URL 修复后，实测表明：100 张淘汰区 ZIP（643MB）已通过验证，但 200 张大尺寸 JPG 淘汰候选区单包 ZIP 依然失败（DownloadInterrupted）。
+
+针对 200 张大尺寸 JPG 淘汰候选区单包 ZIP 失败的问题，**下一步确定采用分批 ZIP 导出方案**（`CORE-ZIP-BATCH-EXPORT`），以避免生成和下载单个 1GB+ 的超大 Blob ZIP，消除浏览器的物理内存与传输管道瓶颈。
+
+**特别声明**：大尺寸 JPG 全链路仍不能记录为完全通过。目前该测试只能标记为“部分通过”，需等待分批 ZIP 导出方案完整实现并执行回归测试通过后，方可将其视为全链路完全通过。在此之前，系统不进入 beta，不将 `USE_SIGNAL_GROUPS_FOR_BATTLE` 常量默认值改为 `true`。
