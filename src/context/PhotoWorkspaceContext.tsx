@@ -7,6 +7,22 @@ import { AnalysisMode, SimilarGroup, BattleDecision } from '@/lib/analysis/visio
 import { detectDuplicates, buildDuplicateSignals, DuplicateAnalysisResult, buildSimilarGroupsFromSignals, QASimilarGroupSignalForBattle, adaptSignalGroupsToLegacySimilarGroups } from '@/lib/analysis/local/duplicate';
 import { USE_SIGNAL_GROUPS_FOR_BATTLE } from '@/lib/config/featureFlags';
 
+declare global {
+  interface Window {
+    __AI_PHOTO_CLEANER_QA__?: {
+      oldSimilarGroupCount: number;
+      newSimilarGroupCount: number;
+      similarGroupCountMismatch: boolean;
+      oldSimilarGroupedPhotoCount: number;
+      newSimilarGroupedPhotoCount: number;
+      similarGroupedPhotoCountMismatch: boolean;
+      leaderMismatchCount: number;
+      generatedAt: number;
+      source: 'duplicateGroupQA';
+    };
+  }
+}
+
 export interface ActiveBattleState {
   groupId: string;
   photoIds: string[];
@@ -454,6 +470,20 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         newSimilarGroupsForQA,
         comparison
       });
+
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        window.__AI_PHOTO_CLEANER_QA__ = {
+          oldSimilarGroupCount: comparison.oldSimilarGroupCount,
+          newSimilarGroupCount: comparison.newSimilarGroupCount,
+          similarGroupCountMismatch: comparison.similarGroupCountMismatch,
+          oldSimilarGroupedPhotoCount: comparison.oldSimilarGroupedPhotoCount,
+          newSimilarGroupedPhotoCount: comparison.newSimilarGroupedPhotoCount,
+          similarGroupedPhotoCountMismatch: comparison.similarGroupedPhotoCountMismatch,
+          leaderMismatchCount: comparison.leaderMismatchCount,
+          generatedAt: Date.now(),
+          source: 'duplicateGroupQA'
+        };
+      }
 
       if (process.env.NODE_ENV === 'development') {
         console.debug('[Duplicate SimilarGroups QA]', {

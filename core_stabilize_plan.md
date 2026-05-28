@@ -375,3 +375,11 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 下一步将进入 `CORE-QA-PARITY-1` 阶段，对 window 全局输出进行最小实现。
   - 正式主流程保持由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值强制为 `false`。
   - 用户最终可见的整理决策分类强制二值化收敛为“保留”与“淘汰候选”。
+
+### 42. `CORE-QA-PARITY-1` (稳定 QA parity 最小实现 - 当前已完成)
+- **最小实现**：在 [PhotoWorkspaceContext.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/context/PhotoWorkspaceContext.tsx) 中新增了 development-only 的全局 window 属性 `__AI_PHOTO_CLEANER_QA__` 写入。
+- **状态与主流程约束**：
+  - 本次修改受 `process.env.NODE_ENV === 'development' && typeof window !== 'undefined'` 双重条件硬卫拦截，绝不污染生产环境或服务端渲染（SSR）。
+  - 输出字段仅包含老/新相似组及相似照片数对比、Leader 错配数、生成的毫秒级时间戳及标记源等，绝对不泄露任何用户文件路径、Base64/Blob 数据以及完整 photo 实例。
+  - 正式主流程仍保持由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
+  - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。

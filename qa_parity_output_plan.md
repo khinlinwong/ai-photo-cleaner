@@ -116,7 +116,7 @@
 ## 八、 规划后续 Checkpoint
 
 1. **`CORE-PERFORMANCE-5-QA`**：Codex 对本 `qa_parity_output_plan.md` 规划文件进行只读审查，确保没有 src 代码脏改动且安全性隔离完整。
-2. **`CORE-QA-PARITY-1`**：实现最小 dev-only 的 `window.__AI_PHOTO_CLEANER_QA__` 全局对象输出，只保留数字比对，杜绝隐私泄漏，主流程完全不变。
+2. **`CORE-QA-PARITY-1`**（当前已完成）：已实现最小 dev-only 的 `window.__AI_PHOTO_CLEANER_QA__` 全局对象输出，输出字段仅为数字摘要与 `source` / `generatedAt` 等辅助新鲜度标记，production 环境不输出，且不包含任何物理文件路径、Base64/Blob 数据、完整 photo 实例以及用户文件细节。
 3. **`CORE-QA-PARITY-1-QA`**：审查代码，确认完全隔离在 development 之下。
 4. **`CORE-QA-PARITY-2`**：配合新的 window 数据读取方式，对 100 张、300 张混合格式图片重跑灰度回归测试并输出比对值。
 
