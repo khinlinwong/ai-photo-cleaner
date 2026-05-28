@@ -267,7 +267,11 @@ export default function ResultsPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(downloadUrl);
+      
+      // 延迟 120 秒释放 Object URL，给超大文件下载写入磁盘留出充裕的传输时间
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+      }, 120_000);
     } catch (err) {
       console.error('Failed to download ZIP pack:', err);
     } finally {

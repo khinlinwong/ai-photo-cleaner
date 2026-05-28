@@ -450,7 +450,17 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **状态与主流程约束**：
   - 维持 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然强制为 `false`，生产环境锁定 legacy 稳定路径不变。
   - 最终用户可见的分类依然收敛为“保留”与“淘汰候选”的二值分类。
-- **下一步**：将正式进入 `CORE-ZIP-LARGE-FILE-FIX` 阶段，仅对 ObjectURL 的生命周期与清理时机进行最小化延迟释放修复，不破坏 ZIP 逻辑与依赖，并完成全链路回归测试。
+- **下一步**：已进入 `CORE-ZIP-LARGE-FILE-FIX` 阶段，仅对 ObjectURL 的生命周期与清理时机进行了最小化延迟释放修复。
+
+### 52. `CORE-ZIP-LARGE-FILE-FIX` (大文件 ZIP 下载中断修复实现 - 已完成)
+- **修复实现与回归结果**：已对 `src/app/results/page.tsx` 中 `downloadPhotosZip` 进行了最小代码修复，通过 `setTimeout` 延迟 120 秒释放 ObjectURL。该修复已安全通过代码审查与编译验证。实测结果显示，100 张相册大包（643.25MB）和 200 张保留区小包（15.78MB）成功完整下载，证明延迟 Object URL 生命周期能解决中等大包异步磁盘写入的冲突；但在 200 张淘汰区大包（1.27GB）压力下依然出现 `DownloadInterrupted` 中断。这说明大尺寸 JPG 全链路在单包 1GB+ 的极端体量下仍未完全通过，此最小延时方案并非超大型单包 ZIP 的最终解法。
+- **修复范围与限制**：
+  - 修复范围严格限制在 ObjectURL 的生命周期管理，没有改动 ZIP 内文件内容选择与筛选分区逻辑。
+  - 双路算法 parity 对齐、照片 processing 处理、A/B 擂台及 Photo Battle 状态机均完全不受此修复影响。
+  - 生产环境强制 legacy 配置，灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 在代码中继续强力保持为 `false` 不变。
+- **下一步**：将正式进入 `CORE-ZIP-BATCH-EXPORT-PLANNING` 阶段，规划按张数或体积分批导出 ZIP 包，彻底规避浏览器单包 1GB+ 内存溢出的限制。
+
+
 
 
 
