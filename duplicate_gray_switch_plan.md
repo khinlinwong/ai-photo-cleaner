@@ -380,4 +380,13 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - **CORE-DUPLICATE-13-PLANNING 进展更新**：在未来规划的 200 / 300 张混合格式物理压测中，测试期间同样必须严格遵循“即测即恢复 false”的红线规程，绝对不允许将启用状态遗留在 `featureFlags.ts` 中。生产环境依然 100% 锁死在 legacy 分离机制中，不得启用 `true` 流程。
 - **CORE-DUPLICATE-13 实测结论**：200 / 300 张混合格式测试结束后，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已被物理恢复为默认 `false`，生产环境依然强制锁定于 legacy 方案。鉴于 300 张压测已经反映出浏览器原型的滚动掉帧等渲染负载隐患，在对其进行 Web Worker 离线计算与 DOM 虚拟化列表等性能优化重构前，严禁扩大 `true` 灰度开关的生产使用或测试范围。
 
+---
+
+## 十八、 CORE-QA-PARITY-2 与 CORE-DUPLICATE-SIGNAL-SWITCH-PLANNING 进展更新
+
+- **稳定比对读取就绪**：已实现开发环境专用的 `window.__AI_PHOTO_CLEANER_QA__` 作为稳定的聚类 Parity 数据抓取通道。在 100 张和 300 张的真实回归测试（`USE_SIGNAL_GROUPS_FOR_BATTLE = true` 临时开启）中，各组及照片的对比指标在当前样本下对齐（零错配），测试完成后开关已恢复为默认值 `false`。
+- **灰度策略确定**：根据最新评估，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然继续强制为 `false`，生产环境已锁定为 legacy，并且生产包通过防污染守卫在 production 验证中未暴露 `window.__AI_PHOTO_CLEANER_QA__` 对象。
+
+
+
 

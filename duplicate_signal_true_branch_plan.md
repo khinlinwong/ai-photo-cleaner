@@ -157,3 +157,12 @@ if (canUseSignalGroups) {
   - 本轮测试为**纯仿真/元数据测试**，并不等于真实 200 张大图读取、解析、Canvas 诊断、UI 网格重绘以及 ZIP 打包压缩等物理压力测试。
   - 开关状态已恢复：`USE_SIGNAL_GROUPS_FOR_BATTLE` 已物理恢复为 `false`。
   - 接入限制：**true 分支仍绝对禁止在 production 生产环境或作为默认主流程启用。** 下一步必须规划真实 100-300 张物理图片文件的压力测试以验证主线程瓶颈。
+
+---
+
+## 十四、 CORE-QA-PARITY-2 与 CORE-DUPLICATE-SIGNAL-SWITCH-PLANNING 进展更新
+
+- **真实混合格式回归通过**：利用新增的 `window.__AI_PHOTO_CLEANER_QA__` 作为稳定的读取通道，已在 `USE_SIGNAL_GROUPS_FOR_BATTLE = true` 临时开启下，成功通过了 100 张和 300 张真实 JPG / PNG / WebP 混合格式物理图片测试，双路算法结果数据（老新组数、相似照片数）在当前回归中稳定一致，领队错配数为 0，滚动性能良好，无第三分类产生。
+- **生产不暴露与灰度限制**：生产包已通过防污染拦截守卫，`typeof window.__AI_PHOTO_CLEANER_QA__` 确认返回 `undefined`。由于目前尚未在真实的客户海量复杂相册以及 RAW / HEIC 等格式下进行深度实测，该 true 分支目前仅建议作为开发环境下的手动灰度（development-only 灰度测试），生产环境已锁定在 legacy 机制，并由 production 验证未暴露该全局对象。
+
+

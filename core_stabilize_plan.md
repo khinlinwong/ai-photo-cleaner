@@ -385,9 +385,18 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
 
 ### 43. `CORE-QA-PARITY-2` (使用 window QA summary 进行回归与生产防护验证 - 当前已完成)
-- **回归测试与指标读取**：通过 `window.__AI_PHOTO_CLEANER_QA__` 全局对象，成功地读取并记录了 100 张和 300 张混合格式图片在灰度测试分支（`USE_SIGNAL_GROUPS_FOR_BATTLE = true`）下的比对结果（组数量与相似照片数量一致，零错配，分类完美收敛于“保留”与“淘汰候选”的二值体系，UI、擂台、ZIP 导出一切正常）。
-- **生产不暴露与安全隔离**：在生产包（`npm run build`）构建完成后，启动 production server 对生产环境进行了无头浏览器读取验证，确认 `typeof window.__AI_PHOTO_CLEANER_QA__` 为 `undefined`，没有向生产环境泄露任何测试或数字摘要数据。
+- **回归测试与指标读取**：通过 `window.__AI_PHOTO_CLEANER_QA__` 全局对象，成功地记录了 100 张 and 300 张混合格式图片在灰度测试分支（`USE_SIGNAL_GROUPS_FOR_BATTLE = true`）下的比对结果（组数量与相似照片数量一致，零错配，分类在此样本下收敛于“保留”与“淘汰候选”的二值体系，UI、擂台、ZIP 导出运行正常）。
+- **生产不暴露与安全隔离**：在生产包（`npm run build`）构建完成后，启动 production server 对生产环境进行了无头浏览器读取验证，确认 `typeof window.__AI_PHOTO_CLEANER_QA__` 为 `undefined`，production 验证未暴露任何测试或数字摘要数据。
 - **状态与主流程约束**：
   - 正式主流程仍保持由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
   - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+
+### 44. `CORE-DUPLICATE-SIGNAL-SWITCH-PLANNING` (Signal Groups 灰度切换就绪度评估 - 当前已完成)
+- **就绪度评估与规划**：已在项目根目录下新建了 [duplicate_signal_switch_readiness_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_signal_switch_readiness_plan.md)，对是否可以开启 signal groups 开发环境灰度切换阶段进行了全面安全与稳定性评估。
+- **状态与主流程约束**：
+  - 确认当前不直接开启 `USE_SIGNAL_GROUPS_FOR_BATTLE` 为 `true`，生产环境保持强制 legacy。
+  - 确认不移除 legacy `detectDuplicates` 及 `similarGroups` 主流程，以提供坚实的安全备份和快速回退能力。
+  - 明确后续测试需要采用更接近手机真实相册的 100-300 张真实测试样本进行开发灰度测试。
+  - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+
 

@@ -173,7 +173,7 @@ production 不暴露验证：
 - production server 已启动并验证。
 - production 下 typeof `window.__AI_PHOTO_CLEANER_QA__` 返回 undefined。
 - 无控制台报错。
-- 说明 development guard 生效，production 不暴露 QA summary。
+- 说明 development guard 生效，production 验证未暴露 QA summary。
 
 字段名澄清：
 - 正式字段名必须是 `window.__AI_PHOTO_CLEANER_QA__`。
@@ -185,3 +185,11 @@ production 不暴露验证：
 - Codex 环境中 build/lint 仍可能受 .next/cache 或 Node 进程占用影响。
 - 这不是本轮代码错误。
 - 后续如果遇到，应先清理 .next 或关闭占用 Node 进程。
+
+---
+
+## 十一、 CORE-DUPLICATE-SIGNAL-SWITCH-PLANNING 进展更新
+
+- **后续回归读取标准**：本 `window.__AI_PHOTO_CLEANER_QA__` 开发环境隐藏输出将作为后续 signal switch (灰度开关) 重新验证与大批量/混合格式回归的唯一标准数据提取和检验源，替代了时机不稳定的 console 拦截或 React 节点深探方案，确保回归结论在当前回归中稳定可信。
+
+
