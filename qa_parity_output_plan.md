@@ -118,19 +118,70 @@
 1. **`CORE-PERFORMANCE-5-QA`**：Codex 对本 `qa_parity_output_plan.md` 规划文件进行只读审查，确保没有 src 代码脏改动且安全性隔离完整。
 2. **`CORE-QA-PARITY-1`**（当前已完成）：已实现最小 dev-only 的 `window.__AI_PHOTO_CLEANER_QA__` 全局对象输出，输出字段仅为数字摘要与 `source` / `generatedAt` 等辅助新鲜度标记，production 环境不输出，且不包含任何物理文件路径、Base64/Blob 数据、完整 photo 实例以及用户文件细节。
 3. **`CORE-QA-PARITY-1-QA`**：审查代码，确认完全隔离在 development 之下。
-4. **`CORE-QA-PARITY-2`**：配合新的 window 数据读取方式，对 100 张、300 张混合格式图片重跑灰度回归测试并输出比对值。
+4. **`CORE-QA-PARITY-2`**（当前已完成）：配合新的 window 数据读取方式，对 100 张、300 张混合格式图片重跑灰度回归测试，通过 `window.__AI_PHOTO_CLEANER_QA__` 读取全部指标，且验证了 production 构建不暴露全局对象。
 
 ---
 
 ## 九、 记录 build/lint 环境问题
 
-在 `CORE-PERFORMANCE-4-POST-QA` 阶段中，Codex 验证环境曾出现过以下两点阻碍：
-- **build 进程挂起**：在执行 `npm run build` 时，受本地磁盘 `.next` 缓存碎片和热更新残留进程的锁定，造成构建管道假死。
-- **lint 缓存权限拦截**：在执行 `npm run lint` 时，由于本地 `.next/cache/eslint` 文件夹被其他 Node 进程锁定或权限不足，导致 lint 抛出拦截警告。
-
-**说明与 fallback**：
 该类问题倾向于系统开发环境的缓存锁和僵尸进程冲突，**并非代码规则错误或 TypeScript 类型不合规**。
 如果在后续验证中再次发生：
 1. 应先执行 `Remove-Item -Recurse -Force .next` 清理缓存。
 2. 通过任务管理器彻底清除残留的僵尸 Node.js 开发服务进程。
 3. 重新运行构建，切忌为了迎合此环境缓存阻碍而对业务逻辑源码进行任何非必要修改。
+
+---
+
+## 十、 CORE-QA-PARITY-2 回归结果记录
+
+development 100 张混合格式 parity 回归：
+- `window.__AI_PHOTO_CLEANER_QA__` 成功读取。
+- oldSimilarGroupCount: 3
+- newSimilarGroupCount: 3
+- similarGroupCountMismatch: false
+- oldSimilarGroupedPhotoCount: 69
+- newSimilarGroupedPhotoCount: 69
+- similarGroupedPhotoCountMismatch: false
+- leaderMismatchCount: 0
+- generatedAt 存在，仅用于新鲜度检查。
+- source: duplicateGroupQA
+- 输出只包含安全字段。
+- 不包含路径、base64、Blob、完整 photo 对象、文件名、photoIds、EXIF、objectUrl、previewUrl。
+- Photo Battle 正常。
+- ZIP 正常。
+- 没有第三最终分类。
+
+development 300 张混合格式 parity 回归：
+- `window.__AI_PHOTO_CLEANER_QA__` 成功读取。
+- oldSimilarGroupCount: 6
+- newSimilarGroupCount: 6
+- similarGroupCountMismatch: false
+- oldSimilarGroupedPhotoCount: 85
+- newSimilarGroupedPhotoCount: 85
+- similarGroupedPhotoCountMismatch: false
+- leaderMismatchCount: 0
+- generatedAt 存在，仅用于新鲜度检查。
+- source: duplicateGroupQA
+- 输出只包含安全字段。
+- 不包含路径、base64、Blob、完整 photo 对象、文件名、photoIds、EXIF、objectUrl、previewUrl。
+- Photo Battle 正常。
+- ZIP 正常。
+- 没有第三最终分类。
+
+production 不暴露验证：
+- npm run build 通过。
+- production server 已启动并验证。
+- production 下 typeof `window.__AI_PHOTO_CLEANER_QA__` 返回 undefined。
+- 无控制台报错。
+- 说明 development guard 生效，production 不暴露 QA summary。
+
+字段名澄清：
+- 正式字段名必须是 `window.__AI_PHOTO_CLEANER_QA__`。
+- window.AI_PHOTO_CLEANER_QA 不是正式字段名。
+- 用户测试回报中出现 window.AI_PHOTO_CLEANER_QA 属于文字表述问题，不是代码字段错误。
+- 代码中未使用 window.AI_PHOTO_CLEANER_QA。
+
+环境问题记录：
+- Codex 环境中 build/lint 仍可能受 .next/cache 或 Node 进程占用影响。
+- 这不是本轮代码错误。
+- 后续如果遇到，应先清理 .next 或关闭占用 Node 进程。

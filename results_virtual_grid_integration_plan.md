@@ -208,13 +208,12 @@ type VirtualPhotoGridProps<T> = {
 - 无 details 裁切。
 - rowHeight={280} 与固定图片高度表现正常。
 
-### 重要边界
-- 本轮 console summary 没有成功捕获 QA 指标。
-- oldSimilarGroupCount / newSimilarGroupCount / grouped photo count / leaderMismatchCount 本轮未读取。
-- 原因是 headless 测试脚本在 SPA 路由跳转时注入 console 劫持时间点略晚。
-- 因此本轮只确认 UI 虚拟网格、Photo Battle、ZIP 和二值分类流程正常。
-- 不把本轮记录为 duplicate signal parity 重新验证，绝不夸大回归测试的验证证据。
-- 后续已在 [qa_parity_output_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/qa_parity_output_plan.md) 中正式规划了独立的 QA parity 输出方案，通过独立通道彻底解决此提取缺陷。
+### 重要边界与 Parity 重新验证
+- 针对先前 console summary 无法稳定捕获 QA 指标的问题，已在 `CORE-QA-PARITY-2` 阶段通过新增的 `window.__AI_PHOTO_CLEANER_QA__` 作为读取通道重新验证。
+- 100 张和 300 张的聚类 Parity 指标已成功通过回归读取并对齐：
+  - 100 张：oldSimilarGroupCount: 3, newSimilarGroupCount: 3, leaderMismatchCount: 0
+  - 300 张：oldSimilarGroupCount: 6, newSimilarGroupCount: 6, leaderMismatchCount: 0
+- 证实了虚拟网格在主业务流程灰度开启状态（`USE_SIGNAL_GROUPS_FOR_BATTLE = true`）下的计算与显示完全一致且正常。
 
 ### 安全状态
 - USE_SIGNAL_GROUPS_FOR_BATTLE 已恢复 false。

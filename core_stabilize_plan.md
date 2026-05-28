@@ -383,3 +383,11 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 输出字段仅包含老/新相似组及相似照片数对比、Leader 错配数、生成的毫秒级时间戳及标记源等，绝对不泄露任何用户文件路径、Base64/Blob 数据以及完整 photo 实例。
   - 正式主流程仍保持由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
   - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+
+### 43. `CORE-QA-PARITY-2` (使用 window QA summary 进行回归与生产防护验证 - 当前已完成)
+- **回归测试与指标读取**：通过 `window.__AI_PHOTO_CLEANER_QA__` 全局对象，成功地读取并记录了 100 张和 300 张混合格式图片在灰度测试分支（`USE_SIGNAL_GROUPS_FOR_BATTLE = true`）下的比对结果（组数量与相似照片数量一致，零错配，分类完美收敛于“保留”与“淘汰候选”的二值体系，UI、擂台、ZIP 导出一切正常）。
+- **生产不暴露与安全隔离**：在生产包（`npm run build`）构建完成后，启动 production server 对生产环境进行了无头浏览器读取验证，确认 `typeof window.__AI_PHOTO_CLEANER_QA__` 为 `undefined`，没有向生产环境泄露任何测试或数字摘要数据。
+- **状态与主流程约束**：
+  - 正式主流程仍保持由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续保持 `false`。
+  - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+

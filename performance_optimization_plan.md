@@ -176,5 +176,6 @@ graph TD
 6. **`CORE-PERFORMANCE-4-QA`（代码实现只读审查）**：
    - 让 Codex 审查实现结果，确保优化局限于 UI 展示层。
 
-- **进展更新**：目前结果页的自研虚拟网格已完成第一版开发并成功接入。经测试，300 张 results 滚动体验相比优化前有明显改善。但由于 headless 测试脚本在 SPA 路由跳转时注入 console 劫持时间点略晚，本轮的聚类 parity QA 指标未能被 console summary 捕获，不过核心页面流转、Photo Battle 及 ZIP 导出均正常。
-- **下一步建议**：稳定 QA parity 输出规划已完成（详见 [qa_parity_output_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/qa_parity_output_plan.md)）。后续 `CORE-QA-PARITY-1` 阶段将只做 development-only window summary 最小实现，不依赖 React Fiber 或 console 劫持时机。在此方案实现前，灰度开关仍将严格保持为 `USE_SIGNAL_GROUPS_FOR_BATTLE = false`。
+- **进展更新**：目前结果页的自研虚拟网格已完成第一版开发并成功接入。在 `CORE-QA-PARITY-2` 阶段中，我们成功使用新增的隐式全局 `window.__AI_PHOTO_CLEANER_QA__` 作为稳定的 QA Parity 自动化读取通道，并在 100 张和 300 张混合格式图片测试中完美跑通了回归，新旧算法数字摘要完全一致，且生产环境不暴露该对象。
+- **下一步建议**：QA parity 输出已通过回归验证。后续可继续采用 `window.__AI_PHOTO_CLEANER_QA__` 作为稳定的 parity 自动化比对及回归读取方式，不再依赖脆弱的 React Fiber 遍历或 console 劫持时机，且生产包不会暴露该对象。
+
