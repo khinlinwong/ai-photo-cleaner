@@ -213,8 +213,8 @@ type VirtualPhotoGridProps<T> = {
 - oldSimilarGroupCount / newSimilarGroupCount / grouped photo count / leaderMismatchCount 本轮未读取。
 - 原因是 headless 测试脚本在 SPA 路由跳转时注入 console 劫持时间点略晚。
 - 因此本轮只确认 UI 虚拟网格、Photo Battle、ZIP 和二值分类流程正常。
-- 不把本轮记录为 duplicate signal parity 重新验证。
-- 后续如需再次验证 parity，应单独修复测试脚本注入时机或规划 dev-only summary 输出。
+- 不把本轮记录为 duplicate signal parity 重新验证，绝不夸大回归测试的验证证据。
+- 后续已在 [qa_parity_output_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/qa_parity_output_plan.md) 中正式规划了独立的 QA parity 输出方案，通过独立通道彻底解决此提取缺陷。
 
 ### 安全状态
 - USE_SIGNAL_GROUPS_FOR_BATTLE 已恢复 false。

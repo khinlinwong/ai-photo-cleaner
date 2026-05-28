@@ -367,3 +367,11 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 本次改动纯属 UI 渲染层优化，完全不涉及 Context 决策层、聚类分析算法、Photo Battle 擂台与 ZIP 打包底座。
   - 正式主流程依旧由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 强制保持为 `false`。
   - 用户可见决策分类依旧只有“保留”与“淘汰候选”两类。
+
+### 41. `CORE-PERFORMANCE-5-PLANNING` (稳定 QA parity 输出规划 - 当前已完成)
+- **规划完成与只读审查**：已在项目根目录下新建了 [qa_parity_output_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/qa_parity_output_plan.md)，详细规划了隐式 window 全局测试输出方案，本规划已成功通过 Codex 只读性安全与规范审查。
+- **状态与主流程约束**：
+  - 本阶段仅进行文档编制，不改写任何业务源码，不实现 window 属性，亦不改变 Context。
+  - 下一步将进入 `CORE-QA-PARITY-1` 阶段，对 window 全局输出进行最小实现。
+  - 正式主流程保持由 legacy 方案驱动，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值强制为 `false`。
+  - 用户最终可见的整理决策分类强制二值化收敛为“保留”与“淘汰候选”。
