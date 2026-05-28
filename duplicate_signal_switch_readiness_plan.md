@@ -65,6 +65,7 @@
 4. **自动化读取**：继续使用 `window.__AI_PHOTO_CLEANER_QA__` 在 results 页面获取 parity 摘要。
 5. **测试完毕复原**：所有本地灰度开启测试结束后，必须立即把开关还原为 `false`。
 6. **非 production 默认开启**：本测试处于外部隔离的开发测试状态，production 生产环境不建议默认开启 `true`，以防带入线上环境。
+7. **大尺寸 JPG 物理压力测试**：由于以往的测试集图片单张体积过小，必须补充 100/200 张 3MB-10MB 的非隐私大尺寸 JPG 物理压力测试，用于专门补足浏览器 I/O、Canvas 像素分析、内存占用及 ZIP 打包导出的压强验证。
 
 ## 五、 关于是否移除 legacy 逻辑的结论
 
@@ -89,5 +90,13 @@
    - 依然存在明确的测试边界（如：未覆盖真实客户相册长期验证、未覆盖 HEIC / RAW 格式、且测试 mock 图片总体积较小，不代表真实大图 I/O 压力），因此依然不建议 production 默认 true，且 legacy 稳定主流程必须全量保留。
 4. **`CORE-DUPLICATE-SIGNAL-BETA-PLANNING`**（已完成）：
    - 评估前述 100 / 300 张真实相册感测试结果，并深入分析是否可以进入 development-only 常态灰度。明确仅评估开发环境常态灰度，不评估 production 默认 true。
-5. **`CORE-DUPLICATE-SIGNAL-BETA-QA`**：
+5. **`CORE-DUPLICATE-SIGNAL-BETA-QA`**（已完成）：
    - Codex 对 beta readiness 规划进行只读审查。
+6. **`CORE-DUPLICATE-LARGE-JPG-PLANNING`**（已完成）：
+   - 规划 100 / 200 张 3MB-10MB 大尺寸 JPG 非隐私测试，用于补足浏览器 I/O、Canvas、内存和 ZIP 压力验证。此项规划已通过 Codex QA 审查，明确不作为 production true 的直接依据，当前不直接默认 true，且不进入正式的 beta 阶段。
+7. **`CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH`**（当前正在进行）：
+   - 补充并提交大尺寸 JPG 测试规划文档并推送至远程仓库。
+8. **`CORE-DUPLICATE-LARGE-JPG-QA`**：
+   - Codex 对最终大尺寸 JPG 测试规划进行只读审查。
+9. **`CORE-DUPLICATE-LARGE-JPG`**：
+   - 临时开启 true 分支，在项目目录外导入测试大图执行 100/200 张压力测试，测试完毕后恢复 false。

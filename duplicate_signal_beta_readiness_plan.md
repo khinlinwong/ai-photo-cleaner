@@ -121,13 +121,19 @@
 
 为了稳步开展后续就绪验证，规划以下 Checkpoint 步骤：
 
-1. **`CORE-DUPLICATE-SIGNAL-BETA-QA`**：
+1. **`CORE-DUPLICATE-SIGNAL-BETA-QA`**（已完成）：
    - Codex 只读审查本 beta readiness 规划文档，核对规划的合理性。
-2. **`CORE-DUPLICATE-LARGE-JPG-PLANNING`**：
-   - 规划 100 / 200 张大尺寸手机原图（3MB-10MB）非隐私测试的方案。
-3. **`CORE-DUPLICATE-LARGE-JPG`**：
+2. **`CORE-DUPLICATE-LARGE-JPG-PLANNING`**（已完成）：
+   - 规划 100 / 200 张大尺寸手机原图（3MB-10MB）非隐私测试的方案。大尺寸 JPG 测试规划已通过 Codex QA 审查，明确测试重点是物理压力验证。200 张不是必跑档位，需依据 100 张的表现决定。当前不直接将开发默认值改为 true，当前不进入 beta，测试结束后也必须恢复 false。
+3. **`CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH`**（当前正在进行）：
+   - 补充、提交大尺寸 JPG 测试规划文档并推送至远程仓库。
+4. **`CORE-DUPLICATE-LARGE-JPG-QA`**：
+   - Codex 只读审查最终大尺寸 JPG 测试规划文档。
+5. **`CORE-DUPLICATE-LARGE-JPG`**：
    - 运行大尺寸 JPG true 分支本地开发环境测试，收集 Parity 和物理压强数据。
-4. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**：
+6. **`CORE-DUPLICATE-LARGE-JPG-RESULT-QA`**：
+   - Codex 审查测试结果。
+7. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**：
    - 规划并设计同一测试集在 true 分支下的多轮重复性测试与内存监控方案。
-5. **`CORE-DUPLICATE-SIGNAL-DEV-TOGGLE-PLANNING`**：
+8. **`CORE-DUPLICATE-SIGNAL-DEV-TOGGLE-PLANNING`**：
    - 在完成上述验证后，若开发确实需要，再单独评估是否引入 dev-only localStorage 配置方式。

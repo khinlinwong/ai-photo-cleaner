@@ -404,7 +404,11 @@ if (USE_SIGNAL_GROUPS_FOR_BATTLE) {
 - **生产强制锁定**：尽管当前回归数据完全对齐，但在完成更大规模或包含 HEIC/RAW 格式的真实用户相册长期验证前，开发环境临时 true 测试后应恢复 false。生产环境锁定在 legacy 分支上，不启用 true 分流。
 - **BETA-PLANNING 评估结论**：在当前就绪评估中，灰度开关的默认 `false` 属性保持不变。如果为了高频测试需要免去手动修改代码的成本，未来可规划在开发环境中读取 dev-only localStorage 开关（如 `localStorage.getItem('aiPhotoCleaner.useSignalGroupsForBattle')`），不建议直接修改 featureFlags.ts 的常量默认值，以防误提交 true 残留并导致生产环境故障。
 
+---
 
+## 二十一、 CORE-DUPLICATE-LARGE-JPG-PLANNING 进展更新
 
-
-
+- **大尺寸 JPG 测试开关规范**：在规划和未来的大尺寸手机原图（3MB-10MB）非隐私测试中，灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 必须继续默认强制为 `false`，仅允许在本地开发环境（development）中临时手动改为 `true` 进行测试。
+- **即测即恢复**：测试结束后必须立刻物理恢复为 `false`，绝对禁止在提交或 push 中遗留 `true` 的配置。
+- **生产环境限制**：无论测试表现如何，production 环境依然 100% 强制锁定在 legacy 分支，灰度开关对生产环境完全关闭，不直接启用 `true` 流程。
+- **提交与推送阶段确认**：本轮大尺寸 JPG 测试规划已通过 Codex QA 审查。测试仍仅限在开发环境临时手动 true，测试后必须物理恢复 false。

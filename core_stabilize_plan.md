@@ -420,5 +420,18 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 最终用户可见的分类依然收敛为“保留”与“淘汰候选”的二值分类，无中间态或其它分类。
   - 生产环境将继续锁定于 legacy 稳定驱动方案（`USE_SIGNAL_GROUPS_FOR_BATTLE` 常量默认值保持为 `false`），不进入 production true。
 
+### 48. `CORE-DUPLICATE-LARGE-JPG-PLANNING` (大尺寸 JPG 灰度测试规划 - 已完成)
+- **规划完成**：已新建 [duplicate_large_jpg_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_large_jpg_test_plan.md) 规划 100 / 200 张 3MB-10MB 大尺寸 JPG 非隐私测试，用于专门验证浏览器 I/O、Canvas 像素解码、主线程内存及大批量 ZIP 打包导出的压强。该规划已成功通过 Codex 只读审查。
+- **状态与主流程约束**：
+  - 正式主流程仍保持由 legacy 方案驱动，开关常量默认值强制为 `false`，不直接在生产环境启用 `true` 分支，production legacy 锁定状态不变。
+  - 用户可见的整理决策分类依旧二值化强制收敛为“保留”与“淘汰候选”。
+
+### 49. `CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH` (提交大尺寸 JPG 测试规划文档 - 当前正在进行)
+- **提交与推送**：补充执行记录模板、200张测试限制与测试边界，并提交推送规划文档。
+- **状态与主流程约束**：
+  - 开关常量默认值确认仍强制为 `false`，production 锁定 legacy 稳定路径不变。
+  - 用户最终分类依旧强制收敛为“保留”与“淘汰候选”。
+- **下一步**：将正式执行 `CORE-DUPLICATE-LARGE-JPG` 100 / 200 张大尺寸 JPG 本地开发环境测试。
+
 
 

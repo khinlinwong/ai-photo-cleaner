@@ -358,3 +358,11 @@ if (canUseSignalGroups) {
 - **production 开启依据不足**：尽管测试指标顺利对齐且功能流转正常，但鉴于测试是在项目外使用算法生成的 mock 样本，并未经真实用户长期、海量、多种操作系统以及移动端常见 HEIC / RAW 格式图片的现场环境验证。此外，测试 mock 大小极小，无法充分暴露出主线程 I/O 与 Canvas 像素解码的内存占用峰值。
 - **结论与约束**：本次成功测试不作为生产环境（production）默认开启 `true` 的依据，灰度开关已恢复为 `false`，生产环境依然由 legacy 逻辑控制。
 - **BETA-PLANNING 进展记录**：项目已进入 `CORE-DUPLICATE-SIGNAL-BETA-PLANNING` 评估。经评估，新信号 true 分支在今后一段时期内将继续作为 development 环境下的调试和灰度测试分支存在，当前并非 production 默认路径。生产打包将自动阻断该配置。
+
+---
+
+## 十七、 CORE-DUPLICATE-LARGE-JPG-PLANNING 进展更新
+
+- **true 分支状态限制**：在规划和未来的大尺寸手机原图测试中，`true` 灰度分支仅被允许在本地开发环境（development）中为了压测临时手动开启，且测试完毕后必须恢复为默认值 `false`。
+- **灰度验证阶段**：由于本轮大图测试是专为补足浏览器物理性能瓶颈的验证，`true` 分支仍处于 development 灰度验证阶段，禁止 production 生产环境或默认开启。
+- **提交与推送阶段确认**：本轮大尺寸 JPG 测试规划已通过 Codex QA 审查。true 分支在未来测试中仍定位为 development 灰度验证，不改变 production 生产环境。
