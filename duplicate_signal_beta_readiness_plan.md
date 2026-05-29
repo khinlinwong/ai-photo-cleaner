@@ -129,13 +129,17 @@
    - 提交大尺寸 JPG 测试规划文档并推送。
 4. **`CORE-DUPLICATE-LARGE-JPG`**（已完成）：
    - 运行大尺寸 JPG true 分支压力压测，算法 parity 对齐通过，但暴露了 200 张大文件 ZIP 导出中断故障。
-5. **`CORE-ZIP-LARGE-FILE-FIX-PLANNING`**（当前正在进行）：
+5. **`CORE-ZIP-LARGE-FILE-FIX-PLANNING`**（已完成）：
    - 规划大文件 ZIP 下载中断修复方案，制定 `zip_large_file_fix_plan.md`。
-6. **`CORE-ZIP-LARGE-FILE-FIX-QA`**：
+6. **`CORE-ZIP-LARGE-FILE-FIX-QA`**（已完成）：
    - Codex 只读审查大文件 ZIP 修复规划。
-7. **`CORE-ZIP-LARGE-FILE-FIX`**：
+7. **`CORE-ZIP-LARGE-FILE-FIX`**（已完成）：
    - 实施最小化 Object URL 延时释放修复，并进行回归测试。
-8. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**（当前阶段）：
-   - 规划并设计同一测试集在 true 分支下的多轮重复性测试与内存监控方案，新建 `duplicate_repeatability_test_plan.md`，明确规定在开启开发环境常态灰度（Beta）前，必须强制完成并验证通过 100 / 200 张大尺寸 JPG 的多轮重复性稳定性测试。
-9. **`CORE-DUPLICATE-SIGNAL-DEV-TOGGLE-PLANNING`**：
-   - 在完成上述验证后，若开发确实需要，再单独评估是否引入 dev-only localStorage 配置方式。
+8. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**（已完成）：
+   - 规划并设计同一测试集在 true 分支下的多轮重复性测试与内存监控方案，新建 `duplicate_repeatability_test_plan.md`。
+9. **`CORE-DUPLICATE-REPEATABILITY`**（已完成）：
+   - 运行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试。100张通过，但 200张 Round 1 导出时 cull part 3 触发了 `DownloadInterrupted`。
+10. **`CORE-ZIP-BATCH-PARAM-TUNING-PLANNING`**（当前阶段）：
+    - 针对 200 张重复性失败，规划更保守的分批 ZIP 参数调优方案（300MB/30张/3000ms），并在参数调优且 200 张重复性通过之前，**硬性不准进入 beta 阶段**。
+11. **`CORE-ZIP-BATCH-PARAM-TUNING`**：
+    - 实施参数收紧（MAX_ZIP_BATCH_BYTES = 300MB，MAX_ZIP_BATCH_PHOTOS = 30，ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000ms），并重新执行 100 张与 200 张的 3 轮重复性验证。

@@ -1,11 +1,10 @@
 # AI Photo Cleaner 分批 ZIP 导出规划 - CORE-ZIP-BATCH-EXPORT-PLANNING
 
 > [!NOTE]
-> **实现状态**：已在 `CORE-ZIP-BATCH-EXPORT` 阶段实现，并在 `CORE-ZIP-BATCH-EXPORT-REGRESSION` 阶段完成物理打包回归验证，成功通过 `CORE-ZIP-BATCH-EXPORT-POST-QA` 审查。
-> - 核心成果：分批导出成功打散了超 1.2GB 的单包限制，当前回归中规避了中等大包和超大包的 `DownloadInterrupted` 错误。目前 ZIP 大文件导出的代码修改已告完成，后续无须再改动 results/page.tsx 的 ZIP 相关代码。
-> - 核心常量：`MAX_ZIP_BATCH_BYTES = 500MB`，`MAX_ZIP_BATCH_PHOTOS = 50`，`ZIP_BATCH_DOWNLOAD_DELAY_MS = 1500ms`，`ZIP_OBJECT_URL_REVOKE_DELAY_MS = 120_000ms`。
-> - 实现方式：通过串行异步打包（`async/await`）与延迟 `revokeObjectURL` 释放技术，实现无并发的逐包压缩与自动排队下载。
-> - 零依赖原则：未引入任何第三方新依赖，未引入 Web Worker 异步线程，未使用流式 ZIP 压缩，未做 Tauri 本地端原生导出。
+> **实现状态与调优进展**：已在 `CORE-ZIP-BATCH-EXPORT` 阶段实现基础分批架构。然而在 `CORE-DUPLICATE-REPEATABILITY` 重复性测试中，原定的 `500MB / 50张 / 1500ms` 参数在 200 张大尺寸 JPG 的 Round 1 测试中触发了 `cull_photos_part_3.zip` 的 `DownloadInterrupted`。
+> - **调优决策**：功能保留，绝不回退，但原参数已被证实不够保守。目前已进入 `CORE-ZIP-BATCH-PARAM-TUNING-PLANNING` 参数调优阶段，计划将参数收紧为 `MAX_ZIP_BATCH_BYTES = 300MB`，`MAX_ZIP_BATCH_PHOTOS = 30`，`ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000ms`。
+> - **实现方式**：保持现有的串行异步打包与延迟 `revokeObjectURL` 机制，纯粹收紧局部常量，为浏览器 I/O 与下载管道留出更多余裕。
+> - **零依赖原则**：继续坚持不引入第三方依赖、不引入 Web Worker、不引入流式 ZIP、不引入 Tauri。
 
 ## 一、 问题背景
 
@@ -273,7 +272,7 @@ function buildZipBatches(
 - **导出验证**：合计共 120 张照片，与 results 页面分区数据完全吻合。在 1500ms 串行间隔下，所有 ZIP 连续排队触发且未被浏览器安全策略拦截，全程无 `DownloadInterrupted` 中断与控制台报错，物理内存无异常飙升。
 
 ### 4. 边界与风险说明
-- **环境局限性**：当前回归结果仅代表当前测试样本和当前本地开发与无头浏览器环境下的验证通过。不能直接推广为在所有用户浏览器、所有硬件设备上已永久且彻底解决。
-- **阈值弹性与超限**：设定 `MAX_ZIP_BATCH_BYTES = 500MB` 是基于经验推荐的安全值。在 200 张保留区测试中，`keep_photos_part_1.zip` 的物理估算为 **501.15 MB**，因第 50 张累加或张数优先超限触发了切包，略微高出 500MB，这在当前架构设计中是完全可以接受的正常表现。
-- **弱网与低配性能**：如果未来应用部署至更弱性能的终端或处理更大分辨率的照片，可以考虑将单包上限阈值调低至 **300MB** 以确保极致的安全度。
-- **灰度开关锁定**：分批 ZIP 的成功解决，并不作为 development-only 灰度开关默认开启（production true）的依据。`USE_SIGNAL_GROUPS_FOR_BATTLE` 开关必须继续锁定为默认 `false`，生产环境继续强制走 legacy 稳定路径。
+- **环境局限性**：当前回归结果仅代表特定开发与测试样本下的通过情况。
+- **重复性压力失败**：在 `CORE-DUPLICATE-REPEATABILITY` 重复性运行测试中，**200 张大图压力下依然在 cull_photos_part_3.zip 上触发了 DownloadInterrupted 中断**。这说明原本设定的 `500MB / 50张 / 1500ms` 在大体积、高频率重复性测试场景下依然不够保守，Peak 峰值内存最高冲到 `4454.17MB`。
+- **安全降级调优**：下一步将进入参数调优阶段，将限制阈值和下载间隔在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中收缩为 `300MB / 30张 / 3000ms`。分批 ZIP 导出整体串行打包逻辑与 120s 释放策略继续保留，不进行功能回退。
+- **灰度开关锁定**：由于 200 张重复性测试尚未完全通过，`USE_SIGNAL_GROUPS_FOR_BATTLE` 必须继续强制恢复并保持为默认值 `false`。生产环境锁定 legacy。

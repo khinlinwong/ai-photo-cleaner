@@ -117,5 +117,9 @@
     - 整理当前阶段的稳定化成果快照并生成 `core_stabilize_snapshot.md`。由于切换条件目前仍未满足 production true 且缺乏真实复杂客户相册运行检验，后续继续保持**阶段 A**（默认为 false，仅在开发环境做临时 true 测试），绝不移除 legacy。
 16. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**（已完成）：
     - 规划同一测试集在 development 临时 true 分支下的重复运行稳定性测试，编写并建立 `duplicate_repeatability_test_plan.md` 规划方案，明确规定在开启开发环境常态灰度（Beta）或 production 默认 true 之前，必须先完成 100 / 200 张大尺寸 JPG 的多轮重复性稳定性测试，且生产环境继续强制锁定为 false，继续保持 development 临时 true 状态进行安全性与资源释放验证。该规划已通过 Codex QA 审查，未执行实际测试。
-17. **`CORE-DUPLICATE-REPEATABILITY`**（当前阶段）：
-    - 在开发环境下临时开启 `true` 分支，执行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试，依据规划重点监测每轮结束并等待 120 秒后的物理内存回收状态，验证是否存在句柄与内存泄露。
+17. **`CORE-DUPLICATE-REPEATABILITY`**（已完成）：
+    - 在开发环境下临时开启 `true` 分支，执行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试。100张通过，但 200张 Round 1 导出第 3 包时由于主线程 Peak 内存冲高至 4454.17MB 触发了 `DownloadInterrupted` 导致测试中止。特性开关已物理恢复为 `false`。
+18. **`CORE-ZIP-BATCH-PARAM-TUNING-PLANNING`**（当前阶段）：
+    - 针对 200 张重复性测试由于分批大包叠加触发的 `DownloadInterrupted` 中断，规划更保守的分批参数调优方案（300MB/30张/3000ms），并建立 `zip_batch_param_tuning_plan.md`。明确在 200 张重复性通过前，**绝对不将 production 默认值设为 true**，开发环境继续保持临时 true 测试的模式。
+19. **`CORE-ZIP-BATCH-PARAM-TUNING`**：
+    - 实施参数调优，将 parameters 收缩，并在本地开发环境临时启用 true 重新回归跑通 100张与200张 的 3 轮重复性稳定性测试。

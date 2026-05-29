@@ -28,9 +28,10 @@
 ### 3. ZIP 导出底座
 - **延迟 revokeObjectURL 机制**：将 Blob 临时 Object URL 的释放改为在 `setTimeout` 中延迟 120 秒释放，成功解决了 100 张淘汰候选区（643MB）中等大小 ZIP 包在下载写入磁盘中途 URL 被同步 revoke 导致的中断错误。
 - **分批 ZIP 导出机制**：彻底放弃前端直接压缩生成单个 1GB+ 浏览器 Blob 的高开销思路，实现局部限制 `MAX_ZIP_BATCH_BYTES = 500MB`，`MAX_ZIP_BATCH_PHOTOS = 50`，利用 `async/await` 串行排队生成和触发下载。
-- **回归通过**：
+- **回归通过与重复性失败**：
   - **小包兼容（零回退）**：未超阈值的小相册直接导出单包，且文件名保持为 `keep_photos.zip` 与 `cull_photos.zip`，无 `_part_1` 编号。
-  - **大包成功拆分**：100 张淘汰区被成功分包为 2 个 part（最大 247MB）；200 张淘汰区被成功打散并下载为 3 个 part（最大 247MB，合计 120 张），下载排队且未被浏览器拦截，当前环境下规避了 Chromium 大文件 OOM 引起的 `DownloadInterrupted` 中断。
+  - **100 张大包通过**：100 张大尺寸 JPG（643MB）成功分包并在 3 轮重复性测试中顺利通过，无中断，内存可正常回收。
+  - **200 张大包重复性失败（快照边界）**：200 张大尺寸 JPG 淘汰区（1.27GB）在第 1 轮分批导出 `cull_photos_part_3.zip` 时仍会触发 `DownloadInterrupted`。JSZip 主线程压缩时的 Peak 物理内存达到 `4454.17MB`。这确定了当前的快照边界：ZIP 分批基础框架已稳固建立，但 200 张大相册稳定性受制于参数宽松度，急需参数调优。
 
 ### 4. 安全与合规边界
 - **测试图片沙箱化**：坚守隐私底线，大尺寸测试图片（约 200 张）全部物理保存在项目源码目录外的 D 盘，无任何测试 JPG 或临时 ZIP 被误提交进入 Git 历史。
@@ -42,18 +43,19 @@
 
 1. **多媒体格式覆盖未完成**：对于高占比的苹果 HEIC、相机 RAW 以及常见视频文件，当前扫描层依旧没有覆盖支持。
 2. **缺乏真实客户相册长期测试**：当前所有测试集和 mock 真实感样本均为仿真逻辑生成的外部图片，没有在真实用户的复杂环境、巨型相册数据上进行过长期持久比对。
-3. **环境兼容性尚未完全检验**：分批 ZIP 虽然通过了目前样本的回归，但是在不同内核浏览器、老旧低配置内存设备下的表现依旧存在未知风险，500MB 的单包物理阈值纯为经验设定（实测保留区 Part 1 达 501.15 MB），在更严酷的环境下可能仍需要微调。
+3. **分批参数不够保守**：500MB / 50张 / 1500ms 的分批参数在 200 张大图的高负荷重复性测试下依然被证实不够保守，会导致 ObjectURL 延迟释放叠加和 JSZip 物理内存峰值冲高，极易引发 `DownloadInterrupted` 下载中断，环境兼容性与长期可靠性面临考验。
 4. **signal groups 严禁默认开启**：虽然逻辑 parity 已经对齐，但在通过更长周期的重复性和客户场景验证前，`USE_SIGNAL_GROUPS_FOR_BATTLE` 开关必须保持默认关闭，绝不能扩大至生产环境。
 5. **正式 beta 前置依赖**：在进入真正的用户公开 beta 阶段前，仍然缺乏公开真实感大图样本的深度压测与重复性稳定性校验。
+6. **快照稳定化边界**：当前快照的边界已定义为分批 ZIP 基础框架已建立且在 100 张大图下通过 3 轮重复测试，但 200 张大图的稳定性仍需调优。在 200 张大相册多轮重复性测试完全通过前，坚决不进入 beta 与 production 默认 true。
 
 ---
 
 ## 四、 规划下一阶段可选方向
 
-### 方向 A：CORE-DUPLICATE-REPEATABILITY-PLANNING（推荐下一步）
-- **核心内容**：针对同一个混合测试集，在 `true` 分支下连续重复运行 3-5 次“导入-处理-Results-PK-ZIP导出”完整周期。
-- **验证目的**：验证多次重入后，Context 中的客观算法信号与 state 是否能得到彻底、干净的重置；使用 Chrome 任务管理器监控 Canvas 对象、Blob 句柄是否存在内存泄漏；验证多次 ZIP 导出时下载流排队的持久稳定性。
-- **推荐理由**：当前功能已实现闭环，目前最迫切的并不是盲目扩大单次测试压强，而是验证在反复操作时的运行可靠性。由于没有重大的架构重构，风险最低，最适合稳步推进。
+### 方向 A：CORE-ZIP-BATCH-PARAM-TUNING-PLANNING（推荐下一步）
+- **核心内容**：基于 200 张重复性测试暴露出的 `DownloadInterrupted` 故障，将分批限制参数收缩为更保守的配置：`MAX_ZIP_BATCH_BYTES = 300MB`，`MAX_ZIP_BATCH_PHOTOS = 30`，`ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000ms`。
+- **验证目的**：确认更低的文件阈值和更长的下载物理间隔可以大幅降低 Peak 物理内存、舒缓浏览器下载管道的 I/O 压力，最终攻克 200 张大图的多轮重复性下载障碍。
+- **推荐理由**：这是解决当前 200 张物理稳定性缺失的唯一无副作用轻量级手段，不需要重构核心代码。
 
 ### 方向 B：CORE-REAL-PUBLIC-ALBUM-PLANNING
 - **核心内容**：从 Unsplash / Pixabay 等渠道选用完全公开、无隐私问题的自然风景、公共建筑、室内物品等大图，编排成 100-300 张相似度极高的测试照片集。
@@ -66,7 +68,8 @@
 
 ## 五、 验收结论
 
-- 当前核心稳定化阶段快照文档已正式建立。
+- 当前核心稳定化阶段快照文档已根据最新测试结果进行更新。
 - 0146065 提交后的代码基线干净，本轮仅有阶段快照相关文档变动。
-- 回归测试指标、边界、风险与下一步规划方向均已精准记录。
-- 下一阶段已正式启动并完成了对 `CORE-DUPLICATE-REPEATABILITY-PLANNING` 重复性运行测试方案的规划，建立了独立的测试方案 [duplicate_repeatability_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_repeatability_test_plan.md)。该规划已顺利通过 Codex QA 审查，未执行实际测试。下一步建议进入 `CORE-DUPLICATE-REPEATABILITY` 执行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试。
+- 明确记录 200 张大尺寸 JPG 重复性稳定性仍需参数调优，快照边界已更新。
+- 在 `CORE-DUPLICATE-REPEATABILITY` 重复性测试中，100 张大图 3 轮通过，但 200 张大图第 1 轮由于 Peak 内存达到 4454.17MB 导致在 `cull_photos_part_3.zip` 处触发了 `DownloadInterrupted` 中断。特性开关已物理恢复为 `false`。
+- 下一阶段已正式确立为 `CORE-ZIP-BATCH-PARAM-TUNING-PLANNING` 参数调优规划，建立了独立的规划方案 [zip_batch_param_tuning_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_batch_param_tuning_plan.md)。在 200 张重复性稳定性验证通过前，强行不准进入 beta 或启用 production true。

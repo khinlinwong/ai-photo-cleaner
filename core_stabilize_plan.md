@@ -480,9 +480,24 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **安全约束**：重申灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值必须保持为 `false`，生产环境绝对走 legacy 稳定驱动方案，用户决定的二值分类逻辑保持完全不变。
 - **下一步方向**：已进入 `CORE-DUPLICATE-REPEATABILITY-PLANNING` 阶段，规划同一测试集重复运行的稳定性测试。
 
-### 55. `CORE-DUPLICATE-REPEATABILITY-PLANNING` (重复运行稳定性测试规划 - 当前已完成)
+### 55. `CORE-DUPLICATE-REPEATABILITY-PLANNING` (重复运行稳定性测试规划 - 已完成)
 - **内容记录**：已正式启动并完成了对同一测试集多次循环、重复运行稳定性的测试方案编制，新建了项目根目录规划文档 [duplicate_repeatability_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_repeatability_test_plan.md)。
 - **规划定位**：
   - 核心目标是验证同一测试集在开发灰度分支下连续循环重复运行 3-5 次的性能，尤其是对内存回收、Canvas 与 Object URL 句柄销毁的资源观察，防止出现多轮重入变慢或卡死，而非盲目扩大单次测试张数压力。
   - 规定了在重复运行通过之前，系统绝不进入 beta 阶段，生产环境（production）继续强制锁定于 legacy 稳定路径运行，不进入 production true，不移除 legacy 稳定底座。
 - **下一步方向**：该规划已顺利通过 Codex QA 审查，未执行实际测试。下一步建议进入 `CORE-DUPLICATE-REPEATABILITY` 阶段，执行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试。
+
+### 56. `CORE-DUPLICATE-REPEATABILITY` (重复运行稳定性测试 - 已完成)
+- **测试执行**：在开发环境下临时启用 `true` 分支，完成了大尺寸 JPG 连续重复性测试。
+- **100 张大尺寸 JPG**：顺利通过 3 轮完整测试。Parity 校验完全对齐，`leaderMismatchCount = 0`，没有出现 DownloadInterrupted，回收后内存稳定（无台阶式上涨）。
+- **200 张大尺寸 JPG**：Round 1 失败。处理时间 58.01s，Parity 对齐，但 `cull_photos_part_3.zip` 导出打包下载过程中出现 `DownloadInterrupted` 导致测试中止。JSZip 压缩打包时 Peak 物理内存达 `4454.17MB`。
+- **回退保护**：开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 已于测试中止后自动恢复为 `false`。
+- **结论**：本轮失败并非算法、状态机或分区逻辑错误，而是由于 500MB / 50张 / 1500ms 分批 ZIP 参数、Blob 内存叠加、主线程内存峰值及下载管道压力导致。需进入分批 ZIP 参数调优。
+
+### 57. `CORE-ZIP-BATCH-PARAM-TUNING-PLANNING` (分批 ZIP 参数调优规划 - 当前进行中)
+- **内容记录**：已正式启动参数调优规划，新建了项目根目录规划文档 [zip_batch_param_tuning_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_batch_param_tuning_plan.md)。
+- **调优决策**：功能与分批架构保留，绝不回退。计划将局部阈值常量收紧为：
+  - `MAX_ZIP_BATCH_BYTES = 300 * 1024 * 1024` (300MB)
+  - `MAX_ZIP_BATCH_PHOTOS = 30`
+  - `ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000` (3.0秒)
+- **安全红线**：不改写 src 业务核心代码，不引入 Web Worker、流式打包或 Tauri，特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 继续保持为默认 `false`，生产环境强制 legacy，且 200 张重复性通过前不进入 beta 与默认启用灰度分支。
