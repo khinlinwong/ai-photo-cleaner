@@ -148,6 +148,8 @@
     - 重新执行重复性回归。100张通过，但 200张 Round 1 依然在 cull part 4 发生 `DownloadInterrupted` 失败。
 13. **CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING**（已完成）：
     - 评估 200 张回归失败并定位为网页端导出架构物理瓶颈，完成 `zip_export_architecture_plan.md` 规划，并随 commit `87e2cb0` 提交。
-14. **CORE-ZIP-EXPORT-UX-LIMIT-PLANNING**（当前阶段）：
-    - 针对浏览器物理瓶颈，开启 Results 页面的大图导出限制提示与失败引导规划，建立 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)。
-    - **Beta 与灰度红线**：在考虑 beta 之前，必须先在 results 页面上完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不放宽 beta 准入判断。同时系统强行不进入公开 beta 阶段，生产环境特征开关默认值锁死为 `false`，不移除 legacy 稳定底座。
+14. **CORE-ZIP-EXPORT-UX-LIMIT-PLANNING / CORE-ZIP-EXPORT-UX-LIMIT**（已完成）：
+    - 针对大包下载中断风险实现了 results 页面轻量级常驻轻提示、isZipping 动态等待提示、照片数量分级警告和 `catch` 异常友好失败 warning，小图/100张回归测试全数通过，已随 commit `7619084` 提交。
+15. **CORE-STABILIZE-NEXT-STEPS-PLANNING**（当前阶段）：
+    - 总结当前成果与物理边界，建立 [core_stabilize_next_steps_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/core_stabilize_next_steps_plan.md) 规划下一阶段推进 results 页面 UI/Product Polish，微调各处口径（保留/淘汰候选）与自适应细节。在此之前，系统继续暂缓进入公开 beta 阶段，特性开关默认值锁死为 `false`，继续保留 legacy 稳定底座。
+

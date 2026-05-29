@@ -146,5 +146,7 @@
   - 没有修改 Context、Photo Battle 及相似检测 `duplicate` 核心算法与分区划归规则，最终的分类强收敛于二值分类。
   - 没有引入 Web Worker 异步打包、流式 ZIP 或 Tauri 等大规模物理重构。
   - 特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 继续保持为默认 `false`，生产环境绝对走 legacy 稳定底座。
+- **Post-QA 与后续规划**：本 UX 限制提示与失败引导的实现与回归已成功通过 Post-QA 阶段（commit `7619084`），项目已顺利开启 `CORE-STABILIZE-NEXT-STEPS-PLANNING` 进行下一阶段路线规划。
+
 
 

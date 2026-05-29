@@ -520,9 +520,15 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **规划内容**：设计了常驻轻提示、照片数量分级提醒及下载 catch 块捕捉异常的页面内 inline warning 友好失败引导，明确了开发红线。
 
 ### 61. `CORE-ZIP-EXPORT-UX-LIMIT` (实现 Results 页面 ZIP 导出限制提示与失败引导 - 已完成)
-- **实现执行**：已在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中完成了轻量级的 UI 提示集成，并在 `downloadPhotosZip` 执行流的 `catch` 块中捕获了导出下载的异常并展示为黄色边框的页面内 warning，文案遵循“淘汰候选”规范。
+- **实现执行**：已在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中完成了轻量级的 UI 提示集成，并在 `downloadPhotosZip` 执行流的 `catch` 块中捕获了导出下载的异常并展示为黄色边框的页面内 warning，已随 commit `7619084` 提交并通过 Post-QA 阶段。
 - **影响控制**：实现过程仅添加了 UI 提示文本与错误捕获状态，完全未对 Context、Photo Battle 对决流转、去重聚类算法、分区筛选逻辑与分包参数做任何修改。特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 依然保持默认 `false`，不移除 legacy 稳定底座。
 - **回归结论**：顺利通过了 Demo/小图 与 100 张大尺寸 JPG 的回归测试。小图无退化（保持 keep_photos.zip/cull_photos.zip 单包导出），100 张显示 >100 张的轻提示并完成正常分包导出，小屏宽度下文案自适应换行，无任何重叠与遮挡，不影响擂台赛与 VirtualPhotoGrid。当前仍不进入 beta 阶段，特性开关默认值继续锁死为 `false`。
+
+### 62. `CORE-STABILIZE-NEXT-STEPS-PLANNING` (规划核心稳定化下一阶段路线 - 当前阶段)
+- **内容记录**：已正式启动下一阶段核心规划工作，在根目录下新建了规划方案 [core_stabilize_next_steps_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/core_stabilize_next_steps_plan.md)。
+- **规划内容**：总结了虚拟网格、双路算法对齐、分批 ZIP 参数及导出提示等关键成果；界定了 200 张大图浏览器 Blob 导出的物理瓶颈，不继续盲调参数。梳理了产品细节润色、Photo Battle 体验、重复性稳定性、HEIC支持调研等路线，决定推荐下一阶段推进 `CORE-RESULTS-UX-POLISH-PLANNING`。
+- **Beta 与灰度红线**：重申当前暂缓进入 beta 阶段，`USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值在物理上锁死为 `false`，生产环境继续强制 legacy 不动，亦不移除 legacy 稳定底座。
+
 
 
 
