@@ -69,7 +69,7 @@
 ## 五、 验收结论
 
 - 当前核心稳定化阶段快照文档已根据最新测试结果进行更新。
-- 0146065 提交后的代码基线干净，本轮仅有阶段快照相关文档变动。
-- 明确记录 200 张大尺寸 JPG 重复性稳定性仍需参数调优，快照边界已更新。
-- 在 `CORE-DUPLICATE-REPEATABILITY` 重复性测试中，100 张大图 3 轮通过，但 200 张大图第 1 轮由于 Peak 内存达到 4454.17MB 导致在 `cull_photos_part_3.zip` 处触发了 `DownloadInterrupted` 中断。特性开关已物理恢复为 `false`。
-- 下一阶段已正式确立为 `CORE-ZIP-BATCH-PARAM-TUNING-PLANNING` 参数调优规划，建立了独立的规划方案 [zip_batch_param_tuning_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_batch_param_tuning_plan.md)。在 200 张重复性稳定性验证通过前，强行不准进入 beta 或启用 production true。
+- 0146065 提交后的代码基线干净，本轮仅有阶段快照及调优规划相关文档变动。
+- **快照稳定快照边界**：分批 ZIP 导出在 100 张大图测试中全数通过；但 200 张大尺寸 JPG 仍然受制于浏览器 Blob 下载物理天花板，大包分包多时仍然会产生下载中断。快照边界更新为：分批 ZIP 框架已在 100 张通过，但 200 张大图稳定性仍需架构升级或产品限制引导。
+- **测试实测记录**：在 `CORE-ZIP-BATCH-PARAM-TUNING-REGRESSION` 测试中，100 张大图 3 轮通过，但 200 张大图 Round 1 由于 Peak 内存达到 3931.92MB 在 `cull_photos_part_4.zip` 处再次触发 `DownloadInterrupted`，特性开关已物理恢复为 `false`。
+- **下一阶段规划**：下一阶段已确立为 `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` 导出架构升级与产品导出引导提示规划，建立了独立的规划方案 [zip_export_architecture_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_architecture_plan.md)。网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不放宽 beta 准入判断。同时强行不准进入公开 beta 阶段，生产环境保持默认 `false`。

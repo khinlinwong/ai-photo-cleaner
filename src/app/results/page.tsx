@@ -230,9 +230,9 @@ export default function ResultsPage() {
   };
 
   // 局部常量定义
-  const MAX_ZIP_BATCH_BYTES = 500 * 1024 * 1024;
-  const MAX_ZIP_BATCH_PHOTOS = 50;
-  const ZIP_BATCH_DOWNLOAD_DELAY_MS = 1500;
+  const MAX_ZIP_BATCH_BYTES = 300 * 1024 * 1024;
+  const MAX_ZIP_BATCH_PHOTOS = 30;
+  const ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000;
   const ZIP_OBJECT_URL_REVOKE_DELAY_MS = 120_000;
 
   // 局部类型定义

@@ -1,10 +1,9 @@
 # AI Photo Cleaner 分批 ZIP 导出规划 - CORE-ZIP-BATCH-EXPORT-PLANNING
 
 > [!NOTE]
-> **实现状态与调优进展**：已在 `CORE-ZIP-BATCH-EXPORT` 阶段实现基础分批架构。然而在 `CORE-DUPLICATE-REPEATABILITY` 重复性测试中，原定的 `500MB / 50张 / 1500ms` 参数在 200 张大尺寸 JPG 的 Round 1 测试中触发了 `cull_photos_part_3.zip` 的 `DownloadInterrupted`。
-> - **调优决策**：功能保留，绝不回退，但原参数已被证实不够保守。目前已进入 `CORE-ZIP-BATCH-PARAM-TUNING-PLANNING` 参数调优阶段，计划将参数收紧为 `MAX_ZIP_BATCH_BYTES = 300MB`，`MAX_ZIP_BATCH_PHOTOS = 30`，`ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000ms`。
-> - **实现方式**：保持现有的串行异步打包与延迟 `revokeObjectURL` 机制，纯粹收紧局部常量，为浏览器 I/O 与下载管道留出更多余裕。
-> - **零依赖原则**：继续坚持不引入第三方依赖、不引入 Web Worker、不引入流式 ZIP、不引入 Tauri。
+> **实现状态与参数调优进展**：已在 `CORE-ZIP-BATCH-EXPORT` 阶段实现基础分批架构，并于 `CORE-ZIP-BATCH-PARAM-TUNING` 阶段在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中将参数调整为：`300MB` / `30张` / `3000ms`。
+> - **回归测试结果**：在 `CORE-ZIP-BATCH-PARAM-TUNING-REGRESSION` 回归测试中，100 张大尺寸 JPG 3 轮重复性稳定性测试已完美通过（分包为 4 包顺利下载，内存顺利回收）。但 200 张大尺寸 JPG（淘汰区加保留区共 7 包）在 Round 1 的 `cull_photos_part_4.zip` 时依然触发 `DownloadInterrupted` 失败。
+> - **调优定位与决策**：分批架构对中等体量（100 张左右大图）相册表现非常稳定，功能必须继续保留。但在 200 张以上超大体量下，分包越细导致 part 包数剧增，多 part 连续下载依然会压迫浏览器磁盘 I/O 写入并导致中断。这证明网页端 Blob 下载已达到物理天花板，继续盲调参数已无收益，系统已进入 `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` 进行架构升级与产品导出引导提示规划。
 
 ## 一、 问题背景
 

@@ -139,7 +139,11 @@
    - 规划并设计同一测试集在 true 分支下的多轮重复性测试与内存监控方案，新建 `duplicate_repeatability_test_plan.md`。
 9. **`CORE-DUPLICATE-REPEATABILITY`**（已完成）：
    - 运行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试。100张通过，但 200张 Round 1 导出时 cull part 3 触发了 `DownloadInterrupted`。
-10. **`CORE-ZIP-BATCH-PARAM-TUNING-PLANNING`**（当前阶段）：
-    - 针对 200 张重复性失败，规划更保守的分批 ZIP 参数调优方案（300MB/30张/3000ms），并在参数调优且 200 张重复性通过之前，**硬性不准进入 beta 阶段**。
-11. **`CORE-ZIP-BATCH-PARAM-TUNING`**：
-    - 实施参数收紧（MAX_ZIP_BATCH_BYTES = 300MB，MAX_ZIP_BATCH_PHOTOS = 30，ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000ms），并重新执行 100 张与 200 张的 3 轮重复性验证。
+10. **`CORE-ZIP-BATCH-PARAM-TUNING-PLANNING`**（已完成）：
+    - 针对 200 张重复性失败，规划更保守的分批 ZIP 参数调优方案（300MB/30张/3000ms），制定 `zip_batch_param_tuning_plan.md`。
+11. **`CORE-ZIP-BATCH-PARAM-TUNING`**（已完成）：
+    - 实施参数收紧（MAX_ZIP_BATCH_BYTES = 300MB，MAX_ZIP_BATCH_PHOTOS = 30，ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000ms）。
+12. **`CORE-ZIP-BATCH-PARAM-TUNING-REGRESSION`**（已完成）：
+    - 重新执行重复性回归。100张通过，但 200张 Round 1 依然在 cull part 4 发生 `DownloadInterrupted` 失败。
+13. **`CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING`**（当前阶段）：
+    - 评估 200 张回归失败并定位为网页端 Blob 下载的物理局限性。网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不应放宽 beta 准入判断。规划中期 Worker/流式和长期桌面 Tauri 原生文件复制架构。在 100 张大图重复性通过、200 张算法/对决流畅、且 results 页面上完成容量限制提示等 UX 改造前，坚决不开启 beta，特性开关继续保持 `false`。

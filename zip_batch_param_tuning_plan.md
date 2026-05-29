@@ -159,3 +159,19 @@
 ## 九、 beta / production true 阻塞限制记录
 * **Beta 准入硬阻塞**：200 张大尺寸 JPG 循环重复性测试全部安全通过是灰度与稳定性验证的关键指标。在 200 张多轮测试完美通过前，**强行不准进入 Beta 阶段**。
 * **Production 默认开启硬阻塞**：为了防止线上普通用户面临超大 Blob 打包引起的浏览器崩溃与中断风险，在参数调优验证前，**禁止将 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值设为 true**，生产环境继续保持 legacy 强制策略，开发环境仅允许临时设置为 true 以供回归测试。
+
+---
+
+## 十、 调优执行与回归记录 - CORE-ZIP-BATCH-PARAM-TUNING
+- **执行状态**：已执行。
+- **参数修改明细**：
+  - `MAX_ZIP_BATCH_BYTES`：`500 * 1024 * 1024` (500MB) → `300 * 1024 * 1024` (300MB) (已于 [page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 实现)
+  - `MAX_ZIP_BATCH_PHOTOS`：`50` 张 → `30` 张 (已实现)
+  - `ZIP_BATCH_DOWNLOAD_DELAY_MS`：`1500` ms → `3000` ms (已实现)
+  - `ZIP_OBJECT_URL_REVOKE_DELAY_MS`：保持 `120_000` ms (120秒) 物理常量不变
+- **回归测试结论**：
+  - **100 张大尺寸 JPG**：**成功通过** 3 轮重复性测试。分包从 2 包拆分为 4 包（大小低于 246MB），无中断，内存顺利回落。
+  - **200 张大尺寸 JPG**：**未通过**。Round 1 导出 `cull_photos_part_4.zip` 时仍会触发 `DownloadInterrupted` 中断。Peak 物理内存降至 `3931.92` MB。
+- **架构诊断与下一步行动**：
+  - 收紧常量虽能降低内存峰值，但也会导致分包数量激增（连同保留区共 7 包），多大包的连续写入极易使浏览器底层的下载管道写入线程发生句柄冲突。
+  - 网页原型已经达到 Blob 下载物理上限，微调分批参数无法根本性解决大体积多并发的冲突。建议停止盲目参数微调，正式进入 `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` 架构升级规划，同时在网页端 Results 页面加入产品层面的导出限制说明和用户友好分批提示。
