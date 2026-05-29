@@ -524,10 +524,15 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **影响控制**：实现过程仅添加了 UI 提示文本与错误捕获状态，完全未对 Context、Photo Battle 对决流转、去重聚类算法、分区筛选逻辑与分包参数做任何修改。特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 依然保持默认 `false`，不移除 legacy 稳定底座。
 - **回归结论**：顺利通过了 Demo/小图 与 100 张大尺寸 JPG 的回归测试。小图无退化（保持 keep_photos.zip/cull_photos.zip 单包导出），100 张显示 >100 张的轻提示并完成正常分包导出，小屏宽度下文案自适应换行，无任何重叠与遮挡，不影响擂台赛与 VirtualPhotoGrid。当前仍不进入 beta 阶段，特性开关默认值继续锁死为 `false`。
 
-### 62. `CORE-STABILIZE-NEXT-STEPS-PLANNING` (规划核心稳定化下一阶段路线 - 当前阶段)
-- **内容记录**：已正式启动下一阶段核心规划工作，在根目录下新建了规划方案 [core_stabilize_next_steps_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/core_stabilize_next_steps_plan.md)。
-- **规划内容**：总结了虚拟网格、双路算法对齐、分批 ZIP 参数及导出提示等关键成果；界定了 200 张大图浏览器 Blob 导出的物理瓶颈，不继续盲调参数。梳理了产品细节润色、Photo Battle 体验、重复性稳定性、HEIC支持调研等路线，决定推荐下一阶段推进 `CORE-RESULTS-UX-POLISH-PLANNING`。
-- **Beta 与灰度红线**：重申当前暂缓进入 beta 阶段，`USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值在物理上锁死为 `false`，生产环境继续强制 legacy 不动，亦不移除 legacy 稳定底座。
+### 62. `CORE-STABILIZE-NEXT-STEPS-PLANNING` (规划核心稳定化下一阶段路线 - 已完成)
+- **内容记录**：已正式启动并完成了对核心稳定化下阶段演进路线的规划，在根目录下新建了规划方案 [core_stabilize_next_steps_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/core_stabilize_next_steps_plan.md)，已随 commit `3b6f173` 提交。
+- **规划内容**：梳理了现存边界并评估了五大候选路线，决定推荐下一阶段启动 Results 页面 UI Polish 规划。
+
+### 63. `CORE-RESULTS-UX-POLISH-PLANNING` (规划 Results 页面 UI Polish - 当前阶段)
+- **内容记录**：已正式启动 Results 页面 UI Polish 规划，在项目根目录下新建了规划方案 [results_ux_polish_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_ux_polish_plan.md)。
+- **规划内容**：设计对 Results 展示层细节体验进行微调，优化副标题层级、统计卡片视觉对比、分批 ZIP 提示间距、Photo Battle 辅助文案引导、空状态缺省、置灰按钮状态说明等，统一中文（保留/淘汰候选）及英文（Keep/Cull Candidate）口径文案。
+- **开发约束**：本阶段纯属展示层与文案规划，不修改任何算法、Context 状态机及分区划归逻辑，生产环境 `USE_SIGNAL_GROUPS_FOR_BATTLE` 继续保持为 `false`，暂缓进入公开 beta，不移除 legacy 稳定底座。
+
 
 
 

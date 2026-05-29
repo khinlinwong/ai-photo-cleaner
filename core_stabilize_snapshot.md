@@ -2,8 +2,8 @@
 
 ## 一、 当前稳定状态
 
-1. **最新远程 Commit**：`7619084 add zip export user warnings`。
-2. **工作区状态**：`7619084` 提交后已实现 Results 页面的 ZIP 导出常驻提示、isZipping 提示、大相册警示及 catch 友好错误引导，且小图/100张大图回归全部通过。
+1. **最新远程 Commit**：`3b6f173 document core stabilization next steps`。
+2. **工作区状态**：`3b6f173` 提交后已记录核心稳定化下一阶段演进路线。当前已进入 Results 页面 UI Polish 规划阶段（`CORE-RESULTS-UX-POLISH-PLANNING`），设计并统一了展示层词汇与交互限制。
 3. **生产分流规则**：生产环境（production）继续强制锁定于 legacy 稳定路径运行，不进入 production true。
 4. **开关默认值**：灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然强力保持为 `false`。
 5. **调试限制**：signal groups `true` 分支仍只允许在开发环境（development）下作为临时功能调试和压力测试，测试完毕即刻物理复位为 `false`。
@@ -73,8 +73,7 @@
 - **快照稳定快照边界**：分批 ZIP 导出在 100 张大图测试中全数通过；但 200 张大尺寸 JPG 仍然受制于浏览器 Blob 下载物理天花板，大包分包多时仍然会产生下载中断。快照边界更新为：分批 ZIP 框架已在 100 张通过，但 200 张大图稳定性仍需架构升级或产品限制引导。
 - **测试实测记录**：在 `CORE-ZIP-BATCH-PARAM-TUNING-REGRESSION` 测试中，100 张大图 3 轮通过，但 200 张大图 Round 1 由于 Peak 内存达到 3931.92MB 在 `cull_photos_part_4.zip` 处再次触发 `DownloadInterrupted`，特性开关已物理恢复为 `false`。
 - **下一阶段规划**：
-  - `CORE-ZIP-EXPORT-UX-LIMIT` 导出限制提示与失败引导实现阶段已成功完成，并随 commit `7619084` 提交。
-  - 目前已正式进入 `CORE-STABILIZE-NEXT-STEPS-PLANNING` 规划阶段，建立了专门的 [core_stabilize_next_steps_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/core_stabilize_next_steps_plan.md) 规划文档，梳理了剩余风险并分析了下一阶段的可行候选路线。
-  - **下一步路线推荐**：强烈推荐下一阶段推进 `CORE-RESULTS-UX-POLISH-PLANNING`，对 Results 页面的各处口径（保留/淘汰候选）、提示信息间距、小屏自适应、按钮 hover/disabled 态以及空状态进行整体打磨。
+  - `CORE-STABILIZE-NEXT-STEPS-PLANNING` 核心稳定化下一阶段路线规划已成功完成，并随 commit `3b6f173` 提交。
+  - 目前已正式进入 `CORE-RESULTS-UX-POLISH-PLANNING` 规划阶段，建立了专门的 [results_ux_polish_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_ux_polish_plan.md) 规划文档，设计对 Results 展示层细节体验进行微调。
+  - **下一步路线推荐**：在通过本轮规划（CORE-RESULTS-UX-POLISH-PLANNING）和后续审查（CORE-RESULTS-UX-POLISH-QA）后，建议进入具体实现阶段。
   - **Beta 与灰度防线约束**：系统暂缓开启公开 Beta，特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值继续锁死为 `false`，生产环境锁定 legacy 稳定底座，不予以移除。
-
