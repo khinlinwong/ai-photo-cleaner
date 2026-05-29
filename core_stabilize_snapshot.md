@@ -72,4 +72,7 @@
 - 0146065 提交后的代码基线干净，本轮仅有阶段快照及调优规划相关文档变动。
 - **快照稳定快照边界**：分批 ZIP 导出在 100 张大图测试中全数通过；但 200 张大尺寸 JPG 仍然受制于浏览器 Blob 下载物理天花板，大包分包多时仍然会产生下载中断。快照边界更新为：分批 ZIP 框架已在 100 张通过，但 200 张大图稳定性仍需架构升级或产品限制引导。
 - **测试实测记录**：在 `CORE-ZIP-BATCH-PARAM-TUNING-REGRESSION` 测试中，100 张大图 3 轮通过，但 200 张大图 Round 1 由于 Peak 内存达到 3931.92MB 在 `cull_photos_part_4.zip` 处再次触发 `DownloadInterrupted`，特性开关已物理恢复为 `false`。
-- **下一阶段规划**：下一阶段已确立为 `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` 导出架构升级与产品导出引导提示规划，建立了独立的规划方案 [zip_export_architecture_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_architecture_plan.md)。网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不放宽 beta 准入判断。同时强行不准进入公开 beta 阶段，生产环境保持默认 `false`。
+- **下一阶段规划**：
+  - `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` 导出架构升级规划已成功完成并随 commit `87e2cb0` 提交。
+  - 目前已正式进入 `CORE-ZIP-EXPORT-UX-LIMIT-PLANNING` 阶段，建立了专门的 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md) 规划文档，明确了在 Results 页面中增加导出常驻轻提示、大图强提醒及失败引导的操作边界文案与 UI 设计规范。
+  - **Beta 与灰度防线约束**：网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先在 results 页面上完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，绝对不放宽 beta 准入判断。同时系统坚决不开启公开 beta 阶段，生产环境特征开关默认值锁死为 `false`，不移除 legacy 稳定底座。

@@ -511,7 +511,12 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **影响控制**：实现过程严格限制在修改此三个常量，完全未对 `Context`、`Photo Battle` 擂台、`duplicate / analysis` 聚类算法、`getUserVisibleBucket` 分区归纳规则、ZIP 分包过滤流程以及特性开关等业务代码做任何侵入性改动。
 - **回归结果**：已执行大尺寸 JPG 重复性回归测试。100张连续3轮完美通过（分包为4包）；但 200张大图在 Round 1 导出 `cull_photos_part_4.zip` 时依然触发 `DownloadInterrupted` 失败。证明微调参数已达到浏览器网页端 Blob 物理上限，需调整策略。
 
-### 59. `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` (ZIP 导出架构升级规划 - 当前进行中)
-- **内容记录**：已正式启动 ZIP 导出架构升级规划，新建了项目根目录规划文档 [zip_export_architecture_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_architecture_plan.md)。
-- **规划内容**：确认分批 ZIP 在中等压强下依然保留，但不承诺 200+ 大图在网页端的绝对导出成功。规划中期 Worker 异步打包、流式 ZIP落盘方案，以及长期桌面原生 Tauri 直接物理操作本地文件的演进路线。
-- **红线约束**：不改写业务代码，并且网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不放宽 beta 准入判断。同时**网页原型坚决不开启 beta，且生产环境 `USE_SIGNAL_GROUPS_FOR_BATTLE` 常量默认值保持为 `false`，不进入 production true**，锁定 legacy 稳定分流不变。
+### 59. `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` (ZIP 导出架构升级规划 - 已完成)
+- **内容记录**：已正式启动并完成了对当前浏览器原型导出上限及演进路线的规划，新建了项目根目录规划文档 [zip_export_architecture_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_architecture_plan.md)，已随 commit `87e2cb0` 成功提交。
+- **规划内容**：确认分批 ZIP 在中等压强下依然保留，但不承诺 200+ 大图在网页端的绝对导出成功。规划中期 Worker 异步打包、流式 ZIP 落盘方案，以及长期桌面原生 Tauri 直接物理操作本地文件的演进路线。
+
+### 60. `CORE-ZIP-EXPORT-UX-LIMIT-PLANNING` (ZIP 大图导出限制提示与失败引导规划 - 当前阶段)
+- **内容记录**：已正式启动导出限制提示与失败引导规划，新建了项目根目录规划文档 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)。
+- **规划内容**：设计在 Results 页面中增加三类交互提示：常驻轻提示（说明分批多 ZIP 为预期设计）、大图导出前确认提醒（警示可能失败）、导出失败友好引导。规划基于张数（>100/200张）与大小（>500MB/1GB）的触发条件，并限定使用低侵入 UI 呈现（按钮下方小字、isZipping 进度提示、警告警告框）。
+- **Beta 与灰度防线**：重申在考虑公开 Beta 之前，必须在 results 页面上物理完成清晰的容量限制提示、失败引导与分批导出 UX 改造。在这些 UX 引导未完成前，不放宽 beta 准入判断，`USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值锁死为 `false`，生产环境绝对走 legacy 稳定底座。
+

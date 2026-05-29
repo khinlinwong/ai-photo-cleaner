@@ -111,13 +111,14 @@
 
 为了实现最高效的稳定化闭环，推荐下一阶段路线为：
 
-### 下一步 Checkpoint：CORE-ZIP-EXPORT-ARCHITECTURE-QA
+### 下一步 Checkpoint：CORE-ZIP-EXPORT-ARCHITECTURE-QA（已完成）
 - **内容**：Codex 对本升级规划文档进行只读审查与就绪确认，不进行代码修改。
 
-### 之后推荐路线：CORE-ZIP-EXPORT-UX-LIMIT-PLANNING
-- **原因**：
+### 之后推荐路线：CORE-ZIP-EXPORT-UX-LIMIT-PLANNING（当前阶段）
+- **原因与进展**：
   - 网页 Blob 导出已经触碰物理天花板，继续盲调参数已无收益，而直接上 Worker 或流式 ZIP 需要面临重大的架构重构和依赖引入，引入的风险极高。
   - 在 Results 页面添加清晰的用户分批引导、大图导出限制提示以及失败容灾小字说明，是当前稳定化阶段成本最低、保障最高的安全手段。
+  - **当前进展**：已正式启动该规划并新建了 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)，完成了提示文案、位置、触发条件及实现边界的方案设计。
 
 ---
 

@@ -125,5 +125,7 @@
     - 实施参数调优，将 parameters 收缩。
 20. **`CORE-ZIP-BATCH-PARAM-TUNING-REGRESSION`**（已完成）：
     - 重新执行重复性回归。100张通过，但 200张 Round 1 依然在 cull part 4 发生 `DownloadInterrupted` 失败。特性开关已物理恢复为 `false`。
-21. **`CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING`**（当前阶段）：
-    - 评估 200 张回归失败并定位为网页端导出架构物理瓶颈，该缺陷不影响双路相似组算法 Parity 的一致性结论（Parity 依旧多轮完美对齐）。但出于防范线上 OOM 与写入中断风险，**绝对禁止将 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值设为 true，生产环境强制锁定为 false**，不进入 production true。网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不应放宽 beta 准入判断。
+21. **`CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING`**（已完成）：
+    - 评估 200 张回归失败并定位为网页端导出架构物理瓶颈，该缺陷不影响双路相似组算法 Parity 的一致性结论（Parity 依旧多轮完美对齐）。但出于防范线上 OOM 与写入中断风险，**绝对禁止将 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值设为 true，生产环境强制锁定为 false**，不进入 production true。网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先在 results 页面上完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不应放宽 beta 准入判断。已建立 [zip_export_architecture_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_architecture_plan.md) 并随 commit `87e2cb0` 提交。
+22. **`CORE-ZIP-EXPORT-UX-LIMIT-PLANNING`**（当前阶段）：
+    - 针对大尺寸大包导出中断问题开展 UX 限制与失败引导规划，新建了 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)。设计了常驻轻提示、导出确认强提醒以及导出失败友好引导，并细化了触发条件与低侵入式 UI 表现方式，确保在进入公开 beta 前建立坚固的用户预期引导。

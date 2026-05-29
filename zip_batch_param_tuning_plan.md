@@ -157,8 +157,8 @@
 ---
 
 ## 九、 beta / production true 阻塞限制记录
-* **Beta 准入硬阻塞**：200 张大尺寸 JPG 循环重复性测试全部安全通过是灰度与稳定性验证的关键指标。在 200 张多轮测试完美通过前，**强行不准进入 Beta 阶段**。
-* **Production 默认开启硬阻塞**：为了防止线上普通用户面临超大 Blob 打包引起的浏览器崩溃与中断风险，在参数调优验证前，**禁止将 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值设为 true**，生产环境继续保持 legacy 强制策略，开发环境仅允许临时设置为 true 以供回归测试。
+* **Beta 准入硬阻塞**：在 200 张大相册多轮重复性测试完全安全通过（或在产品端 results 页面实现明确的容量限制提示、分批导出引导与失败容灾 UX 改造）前，网页原型**坚决不进入公开 Beta 阶段**。在这些产品端的限制与引导未完成前，不放宽 beta 准入判断。
+* **Production 默认开启硬阻塞**：为了防止线上普通用户面临超大 Blob 打包引起的浏览器崩溃与中断风险，**禁止将 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值设为 true**，生产环境继续保持 legacy 强制策略，开发环境仅允许临时设置为 true 以供回归测试，且不移除 legacy 稳定底座。
 
 ---
 
@@ -173,5 +173,7 @@
   - **100 张大尺寸 JPG**：**成功通过** 3 轮重复性测试。分包从 2 包拆分为 4 包（大小低于 246MB），无中断，内存顺利回落。
   - **200 张大尺寸 JPG**：**未通过**。Round 1 导出 `cull_photos_part_4.zip` 时仍会触发 `DownloadInterrupted` 中断。Peak 物理内存降至 `3931.92` MB。
 - **架构诊断与下一步行动**：
-  - 收紧常量虽能降低内存峰值，但也会导致分包数量激增（连同保留区共 7 包），多大包的连续写入极易使浏览器底层的下载管道写入线程发生句柄冲突。
-  - 网页原型已经达到 Blob 下载物理上限，微调分批参数无法根本性解决大体积多并发的冲突。建议停止盲目参数微调，正式进入 `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` 架构升级规划，同时在网页端 Results 页面加入产品层面的导出限制说明和用户友好分批提示。
+  - 收紧常量虽能降低内存峰值，但也会导致分包数量增多，多大包的连续写入极易使浏览器底层的下载管道写入线程发生句柄冲突。
+  - 网页原型已达到 Blob 下载物理上限，微调参数已无边际收益。目前已成功完成并提交了 [zip_export_architecture_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_architecture_plan.md) 架构规划（commit `87e2cb0`）。
+  - 下一步已进入 `CORE-ZIP-EXPORT-UX-LIMIT-PLANNING` 阶段，建立了专门的 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)，通过页面常驻轻提示、大相册强提醒及失败友好引导，在产品层明确大包下载的能力边界，降低用户的使用阻碍。在完成此 UX 改造前不放宽 beta 准入判断。
+

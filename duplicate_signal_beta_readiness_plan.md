@@ -78,7 +78,8 @@
 6. **不覆盖 HEIC / RAW**：暂时维持格式隔离，直至有完备的格式转换和解析规划。
 7. **不进行 500+ 盲测**：避免在未进行性能架构优化前盲目扩大测试张数。
 8. **不把 mock 测试结论扩大到真实客户相册**：始终承认人工模拟样本与真实复杂相册在体积、重复形式等方面的物理差距。
-9. **不进入用户 beta**：在大尺寸 JPG 的分批 ZIP 导出方案（`CORE-ZIP-BATCH-EXPORT`）及 100 / 200 张多轮重复性验证完全实现并验证通过回归测试前，绝对不进入 beta。未成功通过此重复性测试前，绝对不进入 beta 阶段。
+9. **不进入用户 beta**：在大尺寸 JPG 的分批 ZIP 导出方案（`CORE-ZIP-BATCH-EXPORT`）及 100 / 200 张多轮重复性验证完全实现并验证通过回归测试前，且 results 页面上物理完成清晰的容量限制提示、失败引导与分批导出等 UX 改造前，绝对不进入 beta 阶段。在这些产品端的限制与引导未完成前，不放宽 beta 准入判断。
+
 
 最终用户所见的照片分类，任何时候依然强制收敛为“**保留**”与“**淘汰候选**”两类。
 
@@ -145,5 +146,8 @@
     - 实施参数收紧（MAX_ZIP_BATCH_BYTES = 300MB，MAX_ZIP_BATCH_PHOTOS = 30，ZIP_BATCH_DOWNLOAD_DELAY_MS = 3000ms）。
 12. **`CORE-ZIP-BATCH-PARAM-TUNING-REGRESSION`**（已完成）：
     - 重新执行重复性回归。100张通过，但 200张 Round 1 依然在 cull part 4 发生 `DownloadInterrupted` 失败。
-13. **`CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING`**（当前阶段）：
-    - 评估 200 张回归失败并定位为网页端 Blob 下载的物理局限性。网页端 200 张大尺寸 JPG ZIP 全量稳定导出不再作为当前浏览器原型的硬性完成目标，但在考虑 beta 之前，必须先完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不应放宽 beta 准入判断。规划中期 Worker/流式和长期桌面 Tauri 原生文件复制架构。在 100 张大图重复性通过、200 张算法/对决流畅、且 results 页面上完成容量限制提示等 UX 改造前，坚决不开启 beta，特性开关继续保持 `false`。
+13. **CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING**（已完成）：
+    - 评估 200 张回归失败并定位为网页端导出架构物理瓶颈，完成 `zip_export_architecture_plan.md` 规划，并随 commit `87e2cb0` 提交。
+14. **CORE-ZIP-EXPORT-UX-LIMIT-PLANNING**（当前阶段）：
+    - 针对浏览器物理瓶颈，开启 Results 页面的大图导出限制提示与失败引导规划，建立 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)。
+    - **Beta 与灰度红线**：在考虑 beta 之前，必须先在 results 页面上完成清晰的 UX 限制提示、导出边界说明、失败引导和用户分批操作建议。在这些产品端的限制与引导未完成前，不放宽 beta 准入判断。同时系统强行不进入公开 beta 阶段，生产环境特征开关默认值锁死为 `false`，不移除 legacy 稳定底座。

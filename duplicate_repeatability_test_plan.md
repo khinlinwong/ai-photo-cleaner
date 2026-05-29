@@ -200,4 +200,7 @@
 - **回归通过状态**：100 张大尺寸 JPG 连续 3 轮重复测试已通过。200 张大尺寸 JPG 由于多 part ZIP 连续写入中断依然未通过。整体稳定性测试被判定为**未通过**。
 - **定位界定**：本轮失败仍然完全集中在超大 Blob ZIP 连续下载（200 张高压场景），而感知聚类分析、双路 Parity 校验及擂台赛交互均在所有测试轮次中完美对齐，证明算法机制十分稳健，当前瓶颈属于网页端 Blob 下载的物理限制。
 - **beta / production switch 限制**：在 200 张大相册多轮重复性测试完全安全通过（或在产品端实现明确的大图导出限制提示与分批引导）前，网页原型**坚决不进入公开 Beta 阶段**，生产环境继续强制锁定 `USE_SIGNAL_GROUPS_FOR_BATTLE` 为 `false`。
-- **下一步规划**：鉴于微调分批参数已无边际收益，决定停止盲目调参，正式进入 `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` ZIP 导出架构升级规划阶段，探讨中期 Worker/流式 ZIP 和长期桌面 Tauri 复制的替代方案。
+- **下一步规划**：鉴于微调分批参数已无边际收益，已停止盲目调参：
+  - `CORE-ZIP-EXPORT-ARCHITECTURE-PLANNING` 导出架构升级规划已成功完成并随 commit `87e2cb0` 提交。
+  - 目前已正式进入 `CORE-ZIP-EXPORT-UX-LIMIT-PLANNING` 限制提示与失败引导规划阶段，建立了专门的 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)，对 Results 页面的引导文案、位置和 UI 触发做好了方案设计。在 results 页面上物理完成清晰的容量限制提示、失败引导与分批导出等 UX 改造前，网页原型**坚决不进入公开 Beta 阶段**，生产环境继续锁定 `USE_SIGNAL_GROUPS_FOR_BATTLE` 为 `false`，不移除 legacy 稳定底座。
+
