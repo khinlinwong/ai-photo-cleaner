@@ -69,4 +69,4 @@
 - 当前核心稳定化阶段快照文档已正式建立。
 - 0146065 提交后的代码基线干净，本轮仅有阶段快照相关文档变动。
 - 回归测试指标、边界、风险与下一步规划方向均已精准记录。
-- 下一阶段优先建议进入 `CORE-DUPLICATE-REPEATABILITY-PLANNING` 进行多轮重复性与内存泄漏测试。
+- 下一阶段已正式启动并完成了对 `CORE-DUPLICATE-REPEATABILITY-PLANNING` 重复性运行测试方案的规划，建立了独立的测试方案 [duplicate_repeatability_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_repeatability_test_plan.md)。该规划已顺利通过 Codex QA 审查，未执行实际测试。下一步建议进入 `CORE-DUPLICATE-REPEATABILITY` 执行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试。

@@ -478,3 +478,11 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 确认虚拟滚动网格 `VirtualPhotoGrid` 运行状况良好，QA window 隐式元数据摘要在 production 中得到绝对物理阻断隔离。
 - **下一步建议**：根据当前的成果与风险态势，下一步推荐方向为 `CORE-DUPLICATE-REPEATABILITY-PLANNING`（测试集 3-5 次多轮重复运行性与内存泄漏验证），以确保系统的长期可靠性，而非盲目在开发环境增加一次性压强。
 - **安全约束**：重申灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值必须保持为 `false`，生产环境绝对走 legacy 稳定驱动方案，用户决定的二值分类逻辑保持完全不变。
+- **下一步方向**：已进入 `CORE-DUPLICATE-REPEATABILITY-PLANNING` 阶段，规划同一测试集重复运行的稳定性测试。
+
+### 55. `CORE-DUPLICATE-REPEATABILITY-PLANNING` (重复运行稳定性测试规划 - 当前已完成)
+- **内容记录**：已正式启动并完成了对同一测试集多次循环、重复运行稳定性的测试方案编制，新建了项目根目录规划文档 [duplicate_repeatability_test_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/duplicate_repeatability_test_plan.md)。
+- **规划定位**：
+  - 核心目标是验证同一测试集在开发灰度分支下连续循环重复运行 3-5 次的性能，尤其是对内存回收、Canvas 与 Object URL 句柄销毁的资源观察，防止出现多轮重入变慢或卡死，而非盲目扩大单次测试张数压力。
+  - 规定了在重复运行通过之前，系统绝不进入 beta 阶段，生产环境（production）继续强制锁定于 legacy 稳定路径运行，不进入 production true，不移除 legacy 稳定底座。
+- **下一步方向**：该规划已顺利通过 Codex QA 审查，未执行实际测试。下一步建议进入 `CORE-DUPLICATE-REPEATABILITY` 阶段，执行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试。

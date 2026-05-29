@@ -30,6 +30,7 @@
 7. **Battle 接管路径偏年轻**：由 signal groups 完全接管 Photo Battle 流程的机制仍处于灰度阶段，代码复杂度较高，需要渐进式灰度发布。
 8. **Legacy 依然稳定**：传统的 detectDuplicates 主流程性能稳定，经历过线上验证，在没有把握的情况下不应对其强行替代或移除。
 9. **超大 ZIP 下载中断风险**：大尺寸 JPG 压测暴露出超大体积（1GB+）淘汰候选区大包在下载时被浏览器 `DownloadInterrupted` 中断的缺陷。该底层稳定性漏洞是灰度切换就绪度中必须优先克服的阻塞项，因此在未彻底解决前绝不能作为生产环境默认开启 `true` 分支的依据。
+10. **重复性稳定性验证前置**：在 production 开启默认 true 之前，必须先在 development 临时 true 环境下通过同一测试集的多轮重复运行稳定性验证。在未彻底通过该稳定性验证并妥善解决可能存在的内存与句柄释放泄露隐患前，生产环境必须绝对锁定为 false 强制 legacy，继续保持 development 临时 true 测试的模式。
 
 
 ## 三、 下一阶段灰度切换策略规划
@@ -112,5 +113,9 @@
     - 在 results 页面中增加局部常量与辅助函数，通过 `async/await` 串行完成多包 ZIP 压缩打包与自动下载触发。
 14. **`CORE-ZIP-BATCH-EXPORT-REGRESSION`**（已完成）：
     - 200张 JPG 大相册淘汰区（3包）分批导出与物理包压缩尺寸检验成功，规避了单包 1GB+ 溢出隐患，当前回归中规避了中断 Bug。
-15. **`CORE-STABILIZE-SNAPSHOT-PLANNING`**（当前阶段）：
+15. **`CORE-STABILIZE-SNAPSHOT-PLANNING`**（已完成）：
     - 整理当前阶段的稳定化成果快照并生成 `core_stabilize_snapshot.md`。由于切换条件目前仍未满足 production true 且缺乏真实复杂客户相册运行检验，后续继续保持**阶段 A**（默认为 false，仅在开发环境做临时 true 测试），绝不移除 legacy。
+16. **`CORE-DUPLICATE-REPEATABILITY-PLANNING`**（已完成）：
+    - 规划同一测试集在 development 临时 true 分支下的重复运行稳定性测试，编写并建立 `duplicate_repeatability_test_plan.md` 规划方案，明确规定在开启开发环境常态灰度（Beta）或 production 默认 true 之前，必须先完成 100 / 200 张大尺寸 JPG 的多轮重复性稳定性测试，且生产环境继续强制锁定为 false，继续保持 development 临时 true 状态进行安全性与资源释放验证。该规划已通过 Codex QA 审查，未执行实际测试。
+17. **`CORE-DUPLICATE-REPEATABILITY`**（当前阶段）：
+    - 在开发环境下临时开启 `true` 分支，执行 100 张和 200 张大尺寸 JPG 连续 3 轮重复性稳定性测试，依据规划重点监测每轮结束并等待 120 秒后的物理内存回收状态，验证是否存在句柄与内存泄露。
