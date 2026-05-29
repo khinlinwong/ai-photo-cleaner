@@ -53,6 +53,7 @@ export default function ResultsPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
 
   // 本地相似组弹窗控制机制，防止退出时陷入弹出循环
   const [dismissedGroups, setDismissedGroups] = useState<string[]>([]);
@@ -313,6 +314,7 @@ export default function ResultsPage() {
     });
     if (targetPhotos.length === 0) return;
     setIsZipping(true);
+    setZipExportWarning(null);
     try {
       const JSZip = (await import('jszip')).default;
       const baseFilename = status === 'keep' ? 'keep_photos' : 'cull_photos';
@@ -360,6 +362,9 @@ export default function ResultsPage() {
       }
     } catch (err) {
       console.error('Failed to download ZIP pack:', err);
+      setZipExportWarning(
+        'ZIP 下载未完成。浏览器在处理超大相册时可能会中断下载。请尝试减少单次导出数量，或分批导出保留区和淘汰候选区。'
+      );
     } finally {
       setIsZipping(false);
     }
@@ -765,11 +770,38 @@ export default function ResultsPage() {
                           </div>
                         </div>
                       </div>
-                      {isZipping && (
-                        <div className="text-[10px] text-amber-400/90 text-center animate-pulse font-medium select-none mt-1">
-                          ℹ️ 大相册会自动分批导出为多个 ZIP 文件，请等待全部下载完成。
+                      {/* ZIP Export Warnings and Tips */}
+                      <div className="mt-2.5 space-y-1.5 border-t border-white/5 pt-2">
+                        {/* 1. 常驻轻提示 */}
+                        <div className="text-[9.5px] text-[var(--dt-text-soft)] text-center leading-relaxed select-none">
+                          ℹ️ 大相册会自动分批导出为多个 ZIP 文件。导出期间请不要刷新页面，并等待所有文件下载完成。
                         </div>
-                      )}
+
+                        {/* 2. 大相册照片数量提示 */}
+                        {photos.length > 200 ? (
+                          <div className="text-[9.5px] text-amber-400/80 text-center leading-relaxed select-none">
+                            ⚠️ 当前相册较大，如 ZIP 下载失败，建议减少单次导出数量或分批处理。
+                          </div>
+                        ) : photos.length > 100 ? (
+                          <div className="text-[9.5px] text-amber-400/60 text-center leading-relaxed select-none">
+                            💡 当前相册照片较多，浏览器导出可能需要更长时间。
+                          </div>
+                        ) : null}
+
+                        {/* 3. isZipping 状态提示 */}
+                        {isZipping && (
+                          <div className="text-[10px] text-amber-400/90 text-center animate-pulse font-medium select-none">
+                            ⏳ 正在生成 ZIP，请等待所有分包下载完成。
+                          </div>
+                        )}
+
+                        {/* 4. 导出失败警告 */}
+                        {zipExportWarning && (
+                          <div className="border border-yellow-500/20 bg-yellow-500/10 text-yellow-400/90 p-2 rounded text-[9.5px] leading-relaxed text-center">
+                            ⚠️ {zipExportWarning}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Right: Security Strategy Card */}

@@ -278,3 +278,11 @@ function buildZipBatches(
 - **重复性压力失败**：在 `CORE-DUPLICATE-REPEATABILITY` 重复性运行测试中，**200 张大图压力下依然在 cull_photos_part_3.zip 上触发了 DownloadInterrupted 中断**。这说明原本设定的 `500MB / 50张 / 1500ms` 在大体积、高频率重复性测试场景下依然不够保守，Peak 峰值内存最高冲到 `4454.17MB`。
 - **安全降级调优**：下一步将进入参数调优阶段，将限制阈值和下载间隔在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中收缩为 `300MB / 30张 / 3000ms`。分批 ZIP 导出整体串行打包逻辑与 120s 释放策略继续保留，不进行功能回退。
 - **灰度开关锁定**：由于 200 张重复性测试尚未完全通过，`USE_SIGNAL_GROUPS_FOR_BATTLE` 必须继续强制恢复并保持为默认值 `false`。生产环境锁定 legacy。
+
+### 5. 提示配套状态 (CORE-ZIP-EXPORT-UX-LIMIT)
+- **状态记录**：已在 Results 页面中成功实现了常驻轻提示、isZipping 等待提示、大相册照片数分级警告以及导出失败 inline warning，解决了分批导出时对用户的提示覆盖。
+- **用户预期对齐**：通过提示向用户明确：大相册自动分批导出为多个 ZIP 文件是预期的安全导出流程，而非系统报错。下载过程中若捕获 catch 异常，会呈现黄色内联警告框引导用户分批或减量。
+- **回归通过记录**：在 Demo/小图 与 100 张大尺寸 JPG 的回归测试中，常驻轻提示、isZipping 状态变化及照片数量警告展示完美对齐设计，小图文件名（keep_photos.zip/cull_photos.zip）与 100 张大图分包功能零退化，Photo Battle 与 VirtualPhotoGrid 完美兼容。
+- **边界保留说明**：200 张大尺寸 JPG 导出中断（DownloadInterrupted）漏洞依然作为浏览器原型的物理边界保留，在此物理屏障解决前通过 UX 提示引导防范。
+
+

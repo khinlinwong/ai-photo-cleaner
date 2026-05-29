@@ -515,8 +515,14 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **内容记录**：已正式启动并完成了对当前浏览器原型导出上限及演进路线的规划，新建了项目根目录规划文档 [zip_export_architecture_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_architecture_plan.md)，已随 commit `87e2cb0` 成功提交。
 - **规划内容**：确认分批 ZIP 在中等压强下依然保留，但不承诺 200+ 大图在网页端的绝对导出成功。规划中期 Worker 异步打包、流式 ZIP 落盘方案，以及长期桌面原生 Tauri 直接物理操作本地文件的演进路线。
 
-### 60. `CORE-ZIP-EXPORT-UX-LIMIT-PLANNING` (ZIP 大图导出限制提示与失败引导规划 - 当前阶段)
-- **内容记录**：已正式启动导出限制提示与失败引导规划，新建了项目根目录规划文档 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)。
-- **规划内容**：设计在 Results 页面中增加三类交互提示：常驻轻提示（说明分批多 ZIP 为预期设计）、大图导出前确认提醒（警示可能失败）、导出失败友好引导。规划基于张数（>100/200张）与大小（>500MB/1GB）的触发条件，并限定使用低侵入 UI 呈现（按钮下方小字、isZipping 进度提示、警告警告框）。
-- **Beta 与灰度防线**：重申在考虑公开 Beta 之前，必须在 results 页面上物理完成清晰的容量限制提示、失败引导与分批导出 UX 改造。在这些 UX 引导未完成前，不放宽 beta 准入判断，`USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值锁死为 `false`，生产环境绝对走 legacy 稳定底座。
+### 60. `CORE-ZIP-EXPORT-UX-LIMIT-PLANNING` (ZIP 大图导出限制提示与失败引导规划 - 已完成)
+- **内容记录**：已正式启动并完成了对导出限制提示及引导方案的设计与规划，新建了项目根目录规划文档 [zip_export_ux_limit_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/zip_export_ux_limit_plan.md)，已随 commit `8f84c02` 成功提交。
+- **规划内容**：设计了常驻轻提示、照片数量分级提醒及下载 catch 块捕捉异常的页面内 inline warning 友好失败引导，明确了开发红线。
+
+### 61. `CORE-ZIP-EXPORT-UX-LIMIT` (实现 Results 页面 ZIP 导出限制提示与失败引导 - 已完成)
+- **实现执行**：已在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中完成了轻量级的 UI 提示集成，并在 `downloadPhotosZip` 执行流的 `catch` 块中捕获了导出下载的异常并展示为黄色边框的页面内 warning，文案遵循“淘汰候选”规范。
+- **影响控制**：实现过程仅添加了 UI 提示文本与错误捕获状态，完全未对 Context、Photo Battle 对决流转、去重聚类算法、分区筛选逻辑与分包参数做任何修改。特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 依然保持默认 `false`，不移除 legacy 稳定底座。
+- **回归结论**：顺利通过了 Demo/小图 与 100 张大尺寸 JPG 的回归测试。小图无退化（保持 keep_photos.zip/cull_photos.zip 单包导出），100 张显示 >100 张的轻提示并完成正常分包导出，小屏宽度下文案自适应换行，无任何重叠与遮挡，不影响擂台赛与 VirtualPhotoGrid。当前仍不进入 beta 阶段，特性开关默认值继续锁死为 `false`。
+
+
 

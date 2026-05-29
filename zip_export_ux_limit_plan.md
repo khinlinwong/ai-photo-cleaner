@@ -124,3 +124,27 @@
 5. **对齐核心与 Parity**：前述 UI 提示的添加完全不侵入 Photo Battle、算法 Parity 双路校验以及 properties 传递。
 6. **不引入新依赖**：项目依赖树保持纯净。
 7. **USE_SIGNAL_GROUPS_FOR_BATTLE 保持 false**。
+
+---
+
+## 八、 实施记录与回归测试报告 - CORE-ZIP-EXPORT-UX-LIMIT
+- **实现状态**：已在 results 页面中成功实现最小 inline warning 与引导提示，并顺利通过了回归测试。
+- **本轮实现范围**：
+  - **常驻导出提示**：在结果页面导出区域下方常驻显示大相册分批导出、请勿刷新、等待下载完成的轻提示。
+  - **isZipping 等待提示**：在 isZipping 为 true 期间，在结果页中显示正在生成 ZIP 并等待分包下载完成的动态提示。
+  - **ZIP catch 失败提示**：在 `downloadPhotosZip` 过程的 catch 块中，捕获异常并设置友好失败状态，在 UI 中以黄色警告边框形式进行页面内警告展示。文案统一使用“淘汰候选”而非“删除”。在下一次导出开始时，会自动清空旧有状态。
+  - **照片数量提示**：已基于 `photos.length` 完成大相册提示。当照片数 > 100 时显示轻提示，> 200 时显示强提示，提醒用户可能导出时间较长或建议分批导出。
+- **回归测试结论**：
+  - **Demo / 小图回归通过**：在导入小图片或 Demo 旅行相册时，/desktop、/processing 与 /results 页面交互均完全正常。页面正确渲染了常驻轻提示与 isZipping 状态提示；小图未错误显示 100/200张 的警告；导出 `keep_photos.zip` 与 `cull_photos.zip` 正常完成且文件名与分包逻辑未发生任何退化，未发生 `DownloadInterrupted` 中断。Photo Battle 与虚拟滚动网格均不受影响。
+  - **100 张大尺寸 JPG 回归通过**：在 100 张大图压力下，results 页面能够正确显示 > 100张 的轻提示，且未错误显示 > 200张 的强提示。常驻提示与 isZipping 提示功能完备，分批打包导出正常（淘汰区自动分拆为 4 包，合计照片数与 UI 分区完全一致，保留 `.jpg` 后缀），未触发任何 `DownloadInterrupted` 错误，控制台无报错。
+  - **小屏 / 窄宽度布局通过**：在较窄视口宽度下进行布局审计，提示文本自适应换行良好，无多余溢出；警告框和 states 提示在垂直卡片下仅会自适应流式推开，不撑坏页面布局且不遮挡按钮；Photo Battle 弹窗和 VirtualPhotoGrid 列表滚动正常自适应，不发生遮挡与卡顿。
+  - **失败 warning 审查通过**：本轮为了保障主打包逻辑的物理纯净，未强行修改代码制造失败场景；通过对 catch 块以及 React state 的代码静态审查，确认异常发生时能准确展示警告内容，且在下一次点击时会被 `setZipExportWarning(null)` 妥善清空。
+  - **200 张大尺寸 JPG 隔离**：本轮为了专注于验证 UX 提示的无回退和 UI 兼容，未进行 200 张大图的重复性压力测试。
+- **确认未做事项（红线坚守）**：
+  - 没有引入复杂的外部弹窗系统或第三方 Toast 库，项目依赖树保持纯净。
+  - 没有修改 ZIP 分区筛选逻辑，没有修改 `buildZipBatches` 与 `downloadPhotosZip` 的核心分包与下载调度流程。
+  - 没有修改 Context、Photo Battle 及相似检测 `duplicate` 核心算法与分区划归规则，最终的分类强收敛于二值分类。
+  - 没有引入 Web Worker 异步打包、流式 ZIP 或 Tauri 等大规模物理重构。
+  - 特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 继续保持为默认 `false`，生产环境绝对走 legacy 稳定底座。
+
+
