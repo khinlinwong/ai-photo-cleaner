@@ -229,7 +229,81 @@ export default function ResultsPage() {
     setIsRightDragging(false);
   };
 
-  // 纯客户端打包下载特定分区照片 (JSZip)
+  // 局部常量定义
+  const MAX_ZIP_BATCH_BYTES = 500 * 1024 * 1024;
+  const MAX_ZIP_BATCH_PHOTOS = 50;
+  const ZIP_BATCH_DOWNLOAD_DELAY_MS = 1500;
+  const ZIP_OBJECT_URL_REVOKE_DELAY_MS = 120_000;
+
+  // 局部类型定义
+  type ZipBatch = {
+    partIndex: number;
+    photos: PhotoItem[];
+    estimatedBytes: number;
+    filename: string;
+  };
+
+  // 延时辅助函数
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // 分批打包辅助函数
+  function buildZipBatches(
+    photosToZip: PhotoItem[],
+    baseFilename: string
+  ): ZipBatch[] {
+    const batches: ZipBatch[] = [];
+    let currentBatchPhotos: PhotoItem[] = [];
+    let currentBytes = 0;
+    let partIndex = 1;
+
+    for (const photo of photosToZip) {
+      const fileSize = photo.file?.size ?? 0;
+      
+      // 如果单张图就已经超过最大限制，且当前包中已有图，则先结算当前包，让该单张图单独成包
+      if (fileSize >= MAX_ZIP_BATCH_BYTES && currentBatchPhotos.length > 0) {
+        batches.push({
+          partIndex,
+          photos: currentBatchPhotos,
+          estimatedBytes: currentBytes,
+          filename: `${baseFilename}_part_${partIndex}.zip`
+        });
+        partIndex++;
+        currentBatchPhotos = [];
+        currentBytes = 0;
+      }
+
+      currentBatchPhotos.push(photo);
+      currentBytes += fileSize;
+
+      if (currentBytes >= MAX_ZIP_BATCH_BYTES || currentBatchPhotos.length >= MAX_ZIP_BATCH_PHOTOS) {
+        batches.push({
+          partIndex,
+          photos: currentBatchPhotos,
+          estimatedBytes: currentBytes,
+          filename: `${baseFilename}_part_${partIndex}.zip`
+        });
+        partIndex++;
+        currentBatchPhotos = [];
+        currentBytes = 0;
+      }
+    }
+
+    // 结算最后一包
+    if (currentBatchPhotos.length > 0) {
+      // 如果总共只有一包，文件名保持原名（不加 _part_ 编号）
+      const isSingle = partIndex === 1;
+      batches.push({
+        partIndex,
+        photos: currentBatchPhotos,
+        estimatedBytes: currentBytes,
+        filename: isSingle ? `${baseFilename}.zip` : `${baseFilename}_part_${partIndex}.zip`
+      });
+    }
+
+    return batches;
+  }
+
+  // 纯客户端分批打包下载特定分区照片 (JSZip)
   const downloadPhotosZip = async (status: 'keep' | 'delete') => {
     const targetPhotos = photos.filter((p) => {
       if (status === 'keep') {
@@ -241,37 +315,49 @@ export default function ResultsPage() {
     setIsZipping(true);
     try {
       const JSZip = (await import('jszip')).default;
-      const zip = new JSZip();
+      const baseFilename = status === 'keep' ? 'keep_photos' : 'cull_photos';
+      const batches = buildZipBatches(targetPhotos, baseFilename);
 
-      for (let i = 0; i < targetPhotos.length; i++) {
-        const photo = targetPhotos[i];
-        if (photo.file) {
-          zip.file(photo.name, photo.file);
-        } else {
-          try {
-            const res = await fetch(photo.url);
-            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            const blob = await res.blob();
-            zip.file(photo.name, blob);
-          } catch (e) {
-            console.error('Failed to fetch remote image for ZIP:', photo.url, e);
+      for (let b = 0; b < batches.length; b++) {
+        const batch = batches[b];
+        const zip = new JSZip();
+
+        // 串行添加当前批次的照片文件
+        for (let i = 0; i < batch.photos.length; i++) {
+          const photo = batch.photos[i];
+          if (photo.file) {
+            zip.file(photo.name, photo.file);
+          } else {
+            try {
+              const res = await fetch(photo.url);
+              if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+              const blob = await res.blob();
+              zip.file(photo.name, blob);
+            } catch (e) {
+              console.error('Failed to fetch remote image for ZIP:', photo.url, e);
+            }
           }
         }
-      }
 
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const downloadUrl = URL.createObjectURL(zipBlob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = `ai-photo-cleaner-${status === 'keep' ? 'winners' : 'cullCandidates'}-${Date.now()}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // 延迟 120 秒释放 Object URL，给超大文件下载写入磁盘留出充裕的传输时间
-      setTimeout(() => {
-        URL.revokeObjectURL(downloadUrl);
-      }, 120_000);
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const downloadUrl = URL.createObjectURL(zipBlob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = batch.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 延迟释放 Object URL，给大文件下载写入磁盘留出充裕的传输时间
+        setTimeout(() => {
+          URL.revokeObjectURL(downloadUrl);
+        }, ZIP_OBJECT_URL_REVOKE_DELAY_MS);
+
+        // 如果还有下一个分包，则等待一定延迟，防止浏览器判定为并发下载劫持
+        if (b < batches.length - 1) {
+          await sleep(ZIP_BATCH_DOWNLOAD_DELAY_MS);
+        }
+      }
     } catch (err) {
       console.error('Failed to download ZIP pack:', err);
     } finally {
@@ -679,6 +765,11 @@ export default function ResultsPage() {
                           </div>
                         </div>
                       </div>
+                      {isZipping && (
+                        <div className="text-[10px] text-amber-400/90 text-center animate-pulse font-medium select-none mt-1">
+                          ℹ️ 大相册会自动分批导出为多个 ZIP 文件，请等待全部下载完成。
+                        </div>
+                      )}
                     </div>
 
                     {/* Right: Security Strategy Card */}

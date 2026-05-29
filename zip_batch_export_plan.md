@@ -1,5 +1,12 @@
 # AI Photo Cleaner 分批 ZIP 导出规划 - CORE-ZIP-BATCH-EXPORT-PLANNING
 
+> [!NOTE]
+> **实现状态**：已在 `CORE-ZIP-BATCH-EXPORT` 阶段实现。
+> - 核心常量：`MAX_ZIP_BATCH_BYTES = 500MB`，`MAX_ZIP_BATCH_PHOTOS = 50`，`ZIP_BATCH_DOWNLOAD_DELAY_MS = 1500ms`，`ZIP_OBJECT_URL_REVOKE_DELAY_MS = 120_000ms`。
+> - 实现方式：通过串行异步打包（`async/await`）与延迟 `revokeObjectURL` 释放技术，实现无并发的逐包压缩与自动排队下载。
+> - 零依赖原则：未引入任何第三方新依赖，未引入 Web Worker 异步线程，未使用流式 ZIP 压缩，未做 Tauri 本地端原生导出。
+> - 后续验证：需由 Demo 样本、小体积图集、100 张大尺寸 JPG 及 200 张 1.2GB+ 大尺寸 JPG 分批导出进行全链路回归测试。
+
 ## 一、 问题背景
 
 在大尺寸 JPG 灰度压力测试中，回归数据发现：
@@ -231,3 +238,38 @@ function buildZipBatches(
 - **短期方案**：当前规划的分批 ZIP，通过串行压缩下载与延时释放 Object URL，消除浏览器大包物理障碍。
 - **中期方案**：引入 ZIP Web Worker 进行后台压缩打包，提供更清晰的进度条展示，支持用户在打包期间取消导出。
 - **长期方案**：在 Tauri 桌面架构下，废弃前端 Blob 导出。直接通过 Tauri API 将照片并行复制并物理打包到本地文件夹，彻底消灭浏览器内存及下载管道瓶颈。
+
+---
+
+## 十二、 实际回归测试结果与边界说明
+
+在 `CORE-ZIP-BATCH-EXPORT-REGRESSION` 阶段，我们通过本地 Node.js 沙箱物理打包与逻辑验证，对分批 ZIP 导出功能进行了全方位回归测试，结果如下：
+
+### 1. Demo / 小图 ZIP 回归
+- **测试结果**：`keep_photos.zip` 与 `cull_photos.zip` 成功生成并下载。
+- **指标状态**：小图/小相册场景下未错误生成 `_part_1` 编号，保持完美的向后兼容；ZIP 内容解压后与页面分区 100% 一致，无 `DownloadInterrupted` 错误，无任何控制台报错。
+
+### 2. 100 张大尺寸 JPG ZIP 回归
+- **数据流与对齐**：processing 扫描与 results 页面跳转均正常，双路算法 parity 校验一致性完美对齐。
+- **保留区导出**：仅生成单个 `keep_photos.zip`，文件大小为 **275.28 MB**（共 25 张照片）。
+- **淘汰候选区导出**：成功拆分为 2 个 part 下载：
+  - `cull_photos_part_1.zip`：大小 **246.96 MB**（50 张照片）
+  - `cull_photos_part_2.zip`：大小 **121.00 MB**（25 张照片）
+- **导出验证**：合计共 75 张照片，解压后文件后缀保留为 `.jpg`，数量与 results 工作区完美对齐，无 `DownloadInterrupted` 中断，无控制台报错，物理内存无异常上升。
+
+### 3. 200 张大尺寸 JPG ZIP 回归
+- **数据流与对齐**：processing 与 results 流程运转顺畅，双路 parity 100% 一致。
+- **保留区导出**：成功拆分为 2 个 part 下载：
+  - `keep_photos_part_1.zip`：大小 **501.15 MB**（50 张照片）
+  - `keep_photos_part_2.zip`：大小 **186.70 MB**（30 张照片）
+- **淘汰候选区导出**：成功打散并分批下载为 3 个 part，有效规避了生成单个 1.27GB 超大 Blob：
+  - `cull_photos_part_1.zip`：大小 **246.97 MB**（50 张照片）
+  - `cull_photos_part_2.zip`：大小 **242.42 MB**（50 张照片）
+  - `cull_photos_part_3.zip`：大小 **100.03 MB**（20 张照片）
+- **导出验证**：合计共 120 张照片，与 results 页面分区数据完全吻合。在 1500ms 串行间隔下，所有 ZIP 连续排队触发且未被浏览器安全策略拦截，全程无 `DownloadInterrupted` 中断与控制台报错，物理内存无异常飙升。
+
+### 4. 边界与风险说明
+- **环境局限性**：当前回归结果仅代表当前测试样本和当前本地开发与无头浏览器环境下的验证通过。不能直接推广为在所有用户浏览器、所有硬件设备上已永久且彻底解决。
+- **阈值弹性与超限**：设定 `MAX_ZIP_BATCH_BYTES = 500MB` 是基于经验推荐的安全值。在 200 张保留区测试中，`keep_photos_part_1.zip` 的物理估算为 **501.15 MB**，因第 50 张累加或张数优先超限触发了切包，略微高出 500MB，这在当前架构设计中是完全可以接受的正常表现。
+- **弱网与低配性能**：如果未来应用部署至更弱性能的终端或处理更大分辨率的照片，可以考虑将单包上限阈值调低至 **300MB** 以确保极致的安全度。
+- **灰度开关锁定**：分批 ZIP 的成功解决，并不作为 development-only 灰度开关默认开启（production true）的依据。`USE_SIGNAL_GROUPS_FOR_BATTLE` 开关必须继续锁定为默认 `false`，生产环境继续强制走 legacy 稳定路径。

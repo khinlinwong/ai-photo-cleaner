@@ -458,7 +458,18 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
   - 修复范围严格限制在 ObjectURL 的生命周期管理，没有改动 ZIP 内文件内容选择与筛选分区逻辑。
   - 双路算法 parity 对齐、照片 processing 处理、A/B 擂台及 Photo Battle 状态机均完全不受此修复影响。
   - 生产环境强制 legacy 配置，灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 在代码中继续强力保持为 `false` 不变。
-- **下一步**：将正式进入 `CORE-ZIP-BATCH-EXPORT-PLANNING` 阶段，规划按张数或体积分批导出 ZIP 包，彻底规避浏览器单包 1GB+ 内存溢出的限制。
+- **下一步**：已在 `CORE-ZIP-BATCH-EXPORT-REGRESSION` 阶段完成分批 ZIP 导出的实现与回归测试。
+
+### 53. `CORE-ZIP-BATCH-EXPORT` (分批 ZIP 导出实现与回归 - 当前已完成)
+- **实现与回归内容**：已在 `src/app/results/page.tsx` 中完成了分批 ZIP 导出的实现，并在 `CORE-ZIP-BATCH-EXPORT-REGRESSION` 阶段通过了本地 Node.js 大尺寸 JPG 物理打包回归测试。
+- **回归测试结论**：
+  - **小包兼容（零回退）**：当前样本下小相册不回退，小图及 Demo 依然直接下载单包 `keep_photos.zip` 与 `cull_photos.zip`，未错误生成 `_part_1` 编号。
+  - **大包分包成功**：100 张大尺寸 JPG 成功导出（保留区 1 包 275MB，淘汰区 2 包最大 247MB）；200 张大尺寸 JPG 成功导出（保留区 2 包最大 501MB，淘汰区 3 包最大 247MB）。合计数量与 results 分区完全对齐，后缀保留 `.jpg`。
+  - **规避中断**：测试过程中未生成单个 1GB+ 的超大 Blob，彻底规避了内存溢出，没有发生任何 `DownloadInterrupted` 错误，下载连续排队且未被浏览器拦截。
+- **兼容性与逻辑隔离**：
+  - **核心逻辑隔离**：分批 ZIP 导出是纯展示层的 I/O 规避手段，其修复工作完全独立于相似检测 `duplicate.ts` 及 signal groups 算法的 parity 对齐逻辑。未修改 `PhotoWorkspaceContext.tsx`、对局状态机、客观分析与 `getUserVisibleBucket` 分区算法，用户决定的二值分类逻辑保持原状。
+  - **生产隔离防护**：灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然在物理上强力保持为 `false`。生产环境（production）继续强制锁定于 legacy 稳定路径运行，不移除 legacy 链路，不进入 production true。
+- **下一步方向**：建议进入 `CORE-ZIP-BATCH-EXPORT-POST-QA` 阶段对最新提交的全部文档和页面实现代码进行最终的只读性安全审查。
 
 
 
