@@ -95,14 +95,22 @@
 5. **`CORE-DUPLICATE-SIGNAL-BETA-QA`**（已完成）：
    - Codex 对 beta readiness 规划进行只读审查。
 6. **`CORE-DUPLICATE-LARGE-JPG-PLANNING`**（已完成）：
-   - 规划 100 / 200 张 3MB-10MB 大尺寸 JPG 非隐私测试，用于补足浏览器 I/O、Canvas、内存和 ZIP 压力验证。此项规划已通过 Codex QA 审查，明确不作为 production true 的直接依据，当前不直接默认 true，且不进入正式的 beta 阶段。
+   - 规划 100 / 200 张 3MB-10MB 大尺寸 JPG 非隐私测试，用于补足浏览器 I/O、Canvas、内存和 ZIP 压力验证。
 7. **`CORE-DUPLICATE-LARGE-JPG-DOCS-COMMIT-PUSH`**（已完成）：
-   - 补充并提交大尺寸 JPG 测试规划文档并推送。
+   - 提交大尺寸 JPG 测试规划文档并推送。
 8. **`CORE-DUPLICATE-LARGE-JPG`**（已完成）：
    - 运行大尺寸 JPG 物理压测，算法 parity 正常，但发现 200 张大文件 ZIP 导出中断（`DownloadInterrupted`）漏洞。
-9. **`CORE-ZIP-LARGE-FILE-FIX-PLANNING`**（当前正在进行）：
+9. **`CORE-ZIP-LARGE-FILE-FIX-PLANNING`**（已完成）：
    - 规划大文件 ZIP 下载中断修复方案，新建 `zip_large_file_fix_plan.md`。
-10. **`CORE-ZIP-LARGE-FILE-FIX-QA`**：
+10. **`CORE-ZIP-LARGE-FILE-FIX-QA`**（已完成）：
     - Codex 对大文件 ZIP 下载修复方案进行只读审查。
-11. **`CORE-ZIP-LARGE-FILE-FIX`**：
-    - 在开发分支中实施最小低风险的 Object URL 延时释放修复，并进行全方位回归测试。
+11. **`CORE-ZIP-LARGE-FILE-FIX`**（已完成）：
+    - 实施 Object URL 延迟 120 秒释放最小修复。100张（643MB）通过，但 200张（1.27GB）超大单包依然失败。
+12. **`CORE-ZIP-BATCH-EXPORT-PLANNING`**（已完成）：
+    - 规划分批 ZIP 导出方案，新建 `zip_batch_export_plan.md`，确立 500MB / 50张串行限流逻辑。
+13. **`CORE-ZIP-BATCH-EXPORT`**（已完成）：
+    - 在 results 页面中增加局部常量与辅助函数，通过 `async/await` 串行完成多包 ZIP 压缩打包与自动下载触发。
+14. **`CORE-ZIP-BATCH-EXPORT-REGRESSION`**（已完成）：
+    - 200张 JPG 大相册淘汰区（3包）分批导出与物理包压缩尺寸检验成功，规避了单包 1GB+ 溢出隐患，当前回归中规避了中断 Bug。
+15. **`CORE-STABILIZE-SNAPSHOT-PLANNING`**（当前阶段）：
+    - 整理当前阶段的稳定化成果快照并生成 `core_stabilize_snapshot.md`。由于切换条件目前仍未满足 production true 且缺乏真实复杂客户相册运行检验，后续继续保持**阶段 A**（默认为 false，仅在开发环境做临时 true 测试），绝不移除 legacy。

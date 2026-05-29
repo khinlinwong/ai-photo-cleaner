@@ -465,13 +465,16 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **回归测试结论**：
   - **小包兼容（零回退）**：当前样本下小相册不回退，小图及 Demo 依然直接下载单包 `keep_photos.zip` 与 `cull_photos.zip`，未错误生成 `_part_1` 编号。
   - **大包分包成功**：100 张大尺寸 JPG 成功导出（保留区 1 包 275MB，淘汰区 2 包最大 247MB）；200 张大尺寸 JPG 成功导出（保留区 2 包最大 501MB，淘汰区 3 包最大 247MB）。合计数量与 results 分区完全对齐，后缀保留 `.jpg`。
-  - **规避中断**：测试过程中未生成单个 1GB+ 的超大 Blob，彻底规避了内存溢出，没有发生任何 `DownloadInterrupted` 错误，下载连续排队且未被浏览器拦截。
+  - **规避中断**：测试过程中未生成单个 1GB+ 的超大 Blob，当前样本下规避了内存溢出，当前回归中未再出现 `DownloadInterrupted` 错误，下载连续排队且未被浏览器拦截。
 - **兼容性与逻辑隔离**：
   - **核心逻辑隔离**：分批 ZIP 导出是纯展示层的 I/O 规避手段，其修复工作完全独立于相似检测 `duplicate.ts` 及 signal groups 算法的 parity 对齐逻辑。未修改 `PhotoWorkspaceContext.tsx`、对局状态机、客观分析与 `getUserVisibleBucket` 分区算法，用户决定的二值分类逻辑保持原状。
   - **生产隔离防护**：灰度开关常量 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值依然在物理上强力保持为 `false`。生产环境（production）继续强制锁定于 legacy 稳定路径运行，不移除 legacy 链路，不进入 production true。
-- **下一步方向**：建议进入 `CORE-ZIP-BATCH-EXPORT-POST-QA` 阶段对最新提交的全部文档和页面实现代码进行最终的只读性安全审查。
+- **下一步方向**：已进入 `CORE-STABILIZE-SNAPSHOT-PLANNING` 阶段，整理当前核心稳定化成果快照并规划下一步。
 
-
-
-
-
+### 54. `CORE-STABILIZE-SNAPSHOT-PLANNING` (核心稳定化阶段快照整理 - 当前已完成)
+- **内容记录**：已正式启动并完成了对当前核心稳定化阶段所有成果的系统性快照整理，新建了项目根目录快照文档 [core_stabilize_snapshot.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/core_stabilize_snapshot.md)。
+- **成果汇总**：
+  - 确认大文件 ZIP 导出阶段已完整完成实现、回归测试以及 Post-QA 代码和文档审查。
+  - 确认虚拟滚动网格 `VirtualPhotoGrid` 运行状况良好，QA window 隐式元数据摘要在 production 中得到绝对物理阻断隔离。
+- **下一步建议**：根据当前的成果与风险态势，下一步推荐方向为 `CORE-DUPLICATE-REPEATABILITY-PLANNING`（测试集 3-5 次多轮重复运行性与内存泄漏验证），以确保系统的长期可靠性，而非盲目在开发环境增加一次性压强。
+- **安全约束**：重申灰度开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 默认值必须保持为 `false`，生产环境绝对走 legacy 稳定驱动方案，用户决定的二值分类逻辑保持完全不变。

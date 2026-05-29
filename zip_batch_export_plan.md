@@ -1,11 +1,11 @@
 # AI Photo Cleaner 分批 ZIP 导出规划 - CORE-ZIP-BATCH-EXPORT-PLANNING
 
 > [!NOTE]
-> **实现状态**：已在 `CORE-ZIP-BATCH-EXPORT` 阶段实现。
+> **实现状态**：已在 `CORE-ZIP-BATCH-EXPORT` 阶段实现，并在 `CORE-ZIP-BATCH-EXPORT-REGRESSION` 阶段完成物理打包回归验证，成功通过 `CORE-ZIP-BATCH-EXPORT-POST-QA` 审查。
+> - 核心成果：分批导出成功打散了超 1.2GB 的单包限制，当前回归中规避了中等大包和超大包的 `DownloadInterrupted` 错误。目前 ZIP 大文件导出的代码修改已告完成，后续无须再改动 results/page.tsx 的 ZIP 相关代码。
 > - 核心常量：`MAX_ZIP_BATCH_BYTES = 500MB`，`MAX_ZIP_BATCH_PHOTOS = 50`，`ZIP_BATCH_DOWNLOAD_DELAY_MS = 1500ms`，`ZIP_OBJECT_URL_REVOKE_DELAY_MS = 120_000ms`。
 > - 实现方式：通过串行异步打包（`async/await`）与延迟 `revokeObjectURL` 释放技术，实现无并发的逐包压缩与自动排队下载。
 > - 零依赖原则：未引入任何第三方新依赖，未引入 Web Worker 异步线程，未使用流式 ZIP 压缩，未做 Tauri 本地端原生导出。
-> - 后续验证：需由 Demo 样本、小体积图集、100 张大尺寸 JPG 及 200 张 1.2GB+ 大尺寸 JPG 分批导出进行全链路回归测试。
 
 ## 一、 问题背景
 
