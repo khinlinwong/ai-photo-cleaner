@@ -651,6 +651,42 @@ export default function ResultsPage() {
               ) : (
                 <div className="space-y-4">
                   
+                  {/* 页面标题区 */}
+                  <div className="text-left space-y-1 select-none">
+                    <h2 className="text-sm font-bold text-[var(--dt-text-primary)]">整理结果</h2>
+                    <p className="text-[11px] text-[var(--dt-text-soft)] leading-relaxed">
+                      请在这里最终确认要保留和标记为淘汰候选的照片。本步骤只在浏览器中整理结果，不会物理修改你的原图文件。
+                    </p>
+                  </div>
+
+                  {/* 统计摘要区 */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 select-none">
+                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
+                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">保留照片</span>
+                      <span className="text-xs font-bold text-emerald-400 mt-1 font-mono">
+                        {keepPhotos.length} 张 <span className="text-[9px] text-[var(--dt-text-soft)] font-normal">({keepSpaceMB} MB)</span>
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
+                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">淘汰候选照片</span>
+                      <span className="text-xs font-bold text-[#B96F68] mt-1 font-mono">
+                        {deletePhotos.length} 张 <span className="text-[9px] text-[var(--dt-text-soft)] font-normal">({spaceSavedMB} MB)</span>
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
+                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">相似组</span>
+                      <span className="text-xs font-bold text-[var(--dt-text-primary)] mt-1 font-mono">
+                        {similarGroups.length} 组
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
+                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">A/B 对局</span>
+                      <span className="text-xs font-bold text-yellow-400 mt-1 font-mono">
+                        {similarGroups.filter(g => g.battleCompleted).length} / {similarGroups.length} 已完成
+                      </span>
+                    </div>
+                  </div>
+
                   {/* PK 流程进度条与指示 */}
                   <div className={cn(
                     "p-3 rounded-lg border flex items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300",
@@ -659,7 +695,12 @@ export default function ResultsPage() {
                       : "bg-emerald-500/5 border-emerald-500/10 text-emerald-400/95"
                   )}>
                     <div className="flex items-center gap-2">
-                      {pendingGroupsCount > 0 ? (
+                      {similarGroups.length === 0 ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <span>未发现明显相似组。你仍可以手动查看照片结果。</span>
+                        </>
+                      ) : pendingGroupsCount > 0 ? (
                         <>
                           <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
                           <span>还有相似照片未完成 A/B 对比，建议先完成筛选以获得最佳整理效果。当前待处理：<strong>{pendingGroupsCount} 组</strong></span>
@@ -667,7 +708,7 @@ export default function ResultsPage() {
                       ) : (
                         <>
                           <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
-                          <span>整理完成，没有需要 A/B 对比的相似照片。照片已完全分类，您可以放心且安全地进行打包导出！</span>
+                          <span>相似照片对局已完成。你可以继续检查保留区和淘汰候选区，或导出结果。</span>
                         </>
                       )}
                     </div>
@@ -677,10 +718,10 @@ export default function ResultsPage() {
                           const group = similarGroups.find(g => !g.battleCompleted);
                           if (group) startBattleForGroup(group.id);
                         }}
-                        className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1 rounded text-[10px] flex items-center gap-1 transition-all"
+                        className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1 rounded text-[10px] flex items-center gap-1 transition-all shrink-0"
                       >
                         <GitCompare className="h-3 w-3" />
-                        继续 A/B 对比
+                        继续 A/B 对局
                       </button>
                     )}
                   </div>
@@ -711,14 +752,14 @@ export default function ResultsPage() {
                           <div>
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                                <span className="text-emerald-400 text-[10px]">🟢</span> 保留区
+                                <span className="text-emerald-400 text-[10px]">🟢</span> 保留照片
                               </span>
                               <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
                                 {keepPhotos.length} 张
                               </span>
                             </div>
                             <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-1.5 leading-relaxed">
-                              准备保留的照片 (共约 {keepSpaceMB} MB)
+                              确认保留的照片 (共约 {keepSpaceMB} MB)
                             </p>
                           </div>
                           <div className="mt-3">
@@ -728,9 +769,14 @@ export default function ResultsPage() {
                               className="desktop-button-primary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all"
                             >
                               <Download className="h-3.5 w-3.5" />
-                              {keepPhotos.length === 0 ? "暂无保留照片" : "导出保留区 ZIP"}
+                              {isZipping ? "正在导出中..." : "导出保留区 ZIP"}
                             </button>
-                            {pendingGroupsCount > 0 && (
+                            {(keepPhotos.length === 0 || isZipping) && (
+                              <p className="text-[9px] text-[var(--dt-text-soft)] text-center mt-1.5 select-none leading-relaxed">
+                                {isZipping ? "正在生成 ZIP，请等待当前导出完成。" : "暂无可导出的保留照片"}
+                              </p>
+                            )}
+                            {keepPhotos.length > 0 && !isZipping && pendingGroupsCount > 0 && (
                               <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
                                 💡 还有相似照片需要 A/B 对比，建议完成后再导出。
                               </p>
@@ -743,14 +789,14 @@ export default function ResultsPage() {
                           <div>
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                                <span className="text-red-400 text-[10px]">🔴</span> 淘汰候选区
+                                <span className="text-red-400 text-[10px]">🔴</span> 淘汰候选照片
                               </span>
                               <span className="text-[10px] font-mono text-red-400 font-bold bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10">
                                 {deletePhotos.length} 张
                               </span>
                             </div>
                             <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-1.5 leading-relaxed">
-                              建议暂时移出的照片 (约 {spaceSavedMB} MB)。淘汰候选不是删除原图，导出后须由您人工处理。
+                              标记为淘汰候选的照片 (约 {spaceSavedMB} MB)。淘汰候选仅代表整理建议，原图保持不变，导出后由你人工处理。
                             </p>
                           </div>
                           <div className="mt-3">
@@ -760,9 +806,14 @@ export default function ResultsPage() {
                               className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 border border-white/5 font-bold transition-all"
                             >
                               <Trash2 className="h-3.5 w-3.5 text-amber-500/80" />
-                              {deletePhotos.length === 0 ? "暂无淘汰候选" : "导出淘汰候选区 ZIP"}
+                              {isZipping ? "正在导出中..." : "导出淘汰候选区 ZIP"}
                             </button>
-                            {pendingGroupsCount > 0 && (
+                            {(deletePhotos.length === 0 || isZipping) && (
+                              <p className="text-[9px] text-[var(--dt-text-soft)] text-center mt-1.5 select-none leading-relaxed">
+                                {isZipping ? "正在生成 ZIP，请等待当前导出完成。" : "暂无可导出的淘汰候选照片"}
+                              </p>
+                            )}
+                            {deletePhotos.length > 0 && !isZipping && pendingGroupsCount > 0 && (
                               <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
                                 💡 还有相似照片需要 A/B 对比，建议完成后再导出。
                               </p>
@@ -770,37 +821,47 @@ export default function ResultsPage() {
                           </div>
                         </div>
                       </div>
+                      
                       {/* ZIP Export Warnings and Tips */}
-                      <div className="mt-2.5 space-y-1.5 border-t border-white/5 pt-2">
-                        {/* 1. 常驻轻提示 */}
-                        <div className="text-[9.5px] text-[var(--dt-text-soft)] text-center leading-relaxed select-none">
-                          ℹ️ 大相册会自动分批导出为多个 ZIP 文件。导出期间请不要刷新页面，并等待所有文件下载完成。
-                        </div>
-
-                        {/* 2. 大相册照片数量提示 */}
-                        {photos.length > 200 ? (
-                          <div className="text-[9.5px] text-amber-400/80 text-center leading-relaxed select-none">
-                            ⚠️ 当前相册较大，如 ZIP 下载失败，建议减少单次导出数量或分批处理。
-                          </div>
-                        ) : photos.length > 100 ? (
-                          <div className="text-[9.5px] text-amber-400/60 text-center leading-relaxed select-none">
-                            💡 当前相册照片较多，浏览器导出可能需要更长时间。
-                          </div>
-                        ) : null}
-
+                      <div className="mt-4 space-y-2 border-t border-white/5 pt-3">
                         {/* 3. isZipping 状态提示 */}
                         {isZipping && (
-                          <div className="text-[10px] text-amber-400/90 text-center animate-pulse font-medium select-none">
-                            ⏳ 正在生成 ZIP，请等待所有分包下载完成。
+                          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-2 rounded text-[10px] text-center animate-pulse font-semibold flex items-center justify-center gap-1.5 select-none">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                            ⏳ 正在生成分批 ZIP，请静候下载完成，期间请勿刷新页面。
                           </div>
                         )}
 
                         {/* 4. 导出失败警告 */}
                         {zipExportWarning && (
-                          <div className="border border-yellow-500/20 bg-yellow-500/10 text-yellow-400/90 p-2 rounded text-[9.5px] leading-relaxed text-center">
-                            ⚠️ {zipExportWarning}
+                          <div className="border border-[#B96F68]/30 bg-[#B96F68]/10 text-[#B96F68] p-2.5 rounded text-[10px] leading-relaxed text-center flex items-center justify-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                            <span>{zipExportWarning}</span>
                           </div>
                         )}
+
+                        <div className="flex flex-col gap-1 text-[9.5px] text-[var(--dt-text-soft)] bg-black/10 p-2.5 rounded border border-white/5 select-none">
+                          <div className="flex items-start gap-1 leading-normal">
+                            <span className="shrink-0 text-amber-400/80">ℹ️</span>
+                            <span>分批下载：浏览器由于导出机制限制，大相册将自动进行分批导出。为保证文件完整，请避免连续高频点击或在导出过程中关闭/刷新页面。</span>
+                          </div>
+                          
+                          {/* 2. 大相册照片数量提示 */}
+                          {photos.length > 200 ? (
+                            <div className="flex items-start gap-1 leading-normal mt-1 pt-1 border-t border-white/5 text-amber-400/90">
+                              <span className="shrink-0">⚠️</span>
+                              <span>当前导入数量超过 200 张，这已接近浏览器导出处理能力上限，强烈建议分批下载或减少单次导入体积。</span>
+                            </div>
+                          ) : photos.length > 100 ? (
+                            <div className="flex items-start gap-1 leading-normal mt-1 pt-1 border-t border-white/5 text-amber-400/70">
+                              <span className="shrink-0">💡</span>
+                              <span>当前照片多于 100 张，分批打包和排队下载耗时可能会有所延长，请耐心等待。</span>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
 
@@ -813,36 +874,44 @@ export default function ResultsPage() {
                         </div>
                         <div className="mt-2.5 space-y-2 text-[9.5px] text-[var(--dt-text-soft)] leading-relaxed font-mono">
                           <p>
-                            ⚡ <strong className="text-[var(--dt-text-primary)]">只复制不修改</strong>：默认仅在浏览器中打包下载，不直接在您磁盘上物理修改或删除原片。
+                            ⚡ <strong className="text-[var(--dt-text-primary)]">只复制不修改</strong>：默认仅在浏览器中打包下载，不直接在你的磁盘上物理改动原片。
                           </p>
                           <p>
-                            📂 <strong className="text-[var(--dt-text-primary)]">淘汰候选安全</strong>：淘汰区仅代表整理建议，在您确认前绝不会发生任何物理磁盘文件变更。
+                            📂 <strong className="text-[var(--dt-text-primary)]">淘汰候选安全</strong>：淘汰候选仅代表整理建议，在您确认前绝不会发生任何物理磁盘文件变更。
                           </p>
                           <p>
                             💻 <strong className="text-[var(--dt-text-primary)]">未来桌面支持</strong>：后续桌面版客户端将支持“直接复制到文件夹”和“物理移动”（物理剪切必有二次弹框确认）。
                           </p>
+                          <p className="text-[9px] text-[var(--dt-text-secondary)] border-t border-white/5 pt-2.5 select-none leading-relaxed">
+                            💡 逐张比较相似照片，由你决定保留或标记为淘汰候选，原图保持不变。
+                          </p>
                         </div>
                       </div>
 
-                      <div className="flex gap-2 pt-2 border-t border-white/5">
-                        {pendingGroupsCount > 0 ? (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+                        {similarGroups.length === 0 ? (
+                          <div className="text-[9.5px] text-[var(--dt-text-soft)] text-center select-none py-1 leading-relaxed">
+                            当前没有需要 A/B 对比的相似组。
+                          </div>
+                        ) : pendingGroupsCount > 0 ? (
                           <button
                             onClick={() => {
                               const group = similarGroups.find(g => !g.battleCompleted);
                               if (group) startBattleForGroup(group.id);
                             }}
-                            className="flex-1 desktop-button-secondary text-[10px] py-1.5 border border-yellow-500/20 text-yellow-400 hover:text-yellow-300 flex items-center justify-center gap-1"
+                            className="w-full desktop-button-secondary text-[10px] py-1.5 border border-yellow-500/30 text-yellow-400 hover:text-yellow-300 flex items-center justify-center gap-1 font-bold"
                           >
                             <GitCompare className="h-3 w-3" />
-                            继续 PK 对比
+                            继续 A/B 对局
                           </button>
-                        ) : null}
+                        ) : (
+                          <div className="text-[9.5px] text-emerald-400/90 text-center select-none py-1 leading-relaxed">
+                            相似照片对局已完成。
+                          </div>
+                        )}
                         <button 
                           onClick={handleRestart}
-                          className={cn(
-                            "desktop-button-secondary text-[10px] py-1.5 border border-white/5 flex items-center justify-center gap-1",
-                            pendingGroupsCount > 0 ? "w-1/2" : "w-full"
-                          )}
+                          className="w-full desktop-button-secondary text-[10px] py-1.5 border border-white/5 flex items-center justify-center gap-1"
                         >
                           <RotateCcw className="h-3 w-3" />
                           重新导入
@@ -857,9 +926,9 @@ export default function ResultsPage() {
                     <div className="space-y-2 text-left">
                       <div className="border-b border-white/5 pb-1 flex items-baseline justify-between">
                         <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                          <span className="text-emerald-400">🟢</span> 保留区
+                          <span className="text-emerald-400">🟢</span> 保留照片
                         </h3>
-                        <span className="text-[9px] text-[var(--dt-text-soft)]">准备保留的照片 ({keepPhotos.length} 张)</span>
+                        <span className="text-[9px] text-[var(--dt-text-soft)]">确认保留的照片 ({keepPhotos.length} 张)</span>
                       </div>
                       {renderPartitionGrid(keepPhotos, 'keep')}
                     </div>
@@ -869,13 +938,13 @@ export default function ResultsPage() {
                       <div className="border-b border-white/5 pb-1 flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
                         <div className="flex items-center gap-1">
                           <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                            <span className="text-red-400">🔴</span> 淘汰候选区
+                            <span className="text-red-400">🔴</span> 淘汰候选照片
                           </h3>
                           <span className="text-[9px] text-red-400/80 bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10 scale-90">
-                            淘汰候选不是删除原图
+                            淘汰候选仅代表整理建议，原图保持不变
                           </span>
                         </div>
-                        <span className="text-[9px] text-[var(--dt-text-soft)]">淘汰候选照片 ({deletePhotos.length} 张，共约 {spaceSavedMB} MB)</span>
+                        <span className="text-[9px] text-[var(--dt-text-soft)]">标记为淘汰候选的照片 ({deletePhotos.length} 张，共约 {spaceSavedMB} MB)</span>
                       </div>
                       {renderPartitionGrid(deletePhotos, 'cull')}
                     </div>
@@ -1104,7 +1173,7 @@ export default function ResultsPage() {
                     选择更想保留的一张
                   </DialogTitle>
                   <span className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">
-                    这组照片较相似，请直接选择你想保留的结果。未选照片不会被自动删除，只会进入淘汰候选区。
+                    这组照片较相似，请直接选择你想保留的结果。未选照片会标记为淘汰候选，原图保持不变。
                   </span>
                 </div>
                 <div className="bg-black/25 border border-white/5 rounded px-2.5 py-1 text-[10px] text-[var(--dt-text-primary)] font-mono font-bold">

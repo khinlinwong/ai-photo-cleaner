@@ -528,10 +528,25 @@ function getUserVisibleLabel(bucket: SuggestedBucket): string {
 - **内容记录**：已正式启动并完成了对核心稳定化下阶段演进路线的规划，在根目录下新建了规划方案 [core_stabilize_next_steps_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/core_stabilize_next_steps_plan.md)，已随 commit `3b6f173` 提交。
 - **规划内容**：梳理了现存边界并评估了五大候选路线，决定推荐下一阶段启动 Results 页面 UI Polish 规划。
 
-### 63. `CORE-RESULTS-UX-POLISH-PLANNING` (规划 Results 页面 UI Polish - 当前阶段)
-- **内容记录**：已正式启动 Results 页面 UI Polish 规划，在项目根目录下新建了规划方案 [results_ux_polish_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_ux_polish_plan.md)。
+### 63. `CORE-RESULTS-UX-POLISH-PLANNING` (规划 Results 页面 UI Polish - 已完成)
+- **内容记录**：已正式启动 Results 页面 UI Polish 规划，在项目根目录下新建了规划方案 [results_ux_polish_plan.md](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/results_ux_polish_plan.md)，已随 commit `2805484` 提交。
 - **规划内容**：设计对 Results 展示层细节体验进行微调，优化副标题层级、统计卡片视觉对比、分批 ZIP 提示间距、Photo Battle 辅助文案引导、空状态缺省、置灰按钮状态说明等，统一中文（保留/淘汰候选）及英文（Keep/Cull Candidate）口径文案。
 - **开发约束**：本阶段纯属展示层与文案规划，不修改任何算法、Context 状态机及分区划归逻辑，生产环境 `USE_SIGNAL_GROUPS_FOR_BATTLE` 继续保持为 `false`，暂缓进入公开 beta，不移除 legacy 稳定底座。
+
+### 64. `CORE-RESULTS-UX-POLISH` (实现 Results 页面展示层 UI Polish - 已完成)
+- **实现执行**：已在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中完成了 Results 展示页 UI Polish。优化了页面标题区、副标题、统计摘要区、ZIP 导出提示层级、Photo Battle 入口文案、空状态、按钮 disabled 说明以及小屏布局。
+- **影响控制**：实现过程仅修改了 Results 页面展示层和文案代码，完全未对 Context、Photo Battle 状态机、客观聚类分析算法、照片划归逻辑及 ZIP 导出底座逻辑进行任何修改。特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 依然物理上保持为 `false`，生产环境强制锁定为 legacy 稳定底座。
+
+### 65. `CORE-RESULTS-UX-POLISH-FIX` (修正 Results 页面用户可见文案口径 - 已完成)
+- **实现执行**：已在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中微调了 4 处用户可见文案，清除了“删除 / 淘汰区 / 淘汰照片”等残留词汇，落实了“淘汰候选仅代表整理建议，原图保持不变”、“不直接在你的磁盘上物理改动原片”、“原图保持不变”等高保真口径。
+- **影响控制**：本轮仅执行最小文案修正，未修改任何核心业务逻辑、状态和导出打包机制，特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 依然强制为 `false`。
+
+### 66. `CORE-RESULTS-UX-POLISH-FIX-2` (修正 Photo Battle 弹窗残留“自动删除”文案 - 已完成)
+- **实现执行**：已在 [results/page.tsx](file:///C:/Users/khinl/Documents/AI%20Photo%20Cleaner/src/app/results/page.tsx) 中对 Photo Battle Dialog 最后一处用户可见文案进行了修正，将“未选照片不会被自动删除，只会进入淘汰候选区。”替换为：`未选照片会标记为淘汰候选，原图保持不变。`
+- **敏感词排查**：对 Results 页面的用户可见文案进行了全局扫描，确保已完全清除了“删除”、“自动删除”、“淘汰区”、“淘汰照片”等口径词汇，全部符合规范定义。
+- **影响控制**：本轮仅执行这一处用户可见文案的最小物理替换，未改动任何业务逻辑、Context、状态机、ZIP打包和分区机制，未安装任何外部依赖，特性开关 `USE_SIGNAL_GROUPS_FOR_BATTLE` 依然硬编码锁定为 `false`。
+
+
 
 
 
