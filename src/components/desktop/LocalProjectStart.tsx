@@ -1,7 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePhotoWorkspace } from '@/context/PhotoWorkspaceContext';
 import { FolderOpen, ArrowRight, ShieldCheck, Cpu, Trash2, Clock, ChevronRight } from 'lucide-react';
+import {
+  getRecentLocalProjects,
+  saveRecentLocalProject,
+  createProjectId,
+  createFileFingerprints
+} from '@/lib/projects/localProjectStorage';
+import { LocalProjectSummary } from '@/lib/projects/types';
 
 interface LocalProjectStartProps {
   onStatusChange?: (status: string) => void;
@@ -15,6 +22,28 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [isStarting, setIsStarting] = useState<'none' | 'upload' | 'demo'>('none');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // 项目名称状态管理
+  const [projectName, setProjectName] = useState('');
+  const [defaultNamePlaceholder, setDefaultNamePlaceholder] = useState('');
+
+  // 最近项目状态管理
+  const [recentProjects, setRecentProjects] = useState<LocalProjectSummary[]>([]);
+  const [selectedProjectForReassociate, setSelectedProjectForReassociate] = useState<LocalProjectSummary | null>(null);
+
+  // 默认项目名称生成器
+  const getDefaultProjectName = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `本地照片项目 ${yyyy}-${mm}-${dd}`;
+  };
+
+  useEffect(() => {
+    setDefaultNamePlaceholder(getDefaultProjectName());
+    setRecentProjects(getRecentLocalProjects());
+  }, []);
+
   const handleSelectFolderClick = () => {
     fileInputRef.current?.click();
   };
@@ -23,7 +52,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // 过滤出图片
+    // 过滤图片文件
     const imgFiles = files.filter(file => file.type.startsWith('image/'));
     if (imgFiles.length === 0) {
       setErrorMessage('请选择至少一张图片。');
@@ -37,6 +66,23 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     }
 
     try {
+      // 创建新本地项目摘要并保存至 localStorage
+      const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
+      const summary: LocalProjectSummary = {
+        projectId: createProjectId(),
+        projectName: projName,
+        createdAt: new Date().toLocaleString('zh-CN'),
+        updatedAt: new Date().toLocaleString('zh-CN'),
+        photoCount: imgFiles.length,
+        keepCount: 0,
+        cullCount: 0,
+        similarGroupCount: 0,
+        battleCompleted: 0,
+        battleTotal: 0,
+        fileFingerprints: createFileFingerprints(imgFiles)
+      };
+      saveRecentLocalProject(summary);
+
       uploadFiles(imgFiles);
     } catch (err) {
       console.error('File import error:', err);
@@ -56,6 +102,23 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     }
 
     try {
+      // 创建 Demo 演示项目摘要并保存至 localStorage
+      const projName = projectName.trim() || '演示旅行照片项目';
+      const summary: LocalProjectSummary = {
+        projectId: createProjectId(),
+        projectName: projName,
+        createdAt: new Date().toLocaleString('zh-CN'),
+        updatedAt: new Date().toLocaleString('zh-CN'),
+        photoCount: 8,
+        keepCount: 5,
+        cullCount: 1,
+        similarGroupCount: 1,
+        battleCompleted: 0,
+        battleTotal: 1,
+        fileFingerprints: []
+      };
+      saveRecentLocalProject(summary);
+
       loadDemoPhotos();
       router.push('/processing');
     } catch (err) {
@@ -67,12 +130,6 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       }
     }
   };
-
-  const recentProjects = [
-    { name: 'Queenstown Trip', path: '/Users/demo/Pictures/Queenstown', time: '2小时前' },
-    { name: 'Family Album', path: '/Users/demo/Pictures/Family_2025', time: '昨天' },
-    { name: 'Product Shoot', path: '/Users/demo/Pictures/Workspace_Shoot', time: '3天前' },
-  ];
 
   const steps = [
     { num: '01', label: '选择文件夹' },
@@ -103,8 +160,22 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               开始整理本地照片
             </h1>
             <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed max-w-md">
-              选择一个本地照片文件夹，AI Photo Cleaner 会先在本地完成基础分析。您的隐私安全受到完全保护。
+              创建一个本地整理项目。当前浏览器原型只保存项目摘要，不保存原图文件，也不会上传云端。
             </p>
+          </div>
+
+          {/* Project Name Input */}
+          <div className="space-y-1.5 max-w-sm">
+            <label className="text-[10px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider font-mono block">
+              项目名称
+            </label>
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder={defaultNamePlaceholder}
+              className="w-full bg-black/35 border border-white/10 rounded px-3 py-2 text-xs text-[var(--dt-text-primary)] focus:outline-none focus:border-emerald-500/50 transition-all font-mono"
+            />
           </div>
 
           {/* Action Buttons */}
@@ -157,25 +228,38 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               <Clock className="w-3.5 h-3.5" />
               <span>最近照片项目</span>
             </h3>
-            <div className="space-y-2">
-              {recentProjects.map((project, idx) => (
-                <div 
-                  key={idx} 
-                  className="bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] transition-colors p-3 rounded-lg flex items-center justify-between cursor-pointer border border-[var(--dt-border)]"
-                  onClick={() => alert(`模拟载入项目: ${project.name}`)}
-                >
-                  <div className="truncate pr-2">
-                    <div className="text-xs font-semibold text-[var(--dt-text-primary)] truncate">{project.name}</div>
-                    <div className="text-[9px] text-[var(--dt-text-secondary)] truncate font-mono mt-0.5">
-                      {project.path}
+            
+            {recentProjects.length === 0 ? (
+              <div className="border border-dashed border-white/10 rounded-lg p-6 text-center text-[10px] text-[var(--dt-text-faint)]">
+                最近项目只记录项目名称、数量和整理进度摘要。原图保持在您的电脑中，不会被上传或改动。
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[220px] overflow-y-auto scrollbar-thin pr-1">
+                {recentProjects.map((project) => (
+                  <div 
+                    key={project.projectId} 
+                    className="bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] transition-colors p-3 rounded-lg flex items-center justify-between cursor-pointer border border-[var(--dt-border)]"
+                    onClick={() => setSelectedProjectForReassociate(project)}
+                  >
+                    <div className="truncate pr-2 flex-1">
+                      <div className="text-xs font-semibold text-[var(--dt-text-primary)] truncate">{project.projectName}</div>
+                      <div className="text-[9px] text-[var(--dt-text-secondary)] truncate font-mono mt-1 flex items-center gap-2">
+                        <span>共 {project.photoCount} 张</span>
+                        <span>•</span>
+                        <span>{project.createdAt}</span>
+                      </div>
+                    </div>
+                    <div className="text-[9px] text-[var(--dt-text-muted)] shrink-0 font-mono text-right">
+                      {project.keepCount > 0 || project.cullCount > 0 ? (
+                        <span className="text-[#6FA887]">已整理</span>
+                      ) : (
+                        <span className="text-yellow-500/80">未开始</span>
+                      )}
                     </div>
                   </div>
-                  <div className="text-[9px] text-[var(--dt-text-muted)] shrink-0 font-mono">
-                    {project.time}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Security & Privacy card */}
@@ -208,9 +292,9 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               <div className="flex items-start space-x-2.5">
                 <Trash2 className="w-4 h-4 text-[#B89A58] shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold text-[var(--dt-text-primary)] text-xs block">淘汰候选不是删除原图</span>
+                  <span className="font-semibold text-[var(--dt-text-primary)] text-xs block">淘汰候选仅代表整理建议</span>
                   <span className="text-[var(--dt-text-secondary)] text-[10px] leading-relaxed block mt-0.5">
-                    淘汰候选不是删除原图，导出或移动前必须由用户确认。
+                    淘汰候选仅代表整理建议，原图保持不变，在您最终确认并导出时绝不被直接物理修改。
                   </span>
                 </div>
               </div>
@@ -237,6 +321,57 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
           ))}
         </div>
       </div>
+
+      {/* Reassociation Modal */}
+      {selectedProjectForReassociate && (
+        <div className="fixed inset-0 bg-black/60 backdrop-filter backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1f26] border border-white/10 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4 text-left text-[var(--dt-text-primary)]">
+            <h3 className="text-sm font-bold text-[var(--dt-text-primary)] flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-yellow-400" />
+              重新关联本地照片
+            </h3>
+            
+            <div className="space-y-1">
+              <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
+                项目：<span className="font-semibold text-[var(--dt-text-primary)]">{selectedProjectForReassociate.projectName}</span>
+              </p>
+              <p className="text-[10px] text-[var(--dt-text-faint)] font-mono">
+                照片数量: {selectedProjectForReassociate.photoCount} 张 • 建立时间: {selectedProjectForReassociate.createdAt}
+              </p>
+            </div>
+
+            <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
+              这是一个项目摘要。当前浏览器原型不会保存原图文件。若要继续整理该项目，请点击下方按钮重新选择同一批照片进行关联。
+            </p>
+
+            <div className="bg-black/25 border border-white/5 rounded-lg p-3 text-[10px] text-[var(--dt-text-soft)] space-y-1 leading-relaxed">
+              <p className="font-semibold text-white/90">💡 安全声明：</p>
+              <p>• 原图保持在您的本地电脑中，不会被上传或改动。</p>
+              <p>• 淘汰候选仅代表整理建议，原图保持不变。</p>
+              <p>• 最近项目摘要只存储在您的浏览器缓存中，不会上传云端。</p>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setSelectedProjectForReassociate(null)}
+                className="desktop-button-secondary text-xs py-2 px-4 rounded"
+              >
+                关闭
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedProjectForReassociate(null);
+                  handleSelectFolderClick();
+                }}
+                className="desktop-button-primary text-xs py-2 px-4 rounded flex items-center gap-1.5"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                重新选择照片继续
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
