@@ -35,6 +35,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from "@/lib/utils";
 import VirtualPhotoGrid from '@/components/desktop/VirtualPhotoGrid';
+import { buildManifestRows, buildManifestCsv, buildManifestJson } from '@/lib/export/exportManifest';
 
 export default function ResultsPage() {
   const {
@@ -303,6 +304,52 @@ export default function ResultsPage() {
 
     return batches;
   }
+
+  const handleExportManifestCsv = () => {
+    if (photos.length === 0) return;
+    try {
+      const rows = buildManifestRows(photos);
+      const csvContent = buildManifestCsv(rows);
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'ai_photo_cleaner_manifest.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 10000);
+    } catch (err) {
+      console.error('Failed to export CSV manifest:', err);
+    }
+  };
+
+  const handleExportManifestJson = () => {
+    if (photos.length === 0) return;
+    try {
+      const rows = buildManifestRows(photos);
+      const jsonContent = buildManifestJson(rows);
+      
+      const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'ai_photo_cleaner_manifest.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 10000);
+    } catch (err) {
+      console.error('Failed to export JSON manifest:', err);
+    }
+  };
 
   // 纯客户端分批打包下载特定分区照片 (JSZip)
   const downloadPhotosZip = async (status: 'keep' | 'delete') => {
@@ -820,6 +867,36 @@ export default function ResultsPage() {
                             )}
                           </div>
                         </div>
+                      </div>
+
+                      {/* Manifest Export Panel */}
+                      <div className="mt-3 border-t border-white/5 pt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
+                            📊 整理清单导出
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            onClick={handleExportManifestCsv}
+                            disabled={photos.length === 0 || isZipping}
+                            className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all border border-white/5"
+                          >
+                            <Download className="h-3.5 w-3.5 text-emerald-400/80" />
+                            导出整理清单 CSV
+                          </button>
+                          <button
+                            onClick={handleExportManifestJson}
+                            disabled={photos.length === 0 || isZipping}
+                            className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all border border-white/5"
+                          >
+                            <Download className="h-3.5 w-3.5 text-blue-400/80" />
+                            导出整理清单 JSON
+                          </button>
+                        </div>
+                        <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-2 leading-relaxed select-none">
+                          ℹ️ 清单只包含整理结果和照片元数据，不包含原图文件。本地生成，不上传云端。淘汰候选仅代表整理建议，原图保持不变。
+                        </p>
                       </div>
                       
                       {/* ZIP Export Warnings and Tips */}
