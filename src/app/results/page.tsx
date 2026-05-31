@@ -34,6 +34,7 @@ import VirtualPhotoGrid from '@/components/desktop/VirtualPhotoGrid';
 import { buildManifestRows, buildManifestCsv, buildManifestJson } from '@/lib/export/exportManifest';
 import { ResultsSummaryCards } from '@/components/results/ResultsSummaryCards';
 import { ExportPanel } from '@/components/results/ExportPanel';
+import { PhotoBucketSection } from '@/components/results/PhotoBucketSection';
 
 
 export default function ResultsPage() {
@@ -781,32 +782,21 @@ export default function ResultsPage() {
                   {/* Partition List Areas */}
                   <div className="space-y-6">
                     {/* Partition A: Keep list */}
-                    <div className="space-y-2 text-left">
-                      <div className="border-b border-white/5 pb-1 flex items-baseline justify-between">
-                        <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                          <span className="text-emerald-400">🟢</span> 保留照片
-                        </h3>
-                        <span className="text-[9px] text-[var(--dt-text-soft)]">确认保留的照片 ({keepPhotos.length} 张)</span>
-                      </div>
+                    <PhotoBucketSection
+                      bucketType="keep"
+                      photosCount={keepPhotos.length}
+                    >
                       {renderPartitionGrid(keepPhotos, 'keep')}
-                    </div>
+                    </PhotoBucketSection>
 
                     {/* Partition B: Delete Candidate List */}
-                    <div className="space-y-2 text-left">
-                      <div className="border-b border-white/5 pb-1 flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                        <div className="flex items-center gap-1">
-                          <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                            <span className="text-red-400">🔴</span> 淘汰候选照片
-                          </h3>
-                          <span className="text-[9px] text-red-400/80 bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10 scale-90">
-                            淘汰候选仅代表整理建议，原图保持不变
-                          </span>
-                        </div>
-                        <span className="text-[9px] text-[var(--dt-text-soft)]">标记为淘汰候选的照片 ({deletePhotos.length} 张，共约 {spaceSavedMB} MB)</span>
-                      </div>
+                    <PhotoBucketSection
+                      bucketType="cull"
+                      photosCount={deletePhotos.length}
+                      spaceMB={spaceSavedMB}
+                    >
                       {renderPartitionGrid(deletePhotos, 'cull')}
-                    </div>
-
+                    </PhotoBucketSection>
                   </div>
                 </div>
               )}
