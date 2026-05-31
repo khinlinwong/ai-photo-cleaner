@@ -36,6 +36,8 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from "@/lib/utils";
 import VirtualPhotoGrid from '@/components/desktop/VirtualPhotoGrid';
 import { buildManifestRows, buildManifestCsv, buildManifestJson } from '@/lib/export/exportManifest';
+import { ResultsSummaryCards } from '@/components/results/ResultsSummaryCards';
+
 
 export default function ResultsPage() {
   const {
@@ -707,32 +709,16 @@ export default function ResultsPage() {
                   </div>
 
                   {/* 统计摘要区 */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 select-none">
-                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
-                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">保留照片</span>
-                      <span className="text-xs font-bold text-emerald-400 mt-1 font-mono">
-                        {keepPhotos.length} 张 <span className="text-[9px] text-[var(--dt-text-soft)] font-normal">({keepSpaceMB} MB)</span>
-                      </span>
-                    </div>
-                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
-                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">淘汰候选照片</span>
-                      <span className="text-xs font-bold text-[#B96F68] mt-1 font-mono">
-                        {deletePhotos.length} 张 <span className="text-[9px] text-[var(--dt-text-soft)] font-normal">({spaceSavedMB} MB)</span>
-                      </span>
-                    </div>
-                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
-                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">相似组</span>
-                      <span className="text-xs font-bold text-[var(--dt-text-primary)] mt-1 font-mono">
-                        {similarGroups.length} 组
-                      </span>
-                    </div>
-                    <div className="p-3 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between">
-                      <span className="text-[10px] text-[var(--dt-text-soft)] font-medium">A/B 对局</span>
-                      <span className="text-xs font-bold text-yellow-400 mt-1 font-mono">
-                        {similarGroups.filter(g => g.battleCompleted).length} / {similarGroups.length} 已完成
-                      </span>
-                    </div>
-                  </div>
+                  <ResultsSummaryCards
+                    keepCount={keepPhotos.length}
+                    keepSpaceMB={keepSpaceMB}
+                    cullCount={deletePhotos.length}
+                    spaceSavedMB={spaceSavedMB}
+                    similarGroupCount={similarGroups.length}
+                    completedBattleCount={similarGroups.filter(g => g.battleCompleted).length}
+                    totalBattleCount={similarGroups.length}
+                  />
+
 
                   {/* PK 流程进度条与指示 */}
                   <div className={cn(
