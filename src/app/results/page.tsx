@@ -231,6 +231,21 @@ export default function ResultsPage() {
     setIsRightDragging(false);
   };
 
+  // 双击图片重置当前侧缩放与平移状态
+  const handleDoubleClick = (side: 'left' | 'right') => {
+    if (side === 'left') {
+      setLeftScale(1);
+      setLeftX(0);
+      setLeftY(0);
+      setIsLeftDragging(false);
+    } else {
+      setRightScale(1);
+      setRightX(0);
+      setRightY(0);
+      setIsRightDragging(false);
+    }
+  };
+
   // 局部常量定义
   const MAX_ZIP_BATCH_BYTES = 300 * 1024 * 1024;
   const MAX_ZIP_BATCH_PHOTOS = 30;
@@ -1062,6 +1077,7 @@ export default function ResultsPage() {
                         onMouseMove={(e) => handleMouseMove(e, 'left')}
                         onMouseUp={() => handleMouseUpOrLeave('left')}
                         onMouseLeave={() => handleMouseUpOrLeave('left')}
+                        onDoubleClick={() => handleDoubleClick('left')}
                       >
                         <img 
                           src={leftPhoto.url} 
@@ -1124,6 +1140,7 @@ export default function ResultsPage() {
                         onMouseMove={(e) => handleMouseMove(e, 'right')}
                         onMouseUp={() => handleMouseUpOrLeave('right')}
                         onMouseLeave={() => handleMouseUpOrLeave('right')}
+                        onDoubleClick={() => handleDoubleClick('right')}
                       >
                         <img 
                           src={rightPhoto.url} 
@@ -1228,6 +1245,17 @@ export default function ResultsPage() {
 
                 {/* Battle Actions Bar */}
                 <div className="mt-3.5 pt-2.5 border-t border-white/5 flex flex-col gap-2 shrink-0 animate-fade-in">
+                  {/* Keyboard Shortcuts Hint Panel */}
+                  <div className="hidden md:flex items-center justify-center gap-4 py-1.5 px-3 rounded-lg bg-black/20 border border-white/5 text-[10px] text-[var(--dt-text-soft)] select-none">
+                    <span className="font-bold text-[var(--dt-text-secondary)]">{"\ud83d\udcbb \u5feb\u6377\u952e\u63d0\u793a\uff1a"}</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">{"\u2190"}</kbd> {"\u4fdd\u7559\u5de6\u56fe"}</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">{"\u2192"}</kbd> {"\u4fdd\u7559\u53f3\u56fe"}</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">B</kbd> {"\u4e24\u5f20\u90fd\u4fdd\u7559"}</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">C</kbd> {"\u4e24\u5f20\u90fd\u6807\u8bb0\u4e3a\u6dd8\u6c70\u5019\u9009"}</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">S</kbd> {"\u8df3\u8fc7"}</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">Esc</kbd> {"\u5173\u95ed / \u8fd4\u56de"}</span>
+                  </div>
+
                   <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                     <button
                       className="bg-[#6FA887] hover:bg-[#6FA887]/90 text-white font-bold text-xs py-2 px-1.5 rounded border border-white/5 flex flex-col items-center justify-center gap-0.5"
