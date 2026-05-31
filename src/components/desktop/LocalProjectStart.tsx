@@ -29,6 +29,10 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   // 最近项目状态管理
   const [recentProjects, setRecentProjects] = useState<LocalProjectSummary[]>([]);
   const [selectedProjectForReassociate, setSelectedProjectForReassociate] = useState<LocalProjectSummary | null>(null);
+  
+  // 重新关联机制的状态和 Ref
+  const reassociatingProjectRef = useRef<LocalProjectSummary | null>(null);
+  const [mismatchWarning, setMismatchWarning] = useState<{ project: LocalProjectSummary; files: File[] } | null>(null);
 
   // 默认项目名称生成器
   const getDefaultProjectName = () => {
@@ -48,8 +52,37 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     fileInputRef.current?.click();
   };
 
+  const proceedWithReassociation = (project: LocalProjectSummary, files: File[]) => {
+    try {
+      if (onStatusChange) {
+        onStatusChange('正在准备本地项目');
+      }
+      setIsStarting('upload');
+      
+      const updatedSummary: LocalProjectSummary = {
+        ...project,
+        updatedAt: new Date().toLocaleString('zh-CN'),
+        photoCount: files.length,
+        fileFingerprints: createFileFingerprints(files)
+      };
+      
+      saveRecentLocalProject(updatedSummary);
+      uploadFiles(files);
+    } catch (err) {
+      console.error('Reassociation error:', err);
+      setErrorMessage('关联项目失败，请重试。');
+      setIsStarting('none');
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const targetProject = reassociatingProjectRef.current;
+    
+    // Clear ref immediately and reset input value to support selecting same files
+    reassociatingProjectRef.current = null;
+    e.target.value = '';
+
     if (files.length === 0) return;
 
     // 过滤图片文件
@@ -60,30 +93,41 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     }
 
     setErrorMessage(null);
-    setIsStarting('upload');
-    if (onStatusChange) {
-      onStatusChange('正在准备本地项目');
-    }
 
     try {
-      // 创建新本地项目摘要并保存至 localStorage
-      const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
-      const summary: LocalProjectSummary = {
-        projectId: createProjectId(),
-        projectName: projName,
-        createdAt: new Date().toLocaleString('zh-CN'),
-        updatedAt: new Date().toLocaleString('zh-CN'),
-        photoCount: imgFiles.length,
-        keepCount: 0,
-        cullCount: 0,
-        similarGroupCount: 0,
-        battleCompleted: 0,
-        battleTotal: 0,
-        fileFingerprints: createFileFingerprints(imgFiles)
-      };
-      saveRecentLocalProject(summary);
-
-      uploadFiles(imgFiles);
+      if (targetProject) {
+        // 重新关联流程
+        if (imgFiles.length !== targetProject.photoCount) {
+          setMismatchWarning({
+            project: targetProject,
+            files: imgFiles
+          });
+          return;
+        }
+        proceedWithReassociation(targetProject, imgFiles);
+      } else {
+        // 创建新项目流程
+        setIsStarting('upload');
+        if (onStatusChange) {
+          onStatusChange('正在准备本地项目');
+        }
+        const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
+        const summary: LocalProjectSummary = {
+          projectId: createProjectId(),
+          projectName: projName,
+          createdAt: new Date().toLocaleString('zh-CN'),
+          updatedAt: new Date().toLocaleString('zh-CN'),
+          photoCount: imgFiles.length,
+          keepCount: 0,
+          cullCount: 0,
+          similarGroupCount: 0,
+          battleCompleted: 0,
+          battleTotal: 0,
+          fileFingerprints: createFileFingerprints(imgFiles)
+        };
+        saveRecentLocalProject(summary);
+        uploadFiles(imgFiles);
+      }
     } catch (err) {
       console.error('File import error:', err);
       setErrorMessage('导入失败，请重新选择图片。');
@@ -331,13 +375,23 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               重新关联本地照片
             </h3>
             
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
                 项目：<span className="font-semibold text-[var(--dt-text-primary)]">{selectedProjectForReassociate.projectName}</span>
               </p>
-              <p className="text-[10px] text-[var(--dt-text-faint)] font-mono">
-                照片数量: {selectedProjectForReassociate.photoCount} 张 • 建立时间: {selectedProjectForReassociate.createdAt}
-              </p>
+              
+              {/* Detailed historical metadata grid */}
+              <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--dt-text-secondary)] font-mono bg-black/15 p-2.5 rounded border border-white/5">
+                <div>照片总数: <span className="text-[var(--dt-text-primary)] font-bold">{selectedProjectForReassociate.photoCount} 张</span></div>
+                <div>相似组数: <span className="text-[var(--dt-text-primary)] font-bold">{selectedProjectForReassociate.similarGroupCount} 组</span></div>
+                <div>建议保留: <span className="text-[#6FA887] font-bold">{selectedProjectForReassociate.keepCount} 张</span></div>
+                <div>淘汰候选: <span className="text-[#B96F68] font-bold">{selectedProjectForReassociate.cullCount} 张</span></div>
+                {selectedProjectForReassociate.battleTotal > 0 && (
+                  <div className="col-span-2 mt-1 pt-1 border-t border-white/5">
+                    AB 对决进度: <span className="text-[var(--dt-text-primary)] font-bold">{selectedProjectForReassociate.battleCompleted} / {selectedProjectForReassociate.battleTotal}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
@@ -356,10 +410,11 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 onClick={() => setSelectedProjectForReassociate(null)}
                 className="desktop-button-secondary text-xs py-2 px-4 rounded"
               >
-                关闭
+                取消
               </button>
               <button
                 onClick={() => {
+                  reassociatingProjectRef.current = selectedProjectForReassociate;
                   setSelectedProjectForReassociate(null);
                   handleSelectFolderClick();
                 }}
@@ -367,6 +422,46 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               >
                 <FolderOpen className="w-3.5 h-3.5" />
                 重新选择照片继续
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mismatch Warning Modal */}
+      {mismatchWarning && (
+        <div className="fixed inset-0 bg-black/60 backdrop-filter backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1f26] border border-white/10 rounded-xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-left text-[var(--dt-text-primary)]">
+            <h3 className="text-sm font-bold text-[var(--dt-text-primary)] flex items-center gap-2">
+              <span className="text-yellow-500">⚠️</span>
+              提示
+            </h3>
+            
+            <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
+              本次选择的照片数量与上次不同，仍可继续整理。
+            </p>
+
+            <div className="text-[10px] text-[var(--dt-text-faint)] font-mono bg-black/15 p-2 rounded space-y-1">
+              <div>历史照片数量: {mismatchWarning.project.photoCount} 张</div>
+              <div>本次选择数量: {mismatchWarning.files.length} 张</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setMismatchWarning(null)}
+                className="desktop-button-secondary text-xs py-2 px-4 rounded"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  const { project, files } = mismatchWarning;
+                  setMismatchWarning(null);
+                  proceedWithReassociation(project, files);
+                }}
+                className="desktop-button-primary text-xs py-2 px-4 rounded font-semibold"
+              >
+                继续整理
               </button>
             </div>
           </div>
