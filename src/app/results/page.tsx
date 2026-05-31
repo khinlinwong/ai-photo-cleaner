@@ -660,6 +660,37 @@ export default function ResultsPage() {
     );
   };
 
+  // 获取详情清晰度人话标签
+  const getDetailClarityLabel = (photo: PhotoItem) => {
+    if (photo.sharpnessScore >= 80) {
+      return "\u753b\u9762\u7ec6\u8282\u6e05\u6670\uff0c\u7126\u70b9\u6e05\u6670"; // 画面细节清晰，焦点清晰
+    }
+    if (photo.sharpnessScore >= 50) {
+      return "\u6e05\u6670\u5ea6\u5c1a\u53ef\uff0c\u5efa\u8bae\u4eba\u5de5\u786e\u8ba4"; // 清晰度尚可，建议人工确认
+    }
+    return "\u753b\u9762\u53ef\u80fd\u5b58\u5728\u6296\u52a8\u6216\u5bf9\u7126\u504f\u5dee\uff0c\u5efa\u8bae\u6dd8\u6c70\u5019\u9009"; // 画面可能存在抖动或对焦偏差，建议淘汰候选
+  };
+
+  // 获取详情曝光人话标签
+  const getDetailExposureLabel = (photo: PhotoItem) => {
+    if (photo.exposureValue > 25) {
+      return "\u5c40\u90e8\u753b\u9762\u53ef\u80fd\u8fc7\u66b4\uff0c\u4eae\u90e8\u7ec6\u8282\u4e22\u5931"; // 局部画面可能过曝，亮部细节丢失
+    }
+    if (photo.exposureValue < -25) {
+      return "\u753b\u9762\u663e\u8457\u504f\u6697\uff0c\u6697\u90e8\u7ec6\u8282\u4e0d\u8db3"; // 画面显著偏暗，暗部细节不足
+    }
+    return "\u66b4\u5149\u6307\u6807\u5747\u8861\uff0c\u4eae\u5ea6\u8212\u9002"; // 曝光指标均衡，亮度舒适
+  };
+
+  // 获取整理建议说明
+  const getDetailSuggestionText = (photo: PhotoItem) => {
+    const isCull = getUserVisibleBucket(photo) === 'cull';
+    if (isCull) {
+      return "\u6839\u636e AI \u7b5b\u9009\u6216\u5bf9\u5c40\u7ed3\u679c\uff0c\u5f53\u524d\u7167\u7247\u88ab\u5206\u5165\u3010\u6dd8\u6c70\u5019\u9009\u3011\u3002\u5efa\u8bae\u4eba\u5de5\u786e\u8ba4\u540e\u518d\u51b3\u5b9a\u662f\u5426\u5bfc\u51fa\u3002"; // 根据 AI 筛选或对局结果，当前照片被分入【淘汰候选】。建议人工确认后再决定是否导出。
+    }
+    return "\u5f53\u524d\u7167\u7247\u88ab\u5206\u5165\u3010\u4fdd\u7559\u3011\u3002\u5efa\u8bae\u968f\u4fdd\u7559\u7167\u7247\u4e00\u8d77\u5bfc\u51fa\u3002"; // 当前照片被分入【保留】。建议随保留照片一起导出。
+  };
+
   return (
     <div className="desktop-root">
       {/* Toast 提示栏 */}
@@ -857,115 +888,83 @@ export default function ResultsPage() {
                     />
                   </div>
 
-                  <div className="space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3 flex flex-col justify-between text-left">
                     <div>
-                      <h4 className="text-[10px] font-bold text-[var(--dt-text-soft)] uppercase tracking-wider mb-2 flex items-center gap-1">
-                        <Sliders className="h-3 w-3 text-yellow-400" />
-                        AI 深度评分参数
-                      </h4>
-                      
-                      <div className="space-y-1 mb-3">
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-[var(--dt-text-soft)]">综合质量得分</span>
-                          <span className={cn("font-bold font-mono", getScoreColor(selectedPhoto.score))}>
-                            {selectedPhoto.score} / 100
-                          </span>
-                        </div>
-                        <Progress value={selectedPhoto.score} className="h-1.5 bg-white/5 rounded-full" />
+                      {/* Summary Section */}
+                      <div className="bg-black/20 border border-white/5 rounded-lg p-3 mb-2.5">
+                        <h4 className="text-[10px] font-bold text-yellow-400 mb-1.5 flex items-center gap-1.5">
+                          <Sliders className="h-3.5 w-3.5" />
+                          {"\u6574\u7406\u5efa\u8bae"}
+                        </h4>
+                        <p className="text-[11px] text-[var(--dt-text-secondary)] leading-relaxed">
+                          {getDetailSuggestionText(selectedPhoto)}
+                        </p>
                       </div>
 
-                      <div className="space-y-1 mb-3">
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-[var(--dt-text-soft)]">图像对焦清晰度</span>
-                          <span className={cn(
-                            "font-bold font-mono",
-                            selectedPhoto.sharpnessScore < 40 ? 'text-[#B96F68]' :
-                            selectedPhoto.sharpnessScore < 60 ? 'text-[#B89A58]' :
-                            'text-[#6FA887]'
-                          )}>
-                            {selectedPhoto.sharpnessScore} / 100
-                          </span>
+                      {/* Observations Section */}
+                      <div className="bg-black/10 border border-white/5 rounded-lg p-3 mb-2.5 space-y-2 text-[11px]">
+                        <div>
+                          <span className="text-[var(--dt-text-soft)] font-medium">{"\u6e05\u6670\u5ea6\u8bc4\u4f30\uff1a"}</span>
+                          <span className="text-[var(--dt-text-primary)] font-semibold">{getDetailClarityLabel(selectedPhoto)}</span>
                         </div>
-                        <Progress 
-                          value={selectedPhoto.sharpnessScore} 
-                          className={cn(
-                            "h-1.5 bg-white/5 rounded-full",
-                            selectedPhoto.sharpnessScore < 40 ? 'bg-[#B96F68]/20' :
-                            selectedPhoto.sharpnessScore < 60 ? 'bg-[#B89A58]/20' :
-                            ''
-                          )} 
-                        />
-                        
-                        <div className="mt-1 text-[10px] leading-relaxed text-[var(--dt-text-primary)]">
-                          <span className="text-[var(--dt-text-soft)] font-semibold">对焦诊断: </span>
-                          {(() => {
-                             const fs = selectedPhoto.focusStatus || (
-                               selectedPhoto.sharpnessScore >= 85 ? 'Excellent / Share-ready' :
-                               selectedPhoto.sharpnessScore >= 60 ? 'Acceptable / Casual use' :
-                               selectedPhoto.sharpnessScore >= 40 ? 'Soft Focus Detected' :
-                               'Not recommended'
-                             );
-                             switch (fs) {
-                               case 'Excellent / Share-ready':
-                                 return <span className="text-emerald-400">🟢 基础清晰度良好，检测到丰富的边缘高频细节 (Excellent / Share-ready)。</span>;
-                               case 'Acceptable / Casual use':
-                                 return <span className="text-emerald-400/80">🟢 基础清晰度良好，本地算法未检测到明显失焦 (Acceptable / Casual use)。</span>;
-                               case 'Soft Focus Detected':
-                               case 'Slightly Soft':
-                                 return <span className="text-yellow-400">🟡 检测到高频细节轻微流失，可能存在轻微散焦或虚化，建议人工对比 (Soft Focus Detected)。</span>;
-                               case 'Directional Blur Detected':
-                                 return <span className="text-red-400 font-medium">🔴 检测到高对比度边缘出现严重的单向位移拉影，可能存在运动模糊 (Directional Blur Detected)。</span>;
-                               case 'Motion Blur Detected':
-                                 return <span className="text-red-400 font-medium">🔴 检测到边缘细节呈现一致的方向性拖尾，可能存在手抖或运动模糊 (Motion Blur Detected)。</span>;
-                               case 'Edge Smear Detected':
-                                 return <span className="text-red-400 font-medium">🔴 检测到边缘对比度被高度抹平，可能存在镜头污渍或过度降噪涂抹 (Edge Smear Detected)。</span>;
-                               case 'Insufficient Subject Sharpness':
-                                 return <span className="text-red-400 font-medium">🔴 本地算法评估画面中心区域细节不足，可能存在主体对焦偏差 (Insufficient Subject Sharpness)。</span>;
-                               case 'Not recommended':
-                               case 'Blurry':
-                               default:
-                                 return <span className="text-red-400">🔴 本地算法检测到高频边缘信息极少，可能存在严重失焦或虚焦，建议清理 (Not recommended)。</span>;
-                             }
-                          })()}
+                        <div>
+                          <span className="text-[var(--dt-text-soft)] font-medium">{"\u66b4\u5149\u4eae\u5ea6\u8bc4\u4f30\uff1a"}</span>
+                          <span className="text-[var(--dt-text-primary)] font-semibold">{getDetailExposureLabel(selectedPhoto)}</span>
                         </div>
+                        {selectedPhoto.duplicateGroupId && (
+                          <div className="text-[var(--dt-text-secondary)] bg-white/5 p-2 rounded border border-white/5 text-[10px] mt-1">
+                            {"\u2139\ufe0f \u8be5\u7167\u7247\u5c5e\u4e8e\u76f8\u4f3c\u7167\u7247\u7ec4\uff0c\u5efa\u8bae\u4eba\u5de5\u5bf9\u6bd4 A/B \u7b5b\u9009\u3002"}
+                          </div>
+                        )}
                       </div>
 
-                      <div className="space-y-1 mb-3">
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-[var(--dt-text-soft)]">曝光偏好指数得分</span>
-                          <span className={cn("font-bold font-mono", selectedPhoto.exposureScore < 60 ? 'text-[#B96F68]' : 'text-emerald-400')}>
-                            {selectedPhoto.exposureScore} / 100
-                          </span>
-                        </div>
-                        <Progress value={selectedPhoto.exposureScore} className="h-1.5 bg-white/5 rounded-full" />
-                      </div>
+                      {/* Technical parameters (Collapsed) */}
+                      <details className="text-[10px] text-[var(--dt-text-soft)] cursor-pointer mt-1 border border-white/5 rounded-lg p-2.5 bg-black/5">
+                        <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none font-semibold text-[10.5px]">
+                          <span>▶</span> {"\u67e5\u770b AI \u6280\u672f\u5206\u6570\u4e0e\u53c2\u6570"}
+                        </summary>
+                        <div className="mt-2.5 pt-2.5 border-t border-white/5 space-y-3">
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[10.5px]">
+                              <span>{"\u7efc\u5408\u8d28\u91cf\u5f97\u5206"}</span>
+                              <span className={cn("font-bold font-mono", getScoreColor(selectedPhoto.score))}>
+                                {selectedPhoto.score} / 100
+                              </span>
+                            </div>
+                            <Progress value={selectedPhoto.score} className="h-1 bg-white/5 rounded-full" />
+                          </div>
 
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-[var(--dt-text-soft)]">曝光亮度偏差值</span>
-                          <span className="font-bold font-mono text-[var(--dt-text-primary)]">
-                            {selectedPhoto.exposureValue > 0 ? `+${selectedPhoto.exposureValue}` : selectedPhoto.exposureValue}
-                          </span>
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[10.5px]">
+                              <span>{"\u5bf9\u7126\u6e05\u6670\u5ea6\u5f97\u5206"}</span>
+                              <span className="font-bold font-mono">
+                                {selectedPhoto.sharpnessScore} / 100
+                              </span>
+                            </div>
+                            <Progress value={selectedPhoto.sharpnessScore} className="h-1 bg-white/5 rounded-full" />
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[10.5px]">
+                              <span>{"\u66b4\u5149\u504f\u597d\u5f97\u5206"}</span>
+                              <span className="font-bold font-mono">
+                                {selectedPhoto.exposureScore} / 100
+                              </span>
+                            </div>
+                            <Progress value={selectedPhoto.exposureScore} className="h-1 bg-white/5 rounded-full" />
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[10.5px]">
+                              <span>{"\u66b4\u5149\u4eae\u5ea6\u504f\u5dee\u503c"}</span>
+                              <span className="font-bold font-mono text-[var(--dt-text-primary)]">
+                                {selectedPhoto.exposureValue > 0 ? `+${selectedPhoto.exposureValue}` : selectedPhoto.exposureValue}
+                              </span>
+                            </div>
+                            <Progress value={Math.abs(selectedPhoto.exposureValue)} className="h-1 bg-white/5 rounded-full" />
+                          </div>
                         </div>
-                        
-                        <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white/20 z-10" />
-                          <div 
-                            className={`absolute top-0 bottom-0 ${
-                              selectedPhoto.exposureValue > 0 ? 'bg-amber-500' : 'bg-blue-500'
-                            }`}
-                            style={{
-                              left: selectedPhoto.exposureValue > 0 ? '50%' : `${50 + (selectedPhoto.exposureValue / 2)}%`,
-                              width: `${Math.abs(selectedPhoto.exposureValue / 2)}%`
-                            }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-[8px] text-[var(--dt-text-soft)]">
-                          <span>过暗 (-100)</span>
-                          <span>完美 (0)</span>
-                          <span>过亮 (+100)</span>
-                        </div>
-                      </div>
+                      </details>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-black/20 border border-white/5 space-y-0.5 text-[10px] text-[var(--dt-text-soft)] font-mono">
@@ -977,29 +976,36 @@ export default function ResultsPage() {
                 </div>
               </div>
 
-              <DialogFooter className="border-t border-white/5 pt-3 shrink-0">
-                <button 
-                  onClick={() => setDialogOpen(false)}
-                  className="desktop-button-secondary text-xs h-8 px-4 rounded"
-                >
-                  关闭
-                </button>
-                
-                <button
-                  className={cn(
-                    "text-white font-bold text-xs h-8 rounded px-4",
-                    getUserVisibleBucket(selectedPhoto) === 'keep'
-                      ? 'bg-[#B96F68] hover:bg-[#B96F68]/90'
-                      : 'bg-[#6FA887] hover:bg-[#6FA887]/90'
-                  )}
-                  onClick={() => {
-                    const nextStatus = getUserVisibleBucket(selectedPhoto) === 'keep' ? 'delete' : 'keep';
-                    updatePhotoStatus(selectedPhoto.id, nextStatus);
-                    setDialogOpen(false);
-                  }}
-                >
-                  {getUserVisibleBucket(selectedPhoto) === 'keep' ? '标为淘汰候选' : '恢复建议保留'}
-                </button>
+              <DialogFooter className="border-t border-white/5 pt-3 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-[10px] text-[var(--dt-text-soft)] text-left leading-normal max-w-full sm:max-w-[55%]">
+                  {"\u26a0\ufe0f \u6dd8\u6c70\u5019\u9009\u4ec5\u4ee3\u8868\u6574\u7406\u5efa\u8bae\uff0c\u539f\u56fe\u4fdd\u6301\u4e0d\u53d8\uff0c\u4e0d\u4e0a\u4f20\u4e91\u7aef\uff0c\u4e0d\u4f1a\u7269\u7406\u4fee\u6539\u672c\u5730\u6587\u4ef6\u3002"}
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button 
+                    onClick={() => setDialogOpen(false)}
+                    className="desktop-button-secondary text-xs h-8 px-4 rounded"
+                  >
+                    {"\u5173\u95ed"}
+                  </button>
+                  
+                  <button
+                    className={cn(
+                      "text-white font-bold text-xs h-8 rounded px-4",
+                      getUserVisibleBucket(selectedPhoto) === 'keep'
+                        ? 'bg-[#B96F68] hover:bg-[#B96F68]/90'
+                        : 'bg-[#6FA887] hover:bg-[#6FA887]/90'
+                    )}
+                    onClick={() => {
+                      const nextStatus = getUserVisibleBucket(selectedPhoto) === 'keep' ? 'delete' : 'keep';
+                      updatePhotoStatus(selectedPhoto.id, nextStatus);
+                      setDialogOpen(false);
+                    }}
+                  >
+                    {getUserVisibleBucket(selectedPhoto) === 'keep' 
+                      ? "\u6807\u4e3a\u6dd8\u6c70\u5019\u9009" 
+                      : "\u6807\u4e3a\u4fdd\u7559"}
+                  </button>
+                </div>
               </DialogFooter>
             </>
           )}
