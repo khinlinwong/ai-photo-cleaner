@@ -17,15 +17,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  Trash2,
   CheckCircle,
   AlertTriangle,
-  RotateCcw,
   Sun,
   Sliders,
   FolderSync,
-  Download,
-  ShieldCheck,
   GitCompare,
   X,
   Maximize2,
@@ -37,6 +33,7 @@ import { cn } from "@/lib/utils";
 import VirtualPhotoGrid from '@/components/desktop/VirtualPhotoGrid';
 import { buildManifestRows, buildManifestCsv, buildManifestJson } from '@/lib/export/exportManifest';
 import { ResultsSummaryCards } from '@/components/results/ResultsSummaryCards';
+import { ExportPanel } from '@/components/results/ExportPanel';
 
 
 export default function ResultsPage() {
@@ -760,228 +757,26 @@ export default function ResultsPage() {
                   </div>
 
                   {/* Workspace Summary & Secure Export Row */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    {/* Left: Secure Export Console with Buckets */}
-                    <div className="lg:col-span-2 p-4 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between space-y-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                          <span className="text-[10px] text-[var(--dt-text-secondary)] font-bold uppercase tracking-wider">
-                            安全导出结果
-                          </span>
-                        </div>
-                        <p className="text-[11.5px] mt-1.5 leading-relaxed font-medium text-amber-400/90">
-                          {pendingGroupsCount > 0 
-                            ? "💡 还有相似照片需要 A/B 对比，建议完成后再导出。" 
-                            : "🟢 整理完成，可以安全导出。"} 
-                          <span className="text-[var(--dt-text-soft)] font-normal">导出只会复制或打包整理结果，不会直接处理原图。</span>
-                        </p>
-                      </div>
-
-                      {/* Two Buckets Columns */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                        {/* Bucket 1: Keep */}
-                        <div className="bg-black/15 p-3 rounded-lg border border-white/5 flex flex-col justify-between min-h-[110px]">
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                                <span className="text-emerald-400 text-[10px]">🟢</span> 保留照片
-                              </span>
-                              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
-                                {keepPhotos.length} 张
-                              </span>
-                            </div>
-                            <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-1.5 leading-relaxed">
-                              确认保留的照片 (共约 {keepSpaceMB} MB)
-                            </p>
-                          </div>
-                          <div className="mt-3">
-                            <button
-                              onClick={() => downloadPhotosZip('keep')}
-                              disabled={keepPhotos.length === 0 || isZipping}
-                              className="desktop-button-primary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              {isZipping ? "正在导出中..." : "导出保留区 ZIP"}
-                            </button>
-                            {(keepPhotos.length === 0 || isZipping) && (
-                              <p className="text-[9px] text-[var(--dt-text-soft)] text-center mt-1.5 select-none leading-relaxed">
-                                {isZipping ? "正在生成 ZIP，请等待当前导出完成。" : "暂无可导出的保留照片"}
-                              </p>
-                            )}
-                            {keepPhotos.length > 0 && !isZipping && pendingGroupsCount > 0 && (
-                              <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
-                                💡 还有相似照片需要 A/B 对比，建议完成后再导出。
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Bucket 2: Delete Cull */}
-                        <div className="bg-black/15 p-3 rounded-lg border border-white/5 flex flex-col justify-between min-h-[110px]">
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-                                <span className="text-red-400 text-[10px]">🔴</span> 淘汰候选照片
-                              </span>
-                              <span className="text-[10px] font-mono text-red-400 font-bold bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10">
-                                {deletePhotos.length} 张
-                              </span>
-                            </div>
-                            <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-1.5 leading-relaxed">
-                              标记为淘汰候选的照片 (约 {spaceSavedMB} MB)。淘汰候选仅代表整理建议，原图保持不变，导出后由你人工处理。
-                            </p>
-                          </div>
-                          <div className="mt-3">
-                            <button
-                              onClick={() => downloadPhotosZip('delete')}
-                              disabled={deletePhotos.length === 0 || isZipping}
-                              className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 border border-white/5 font-bold transition-all"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-amber-500/80" />
-                              {isZipping ? "正在导出中..." : "导出淘汰候选区 ZIP"}
-                            </button>
-                            {(deletePhotos.length === 0 || isZipping) && (
-                              <p className="text-[9px] text-[var(--dt-text-soft)] text-center mt-1.5 select-none leading-relaxed">
-                                {isZipping ? "正在生成 ZIP，请等待当前导出完成。" : "暂无可导出的淘汰候选照片"}
-                              </p>
-                            )}
-                            {deletePhotos.length > 0 && !isZipping && pendingGroupsCount > 0 && (
-                              <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
-                                💡 还有相似照片需要 A/B 对比，建议完成后再导出。
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Manifest Export Panel */}
-                      <div className="mt-3 border-t border-white/5 pt-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
-                            📊 整理清单导出
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <button
-                            onClick={handleExportManifestCsv}
-                            disabled={photos.length === 0 || isZipping}
-                            className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all border border-white/5"
-                          >
-                            <Download className="h-3.5 w-3.5 text-emerald-400/80" />
-                            导出整理清单 CSV
-                          </button>
-                          <button
-                            onClick={handleExportManifestJson}
-                            disabled={photos.length === 0 || isZipping}
-                            className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all border border-white/5"
-                          >
-                            <Download className="h-3.5 w-3.5 text-blue-400/80" />
-                            导出整理清单 JSON
-                          </button>
-                        </div>
-                        <p className="text-[9.5px] text-[var(--dt-text-soft)] mt-2 leading-relaxed select-none">
-                          ℹ️ 清单只包含整理结果和照片元数据，不包含原图文件。本地生成，不上传云端。淘汰候选仅代表整理建议，原图保持不变。
-                        </p>
-                      </div>
-                      
-                      {/* ZIP Export Warnings and Tips */}
-                      <div className="mt-4 space-y-2 border-t border-white/5 pt-3">
-                        {/* 3. isZipping 状态提示 */}
-                        {isZipping && (
-                          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-2 rounded text-[10px] text-center animate-pulse font-semibold flex items-center justify-center gap-1.5 select-none">
-                            <span className="relative flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                            </span>
-                            ⏳ 正在生成分批 ZIP，请静候下载完成，期间请勿刷新页面。
-                          </div>
-                        )}
-
-                        {/* 4. 导出失败警告 */}
-                        {zipExportWarning && (
-                          <div className="border border-[#B96F68]/30 bg-[#B96F68]/10 text-[#B96F68] p-2.5 rounded text-[10px] leading-relaxed text-center flex items-center justify-center gap-1.5">
-                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                            <span>{zipExportWarning}</span>
-                          </div>
-                        )}
-
-                        <div className="flex flex-col gap-1 text-[9.5px] text-[var(--dt-text-soft)] bg-black/10 p-2.5 rounded border border-white/5 select-none">
-                          <div className="flex items-start gap-1 leading-normal">
-                            <span className="shrink-0 text-amber-400/80">ℹ️</span>
-                            <span>分批下载：浏览器由于导出机制限制，大相册将自动进行分批导出。为保证文件完整，请避免连续高频点击或在导出过程中关闭/刷新页面。</span>
-                          </div>
-                          
-                          {/* 2. 大相册照片数量提示 */}
-                          {photos.length > 200 ? (
-                            <div className="flex items-start gap-1 leading-normal mt-1 pt-1 border-t border-white/5 text-amber-400/90">
-                              <span className="shrink-0">⚠️</span>
-                              <span>当前导入数量超过 200 张，这已接近浏览器导出处理能力上限，强烈建议分批下载或减少单次导入体积。</span>
-                            </div>
-                          ) : photos.length > 100 ? (
-                            <div className="flex items-start gap-1 leading-normal mt-1 pt-1 border-t border-white/5 text-amber-400/70">
-                              <span className="shrink-0">💡</span>
-                              <span>当前照片多于 100 张，分批打包和排队下载耗时可能会有所延长，请耐心等待。</span>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Security Strategy Card */}
-                    <div className="p-4 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between space-y-3">
-                      <div>
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--dt-text-primary)]">
-                          <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                          <span>🔒 安全策略声明</span>
-                        </div>
-                        <div className="mt-2.5 space-y-2 text-[9.5px] text-[var(--dt-text-soft)] leading-relaxed font-mono">
-                          <p>
-                            ⚡ <strong className="text-[var(--dt-text-primary)]">只复制不修改</strong>：默认仅在浏览器中打包下载，不直接在你的磁盘上物理改动原片。
-                          </p>
-                          <p>
-                            📂 <strong className="text-[var(--dt-text-primary)]">淘汰候选安全</strong>：淘汰候选仅代表整理建议，在您确认前绝不会发生任何物理磁盘文件变更。
-                          </p>
-                          <p>
-                            💻 <strong className="text-[var(--dt-text-primary)]">未来桌面支持</strong>：后续桌面版客户端将支持“直接复制到文件夹”和“物理移动”（物理剪切必有二次弹框确认）。
-                          </p>
-                          <p className="text-[9px] text-[var(--dt-text-secondary)] border-t border-white/5 pt-2.5 select-none leading-relaxed">
-                            💡 逐张比较相似照片，由你决定保留或标记为淘汰候选，原图保持不变。
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
-                        {similarGroups.length === 0 ? (
-                          <div className="text-[9.5px] text-[var(--dt-text-soft)] text-center select-none py-1 leading-relaxed">
-                            当前没有需要 A/B 对比的相似组。
-                          </div>
-                        ) : pendingGroupsCount > 0 ? (
-                          <button
-                            onClick={() => {
-                              const group = similarGroups.find(g => !g.battleCompleted);
-                              if (group) startBattleForGroup(group.id);
-                            }}
-                            className="w-full desktop-button-secondary text-[10px] py-1.5 border border-yellow-500/30 text-yellow-400 hover:text-yellow-300 flex items-center justify-center gap-1 font-bold"
-                          >
-                            <GitCompare className="h-3 w-3" />
-                            继续 A/B 对局
-                          </button>
-                        ) : (
-                          <div className="text-[9.5px] text-emerald-400/90 text-center select-none py-1 leading-relaxed">
-                            相似照片对局已完成。
-                          </div>
-                        )}
-                        <button 
-                          onClick={handleRestart}
-                          className="w-full desktop-button-secondary text-[10px] py-1.5 border border-white/5 flex items-center justify-center gap-1"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          重新导入
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <ExportPanel
+                    totalPhotoCount={photos.length}
+                    keepCount={keepPhotos.length}
+                    keepSpaceMB={keepSpaceMB}
+                    cullCount={deletePhotos.length}
+                    spaceSavedMB={spaceSavedMB}
+                    isZipping={isZipping}
+                    zipExportWarning={zipExportWarning}
+                    pendingGroupsCount={pendingGroupsCount}
+                    similarGroupsCount={similarGroups.length}
+                    onExportKeepZip={() => downloadPhotosZip('keep')}
+                    onExportCullZip={() => downloadPhotosZip('delete')}
+                    onExportManifestCsv={handleExportManifestCsv}
+                    onExportManifestJson={handleExportManifestJson}
+                    onContinueBattle={() => {
+                      const group = similarGroups.find(g => !g.battleCompleted);
+                      if (group) startBattleForGroup(group.id);
+                    }}
+                    onRestart={handleRestart}
+                  />
 
                   {/* Partition List Areas */}
                   <div className="space-y-6">
