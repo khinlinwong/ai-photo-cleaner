@@ -163,7 +163,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       };
       
       saveRecentLocalProject(updatedSummary);
-      uploadFiles(files);
+      uploadFiles(files, project.projectName);
     } catch (err) {
       console.error('Reassociation error:', err);
       if (isMountedRef.current) {
@@ -209,7 +209,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         fileFingerprints: createFileFingerprints(imgFiles)
       };
       saveRecentLocalProject(summary);
-      uploadFiles(imgFiles);
+      uploadFiles(imgFiles, projName);
     } catch (err) {
       console.error('File import error:', err);
       if (isMountedRef.current) {

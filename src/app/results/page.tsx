@@ -32,6 +32,7 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from "@/lib/utils";
 import VirtualPhotoGrid from '@/components/desktop/VirtualPhotoGrid';
 import { buildManifestRows, buildManifestCsv, buildManifestJson } from '@/lib/export/exportManifest';
+import { buildZipExportFilename, buildManifestExportFilename } from '@/lib/export/exportFilenames';
 import { ResultsSummaryCards } from '@/components/results/ResultsSummaryCards';
 import { ExportPanel } from '@/components/results/ExportPanel';
 import { PhotoBucketSection } from '@/components/results/PhotoBucketSection';
@@ -47,7 +48,8 @@ export default function ResultsPage() {
     activeBattle,
     startBattleForGroup,
     applyBattleDecision,
-    closeBattle
+    closeBattle,
+    projectName
   } = usePhotoWorkspace();
 
   const router = useRouter();
@@ -330,7 +332,7 @@ export default function ResultsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'ai_photo_cleaner_manifest.csv';
+      link.download = buildManifestExportFilename(projectName, 'csv');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -353,7 +355,7 @@ export default function ResultsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'ai_photo_cleaner_manifest.json';
+      link.download = buildManifestExportFilename(projectName, 'json');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -379,7 +381,9 @@ export default function ResultsPage() {
     setZipExportWarning(null);
     try {
       const JSZip = (await import('jszip')).default;
-      const baseFilename = status === 'keep' ? 'keep_photos' : 'cull_photos';
+      const baseFilename = status === 'keep'
+        ? buildZipExportFilename(projectName).replace(/\.zip$/, '')
+        : `ai-photo-cleaner-cull-${buildZipExportFilename(projectName).replace(/^ai-photo-cleaner-/, '').replace(/\.zip$/, '')}`;
       const batches = buildZipBatches(targetPhotos, baseFilename);
 
       for (let b = 0; b < batches.length; b++) {
@@ -814,6 +818,7 @@ export default function ResultsPage() {
                     zipExportWarning={zipExportWarning}
                     pendingGroupsCount={pendingGroupsCount}
                     similarGroupsCount={similarGroups.length}
+                    projectName={projectName}
                     onExportKeepZip={() => downloadPhotosZip('keep')}
                     onExportCullZip={() => downloadPhotosZip('delete')}
                     onExportManifestCsv={handleExportManifestCsv}

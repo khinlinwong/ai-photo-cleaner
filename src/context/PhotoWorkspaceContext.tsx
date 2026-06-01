@@ -268,8 +268,10 @@ interface PhotoWorkspaceContextType {
   currentAnalysisIndex: number;
   currentAnalysisName: string;
   analysisMode: AnalysisMode;
+  projectName: string;
+  setProjectName: (name: string) => void;
   setAnalysisMode: (mode: AnalysisMode) => void;
-  uploadFiles: (files: File[]) => void;
+  uploadFiles: (files: File[], name?: string) => void;
   startAnalysis: () => void;
   togglePhotoStatus: (id: string) => void;
   updatePhotoStatus: (id: string, status: 'keep' | 'review' | 'delete') => void;
@@ -381,6 +383,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [currentAnalysisIndex, setCurrentAnalysisIndex] = useState(-1);
   const [currentAnalysisName, setCurrentAnalysisName] = useState('');
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('local');
+  const [projectName, setProjectName] = useState<string>('');
   const router = useRouter();
 
   // Development-only guard.
@@ -782,9 +785,12 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   // 上传文件：保存本地 File 对象和预览 URL
-  const uploadFiles = (files: File[]) => {
+  const uploadFiles = (files: File[], name?: string) => {
     // 释放旧的预览 URL 防止泄露
     photos.forEach(p => revokeBlobUrl(p.url));
+
+    // 设置项目名称
+    setProjectName(name || '');
 
     // 重置所有分析和 Battle 相关状态
     setAnalysisProgress(0);
@@ -1043,6 +1049,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setAnalysisLogs([]);
     setCurrentAnalysisIndex(-1);
     setCurrentAnalysisName('');
+    setProjectName('');
   };
 
   // 载入演示图片数据包
@@ -1058,6 +1065,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setActiveBattle(null);
     setIsAnalyzing(false);
     isAnalyzingRef.current = false;
+    setProjectName('演示旅行照片项目');
 
     const processed = detectDuplicates(MOCK_TRAVEL_PHOTOS);
     setPhotos(processed);
@@ -1075,6 +1083,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         currentAnalysisIndex,
         currentAnalysisName,
         analysisMode,
+        projectName,
+        setProjectName,
         setAnalysisMode,
         uploadFiles,
         startAnalysis,

@@ -18,6 +18,7 @@ export interface ExportPanelProps {
   zipExportWarning: string | null;
   pendingGroupsCount: number;
   similarGroupsCount: number;
+  projectName?: string;
   onExportKeepZip: () => void;
   onExportCullZip: () => void;
   onExportManifestCsv: () => void;
@@ -27,48 +28,48 @@ export interface ExportPanelProps {
 }
 
 const LABELS = {
-  secureExportTitle: "\u5b89\u5168\u5bfc\u51fa\u7ed3\u679c",
-  exportWarningTip: "\ud83d\udca1 \u8fd8\u6709\u76f8\u4f3c\u7167\u7247\u9700\u8981 A/B \u5bf9\u6bd4\uff0c\u5efa\u8bae\u5b8c\u6210\u540e\u518d\u5bfc\u51fa\u3002",
-  exportOkTip: "\ud83d\udfe2 \u6574\u7406\u5b8c\u6210\uff0c\u53ef\u4ee5\u5b89\u5168\u5bfc\u51fa\u3002",
-  exportScopeTip: "\u5bfc\u51fa\u53ea\u4f1a\u590d\u5236\u6216\u6253\u5305\u6574\u7406\u7ed3\u679c\uff0c\u4e0d\u4f1a\u76f4\u63a5\u5904\u7406\u539f\u56fe\u3002",
-  keepPhotosHeader: "\ud83d\udfe2 \u4fdd\u7559\u7167\u7247",
-  keepPhotosDesc: "\u786e\u8ba4\u4fdd\u7559\u7684\u7167\u7247 (\u5171\u7ea6 ",
-  zippingStatus: "\u6b63\u5728\u5bfc\u51fa\u4e2d...",
-  exportKeepZipBtn: "\u5bfc\u51fa\u4fdd\u7559\u533a ZIP",
-  zippingKeepDesc: "\u6b63\u5728\u751f\u6210 ZIP\uff0c\u8bf7\u7b49\u5f85\u5f53\u524d\u5bfc\u51fa\u5b8c\u6210\u3002",
-  noKeepPhotosDesc: "\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u4fdd\u7559\u7167\u7247",
-  cullPhotosHeader: "\ud83d\udd34 \u6dd8\u6c70\u5019\u9009\u7167\u7247",
-  cullPhotosDesc: "\u6807\u8bb0\u4e3a\u6dd8\u6c70\u5019\u9009\u7684\u7167\u7247 (\u7ea6 ",
-  cullPhotosDescEnd: ")\u3002\u6dd8\u6c70\u5019\u9009\u4ec5\u4ee3\u8868\u6574\u7406\u5efa\u8bae\uff0c\u539f\u56fe\u4fdd\u6301\u4e0d\u53d8\uff0c\u5bfc\u51fa\u540e\u7531\u4f60\u4eba\u5de5\u5904\u7406\u3002",
-  exportCullZipBtn: "\u5bfc\u51fa\u6dd8\u6c70\u5019\u9009\u533a ZIP",
-  noCullPhotosDesc: "\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6dd8\u6c70\u5019\u9009\u7167\u7247",
-  manifestHeader: "\ud83d\udcca \u6574\u7406\u6e05\u5355\u5bfc\u51fa",
-  exportCsvBtn: "\u5bfc\u51fa\u6574\u7406\u6e05\u5355 CSV",
-  exportJsonBtn: "\u5bfc\u51fa\u6574\u7406\u6e05\u5355 JSON",
-  manifestDesc: "\u2139\ufe0f \u6e05\u5355\u53ea\u5305\u542b\u6574\u7406\u7ed3\u679c\u548c\u7167\u7247\u5143\u6570\u636e\uff0c\u4e0d\u5305\u542b\u539f\u56fe\u6587\u4ef6\u3002\u672c\u5730\u751f\u6210\uff0c\u4e0d\u4e0a\u4f20\u4e91\u7aef\u3002\u6dd8\u6c70\u5019\u9009\u4ec5\u4ee3\u8868\u6574\u7406\u5efa\u8bae\uff0c\u539f\u56fe\u4fdd\u6301\u4e0d\u53d8\u3002",
-  zippingOverlayTip: "\u23f3 \u6b63\u5728\u751f\u6210\u5206\u6279 ZIP\uff0c\u8bf7\u9759\u5019\u4e0b\u8f7d\u5b8c\u6210\uff0c\u671f\u95f4\u8bf7\u52ff\u5237\u65b0\u9875\u9762\u3002",
-  batchDownloadTip: "\u5206\u6279\u4e0b\u8f7d\uff1a\u6d4f\u89c8\u5668\u7531\u4e8e\u5bfc\u51fa\u673a\u5236\u9650\u5236\uff0c\u5927\u76f8\u518c\u5c06\u81ea\u52a8\u8fdb\u884c\u5206\u6279\u5bfc\u51fa\u3002\u4e3a\u4fdd\u8bc1\u6587\u4ef6\u5b8c\u6574\uff0c\u8bf7\u907f\u514d\u8fde\u7eed\u9ad8\u9891\u70b9\u51fb\u6216\u5728\u5bfc\u51fa\u8fc7\u7a0b\u4e2d\u5173\u95ed/\u5237\u65b0\u9875\u9762\u3002",
-  limit200Tip: "\u5f53\u524d\u5bfc\u5165\u6570\u91cf\u8d85\u8fc7 200 \u5f20\uff0c\u8fd9\u5df2\u63a5\u8fd1\u6d4f\u89c8\u5668\u5bfc\u51fa\u5904\u7406\u80fd\u529b\u4e0a\u9650\uff0c\u5f3a\u70c8\u5efa\u8bae\u5206\u6279\u4e0b\u8f7d\u6216\u51cf\u5c15\u5355\u6b21\u5bfc\u5165\u4f53\u79ef\u3002",
-  limit100Tip: "\u5f53\u524d\u7167\u7247\u591a\u4e8e 100 \u5f20\uff0c\u5206\u6279\u6253\u5305\u548c\u6392\u961f\u4e0b\u8f7d\u8017\u65f6\u53ef\u80fd\u4f1a\u6709\u6240\u5ef6\u957f\uff0c\u8bf7\u8010\u5fc3\u7b49\u5f85\u3002",
-  securityPolicyHeader: "\ud83d\udd12 \u5b89\u5168\u7b56\u7565\u58f0\u660e",
-  policyCopyTitle: "\u26a1 \u53ea\u590d\u5236\u4e0d\u4fee\u6539",
-  policyCopyDesc: "\uff1a\u9ed8\u8ba4\u4ec5\u5728\u6d4f\u89c8\u5668\u4e2d\u6253\u5305\u4e0b\u8f7d\uff0c\u4e0d\u76f4\u63a5\u5728\u4f60\u7684\u78c1\u76d8\u4e0a\u7269\u7406\u6539\u52a8\u539f\u7247\u3002",
-  policyCullTitle: "\ud83d\udcc1 \u6dd8\u6c70\u5019\u9009\u5b89\u5168",
-  policyCullDesc: "\uff1a\u6dd8\u6c70\u5019\u9009\u4ec5\u4ee3\u8868\u6574\u7406\u5efa\u8bae\uff0c\u5728\u60a8\u786e\u8ba4\u524d\u7edd\u4e0d\u4f1a\u53d1\u751f\u4efb\u4f55\u7269\u7406\u78c1\u76d8\u6587\u4ef6\u53d8\u66f4\u3002",
-  policyDesktopTitle: "\ud83d\udcbb \u672a\u6765\u684c\u9762\u652f\u6301",
-  policyDesktopDesc: "\uff1a\u540e\u7eed\u684c\u9762\u7248\u5ba2\u6237\u7aef\u5c06\u652f\u6301\u201c\u76f4\u63a5\u590d\u5236\u5230\u6587\u4ef6\u5939\u201d\u548c\u201c\u7269\u7406\u79fb\u52a8\u201d\uff08\u7269\u7406\u526a\u5207\u5fc5\u6709\u4e8c\u6b21\u5f39\u6846\u786e\u8ba4\uff09\u3002",
-  policyDisclaimer: "\ud83d\udca1 \u9010\u5f20\u6bd4\u8f83\u76f8\u4f3c\u7167\u7247\uff0c\u7531\u4f60\u51b3\u5b9a\u4fdd\u7559\u6216\u6807\u8bb0\u4e3a\u6dd8\u6c70\u5019\u9009\uff0c\u539f\u56fe\u4fdd\u6301\u4e0d\u53d8\u3002",
-  noBattlePending: "\u5f53\u524d\u6ca1\u6709\u9700\u8981 A/B \u5bf9\u6bd4\u7684\u76f8\u4f3c\u7ec4\u3002",
-  continueBattleBtn: "\u7ee7\u7eed A/B \u5bf9\u5c40",
-  battleCompletedTip: "\u76f8\u4f3c\u7167\u7247\u5bf9\u5c40\u5df2\u5b8c\u6210\u3002",
-  restartBtn: "\u91cd\u65b0\u5bfc\u5165",
-  sheetUnit: "\u5f20",
-  infoEmoji: "\u2139\ufe0f",
-  warningEmoji: "\u26a0\ufe0f",
-  bulbEmoji: "\ud83d\udca1",
-  flashEmoji: "\u26a1",
-  folderEmoji: "\ud83d\udcc1",
-  desktopEmoji: "\ud83d\udcbb"
+  secureExportTitle: "安全导出结果",
+  exportWarningTip: "💡 还有相似照片需要 A/B 对决，建议完成后再导出。",
+  exportOkTip: "🟢 整理完成，可以安全导出。",
+  exportScopeTip: "所有操作均在本地进行，原图文件绝不会被修改或上传云端。导出时将生成新的压缩包或清单。",
+  keepPhotosHeader: "🟢 保留照片",
+  keepPhotosDesc: "安全打包所有标记为【保留】的照片（共约 ",
+  zippingStatus: "正在导出中...",
+  exportKeepZipBtn: "导出保留区 ZIP",
+  zippingKeepDesc: "正在生成 ZIP，请等待当前导出完成。",
+  noKeepPhotosDesc: "暂无可导出的保留照片",
+  cullPhotosHeader: "🔴 淘汰候选照片",
+  cullPhotosDesc: "标记为淘汰候选的照片（约 ",
+  cullPhotosDescEnd: "）。淘汰候选仅代表整理建议，原图在您的电脑上仍保持原样，我们仅为您打包一份独立的压缩包供后续确认，绝对不改动您的本地原图文件。",
+  exportCullZipBtn: "导出淘汰候选区 ZIP",
+  noCullPhotosDesc: "暂无可导出的淘汰候选照片",
+  manifestHeader: "📊 整理清单导出",
+  exportCsvBtn: "导出整理清单 CSV",
+  exportJsonBtn: "导出整理清单 JSON",
+  manifestDesc: "ℹ️ 整理清单为纯文本元数据（CSV/JSON 格式），只记录照片评分及整理结果，绝不包含也绝不上传任何原图照片，原图保持原样。",
+  zippingOverlayTip: "⏳ 正在生成分批 ZIP，请静候下载完成，期间请勿刷新页面。",
+  batchDownloadTip: "分批下载：浏览器由于导出机制限制，大相册将自动进行分批导出。为保证文件完整，请避免连续高频点击或在导出过程中关闭/刷新页面。",
+  limit200Tip: "当前导入数量超过 200 张，这已接近浏览器导出处理能力上限，强烈建议分批下载或减小单次导入体积。",
+  limit100Tip: "当前照片多于 100 张，分批打包和排队下载耗时可能会有所延长，请耐心等待。",
+  securityPolicyHeader: "🔒 安全策略声明",
+  policyCopyTitle: "⚡ 只打包不修改",
+  policyCopyDesc: "：默认仅在浏览器中打包下载，不直接在您的磁盘上物理改动原片。",
+  policyCullTitle: "📁 淘汰候选安全",
+  policyCullDesc: "：淘汰候选仅代表整理建议，在您确认前绝不被直接物理修改，原件保持不变。",
+  policyDesktopTitle: "💻 桌面版支持说明",
+  policyDesktopDesc: "：后续桌面版客户端将支持“直接复制到文件夹”和“物理移动”，且都会提供二次弹窗确认。",
+  policyDisclaimer: "💡 逐张比较相似照片，由你决定保留或标记为淘汰候选，原图保持不变。",
+  noBattlePending: "当前没有需要 A/B 对比的相似组。",
+  continueBattleBtn: "继续 A/B 对局",
+  battleCompletedTip: "相似照片对局已完成。",
+  restartBtn: "重新导入",
+  sheetUnit: "张",
+  infoEmoji: "ℹ️",
+  warningEmoji: "⚠️",
+  bulbEmoji: "💡",
+  flashEmoji: "⚡",
+  folderEmoji: "📁",
+  desktopEmoji: "💻"
 };
 
 export function ExportPanel({
@@ -81,6 +82,7 @@ export function ExportPanel({
   zipExportWarning,
   pendingGroupsCount,
   similarGroupsCount,
+  projectName,
   onExportKeepZip,
   onExportCullZip,
   onExportManifestCsv,
@@ -92,14 +94,21 @@ export function ExportPanel({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       {/* Left: Secure Export Console with Buckets */}
       <div className="lg:col-span-2 p-4 rounded-lg bg-[var(--dt-card-bg)] border border-white/5 flex flex-col justify-between space-y-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-            <span className="text-[10px] text-[var(--dt-text-secondary)] font-bold uppercase tracking-wider">
-              {LABELS.secureExportTitle}
-            </span>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              <span className="text-[10px] text-[var(--dt-text-secondary)] font-bold uppercase tracking-wider">
+                {LABELS.secureExportTitle}
+              </span>
+            </div>
+            {projectName && (
+              <span className="text-[10px] text-[var(--dt-text-muted)] font-mono bg-white/5 px-2 py-0.5 rounded border border-white/5 truncate max-w-[200px]" title={projectName}>
+                项目: {projectName}
+              </span>
+            )}
           </div>
-          <p className="text-[11.5px] mt-1.5 leading-relaxed font-medium text-amber-400/90">
+          <p className="text-[11.5px] leading-relaxed font-medium text-amber-400/90">
             {pendingGroupsCount > 0 
               ? LABELS.exportWarningTip 
               : LABELS.exportOkTip} 
@@ -107,6 +116,30 @@ export function ExportPanel({
               {LABELS.exportScopeTip}
             </span>
           </p>
+
+          {/* Export Scope Summary Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-black/20 p-2.5 rounded-lg border border-white/5 text-[10.5px]">
+            <div className="flex flex-col">
+              <span className="text-[var(--dt-text-muted)] font-medium">保留照片</span>
+              <span className="text-emerald-400 font-bold font-mono mt-0.5">{keepCount} 张</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[var(--dt-text-muted)] font-medium">淘汰候选</span>
+              <span className="text-red-400 font-bold font-mono mt-0.5">{cullCount} 张</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[var(--dt-text-muted)] font-medium">相似组数</span>
+              <span className="text-blue-400 font-bold font-mono mt-0.5">{similarGroupsCount} 组</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[var(--dt-text-muted)] font-medium">AB 对决</span>
+              <span className="text-[var(--dt-text-primary)] font-bold font-mono mt-0.5">
+                {similarGroupsCount > 0 
+                  ? `${similarGroupsCount - pendingGroupsCount} / ${similarGroupsCount} 组`
+                  : '无需对决'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Two Buckets Columns */}
