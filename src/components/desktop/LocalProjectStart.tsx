@@ -15,6 +15,7 @@ import { isTauriRuntime } from '@/lib/desktop/tauriEnvironment';
 import { pickNativeImageFolder } from '@/lib/desktop/nativeFolderPicker';
 import { scanNativeFolderMetadata, NativeFolderMetadataSummary } from '@/lib/desktop/nativeFolderScanner';
 import { scanNativeFolderImageEntries } from '@/lib/desktop/nativeImageEntriesScanner';
+import { scanNativeFolderImagePreviews, NativeImagePreviewItem } from '@/lib/desktop/nativeImagePreviewScanner';
 
 /**
  * Extract folder basename securely from path string, removing drive letter and full hierarchy.
@@ -83,6 +84,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [pickedFolder, setPickedFolder] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanSummary, setScanSummary] = useState<NativeFolderMetadataSummary | null>(null);
+  const [previews, setPreviews] = useState<NativeImagePreviewItem[]>([]);
 
 
   // 稳定性防护相关 Refs 与 timeouts
@@ -133,6 +135,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     setErrorMessage(null);
     setPickedFolder(null);
     setScanSummary(null);
+    setPreviews([]);
     try {
       const res = await pickNativeImageFolder();
       if (res && res.path) {
@@ -145,6 +148,13 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         const meta = await scanNativeFolderMetadata(res.path);
         // Execute scanner command to verify desktop bridge functionality
         await scanNativeFolderImageEntries(res.path);
+        
+        // Fetch previews
+        const previewResult = await scanNativeFolderImagePreviews(res.path);
+        if (previewResult && previewResult.items) {
+          setPreviews(previewResult.items);
+        }
+
         setIsScanning(false);
 
         if (meta) {
@@ -513,8 +523,36 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                       <div>图片总大小：<span className="text-[var(--dt-text-primary)] font-bold">{formatBytes(scanSummary.totalSizeBytes)}</span></div>
                       <div>支持格式：<span className="text-[var(--dt-text-soft)]">JPG / PNG / WEBP / HEIC / HEIF</span></div>
                     </div>
+                  </div>
+                )}
 
-
+                {!isScanning && previews.length > 0 && (
+                  <div className="space-y-2 mt-2 pt-2 border-t border-emerald-500/10">
+                    <div className="flex items-center justify-between text-[10.5px]">
+                      <span className="font-bold text-[var(--dt-text-primary)]">本地预览</span>
+                      <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 12 张</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {previews.map((item, idx) => (
+                        <div key={item.id} className="relative aspect-square rounded overflow-hidden bg-black/35 border border-white/5 group">
+                          <img
+                            src={item.previewUrl}
+                            alt={`Preview ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1 text-[8px] font-mono text-[var(--dt-text-primary)] leading-tight">
+                            <div>{(item.sizeBytes / (1024 * 1024)).toFixed(1)}M</div>
+                            <div className="uppercase text-[7px] text-[var(--dt-text-soft)]">{item.extension}</div>
+                          </div>
+                          <div className="absolute top-0.5 left-0.5 bg-black/65 px-1 rounded-[3px] text-[8px] font-mono text-[var(--dt-text-primary)] leading-none py-0.5">
+                            {String(idx + 1).padStart(2, '0')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 

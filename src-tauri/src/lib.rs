@@ -172,13 +172,120 @@ fn scan_folder_image_entries(folder_path: String) -> Result<NativeImageEntriesSc
   })
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct NativeImagePreviewItem {
+  id: String,
+  preview_url: String,
+  extension: String,
+  size_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct NativeImagePreviewScanResult {
+  total_preview_items: usize,
+  preview_limit: usize,
+  items: Vec<NativeImagePreviewItem>,
+}
+
+fn percent_encode(s: &str) -> String {
+  let mut encoded = String::new();
+  for byte in s.bytes() {
+    match byte {
+      b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+        encoded.push(byte as char);
+      }
+      _ => {
+        encoded.push_str(&format!("%{:02X}", byte));
+      }
+    }
+  }
+  encoded
+}
+
+fn path_to_asset_url(path: &Path) -> String {
+  let path_str = path.to_string_lossy();
+  let encoded = percent_encode(&path_str);
+  if cfg!(target_os = "windows") {
+    format!("http://asset.localhost/{}", encoded)
+  } else {
+    format!("asset://localhost/{}", encoded)
+  }
+}
+
+#[tauri::command]
+fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewScanResult, String> {
+  let path = Path::new(&folder_path);
+  if !path.exists() || !path.is_dir() {
+    return Err("无法读取所选文件夹，请重新选择。".to_string());
+  }
+
+  let entries = fs::read_dir(path)
+    .map_err(|_| "当前文件夹暂时无法扫描。".to_string())?;
+
+  let mut preview_items = Vec::new();
+  let mut idx = 0;
+  const PREVIEW_LIMIT: usize = 12;
+
+  for entry in entries {
+    if preview_items.len() >= PREVIEW_LIMIT {
+      break;
+    }
+    if let Ok(entry) = entry {
+      let file_type = match entry.file_type() {
+        Ok(t) => t,
+        Err(_) => continue,
+      };
+
+      if file_type.is_file() {
+        let file_path = entry.path();
+        
+        let ext = file_path
+          .extension()
+          .and_then(|e| e.to_str())
+          .unwrap_or("")
+          .to_lowercase();
+
+        let is_image = match ext.as_str() {
+          "jpg" | "jpeg" | "png" | "webp" | "heic" | "heif" => true,
+          _ => false,
+        };
+
+        if is_image {
+          let mut size_bytes = 0;
+          if let Ok(metadata) = entry.metadata() {
+            size_bytes = metadata.len();
+          }
+
+          let id = format!("native-preview-{}-{}-{}", idx, size_bytes, ext);
+          let preview_url = path_to_asset_url(&file_path);
+          idx += 1;
+
+          preview_items.push(NativeImagePreviewItem {
+            id,
+            preview_url,
+            extension: ext,
+            size_bytes,
+          });
+        }
+      }
+    }
+  }
+
+  Ok(NativeImagePreviewScanResult {
+    total_preview_items: preview_items.len(),
+    preview_limit: PREVIEW_LIMIT,
+    items: preview_items,
+  })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![
       scan_folder_metadata,
-      scan_folder_image_entries
+      scan_folder_image_entries,
+      scan_folder_image_previews
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
