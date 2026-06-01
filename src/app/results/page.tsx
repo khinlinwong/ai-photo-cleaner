@@ -560,6 +560,24 @@ export default function ResultsPage() {
   const keepPhotos = photos.filter((p) => getUserVisibleBucket(p) === 'keep');
   const deletePhotos = photos.filter((p) => getUserVisibleBucket(p) === 'cull');
 
+  const selectedKeepCount = selectedPhotoIds.filter(id => keepPhotos.some(p => p.id === id)).length;
+  const selectedCullCount = selectedPhotoIds.filter(id => deletePhotos.some(p => p.id === id)).length;
+
+  const selectAllInBucket = useCallback((bucket: 'keep' | 'cull') => {
+    const targetPhotos = bucket === 'keep' ? keepPhotos : deletePhotos;
+    const targetIds = targetPhotos.map(p => p.id);
+    setSelectedPhotoIds(prev => {
+      const otherBucketIds = prev.filter(id => !targetIds.includes(id));
+      return [...otherBucketIds, ...targetIds];
+    });
+  }, [keepPhotos, deletePhotos]);
+
+  const clearSelectionInBucket = useCallback((bucket: 'keep' | 'cull') => {
+    const targetPhotos = bucket === 'keep' ? keepPhotos : deletePhotos;
+    const targetIds = targetPhotos.map(p => p.id);
+    setSelectedPhotoIds(prev => prev.filter(id => !targetIds.includes(id)));
+  }, [keepPhotos, deletePhotos]);
+
   const pendingGroupsCount = similarGroups.filter(g => !g.battleCompleted).length;
 
   const spaceSavedMB = deletePhotos.reduce((acc, p) => {
@@ -917,9 +935,11 @@ export default function ResultsPage() {
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold font-mono text-[10px]">
                           {selectedPhotoIds.length}
                         </span>
-                        <span className="text-[var(--dt-text-primary)] font-medium">已选择 {selectedPhotoIds.length} 张照片</span>
-                        <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">|</span>
-                        <span className="text-[10px] text-[var(--dt-text-soft)]">只调整整理结果，不会修改原图，不会上传云端</span>
+                        <span className="text-[var(--dt-text-primary)] font-medium">
+                          已选择 {selectedPhotoIds.length} 张 (保留中 {selectedKeepCount} 张，淘汰候选中 {selectedCullCount} 张)
+                        </span>
+                        <span className="text-[10px] text-[var(--dt-text-soft)] hidden lg:inline">|</span>
+                        <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">只调整整理结果，不会修改原图</span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
@@ -1041,6 +1061,10 @@ export default function ResultsPage() {
                     <PhotoBucketSection
                       bucketType="keep"
                       photosCount={keepPhotos.length}
+                      onSelectAll={() => selectAllInBucket('keep')}
+                      onClearSelection={() => clearSelectionInBucket('keep')}
+                      isAllSelected={selectedKeepCount === keepPhotos.length && keepPhotos.length > 0}
+                      hasSelected={selectedKeepCount > 0}
                     >
                       {renderPartitionGrid(keepPhotos, 'keep')}
                     </PhotoBucketSection>
@@ -1050,6 +1074,10 @@ export default function ResultsPage() {
                       bucketType="cull"
                       photosCount={deletePhotos.length}
                       spaceMB={spaceSavedMB}
+                      onSelectAll={() => selectAllInBucket('cull')}
+                      onClearSelection={() => clearSelectionInBucket('cull')}
+                      isAllSelected={selectedCullCount === deletePhotos.length && deletePhotos.length > 0}
+                      hasSelected={selectedCullCount > 0}
                     >
                       {renderPartitionGrid(deletePhotos, 'cull')}
                     </PhotoBucketSection>

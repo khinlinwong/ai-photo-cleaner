@@ -5,6 +5,10 @@ export interface PhotoBucketSectionProps {
   photosCount: number;
   spaceMB?: string;
   children: React.ReactNode;
+  onSelectAll?: () => void;
+  onClearSelection?: () => void;
+  isAllSelected?: boolean;
+  hasSelected?: boolean;
 }
 
 const LABELS = {
@@ -24,18 +28,48 @@ export function PhotoBucketSection({
   bucketType,
   photosCount,
   spaceMB,
-  children
+  children,
+  onSelectAll,
+  onClearSelection,
+  isAllSelected = false,
+  hasSelected = false
 }: PhotoBucketSectionProps) {
   if (bucketType === 'keep') {
     return (
       <div className="space-y-2 text-left">
-        <div className="border-b border-white/5 pb-1 flex items-baseline justify-between">
-          <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
-            <span className="text-emerald-400">{LABELS.greenDot}</span> {LABELS.keepTitle}
-          </h3>
-          <span className="text-[9px] text-[var(--dt-text-soft)]">
-            {LABELS.keepDescPrefix}{photosCount}{LABELS.keepDescSuffix}
-          </span>
+        <div className="border-b border-white/5 pb-1 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
+              <span className="text-emerald-400">{LABELS.greenDot}</span> {LABELS.keepTitle}
+            </h3>
+            <span className="text-[9px] text-[var(--dt-text-soft)]">
+              {LABELS.keepDescPrefix}{photosCount}{LABELS.keepDescSuffix}
+            </span>
+          </div>
+          {photosCount > 0 && onSelectAll && onClearSelection && (
+            <div className="flex items-center gap-2 text-[10px] select-none">
+              <button
+                type="button"
+                disabled={isAllSelected}
+                onClick={onSelectAll}
+                className="text-[var(--dt-text-soft)] hover:text-[var(--dt-text-primary)] disabled:opacity-40 disabled:hover:text-[var(--dt-text-soft)] bg-transparent border-0 cursor-pointer p-0 transition-colors font-medium"
+              >
+                选择本组全部
+              </button>
+              {hasSelected && (
+                <>
+                  <span className="text-white/10">|</span>
+                  <button
+                    type="button"
+                    onClick={onClearSelection}
+                    className="text-[var(--dt-text-soft)] hover:text-red-400 bg-transparent border-0 cursor-pointer p-0 transition-colors font-medium"
+                  >
+                    清空本组选择
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
         {children}
       </div>
@@ -44,18 +78,42 @@ export function PhotoBucketSection({
 
   return (
     <div className="space-y-2 text-left">
-      <div className="border-b border-white/5 pb-1 flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-        <div className="flex items-center gap-1">
+      <div className="border-b border-white/5 pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1">
             <span className="text-red-400">{LABELS.redDot}</span> {LABELS.cullTitle}
           </h3>
+          <span className="text-[9px] text-[var(--dt-text-soft)]">
+            {LABELS.cullDescPrefix}{photosCount}{LABELS.cullDescMiddle}{spaceMB}{LABELS.cullDescSuffix}
+          </span>
           <span className="text-[9px] text-red-400/80 bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10 scale-90">
             {LABELS.cullSubBadge}
           </span>
         </div>
-        <span className="text-[9px] text-[var(--dt-text-soft)]">
-          {LABELS.cullDescPrefix}{photosCount}{LABELS.cullDescMiddle}{spaceMB}{LABELS.cullDescSuffix}
-        </span>
+        {photosCount > 0 && onSelectAll && onClearSelection && (
+          <div className="flex items-center gap-2 text-[10px] shrink-0 select-none">
+            <button
+              type="button"
+              disabled={isAllSelected}
+              onClick={onSelectAll}
+              className="text-[var(--dt-text-soft)] hover:text-[var(--dt-text-primary)] disabled:opacity-40 disabled:hover:text-[var(--dt-text-soft)] bg-transparent border-0 cursor-pointer p-0 transition-colors font-medium"
+            >
+              选择本组全部
+            </button>
+            {hasSelected && (
+              <>
+                <span className="text-white/10">|</span>
+                <button
+                  type="button"
+                  onClick={onClearSelection}
+                  className="text-[var(--dt-text-soft)] hover:text-red-400 bg-transparent border-0 cursor-pointer p-0 transition-colors font-medium"
+                >
+                  清空本组选择
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
       {children}
     </div>
