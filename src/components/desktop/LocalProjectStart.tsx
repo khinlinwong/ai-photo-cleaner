@@ -11,6 +11,8 @@ import {
   clearRecentLocalProjects
 } from '@/lib/projects/localProjectStorage';
 import { LocalProjectSummary } from '@/lib/projects/types';
+import { isTauriRuntime } from '@/lib/desktop/tauriEnvironment';
+import { pickNativeImageFolder } from '@/lib/desktop/nativeFolderPicker';
 
 interface LocalProjectStartProps {
   onStatusChange?: (status: string) => void;
@@ -41,6 +43,10 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [relinkingProject, setRelinkingProject] = useState<LocalProjectSummary | null>(null);
   const [mismatchWarning, setMismatchWarning] = useState<{ project: LocalProjectSummary; files: File[] } | null>(null);
 
+  // 桌面端状态
+  const [isTauri, setIsTauri] = useState(false);
+  const [pickedFolder, setPickedFolder] = useState<string | null>(null);
+
   // 稳定性防护相关 Refs 与 timeouts
   const activeFocusListenerRef = useRef<(() => void) | null>(null);
   const focusSetupTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,6 +64,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   useEffect(() => {
     isMountedRef.current = true;
+    setIsTauri(isTauriRuntime());
     setDefaultNamePlaceholder(getDefaultProjectName());
     setRecentProjects(getRecentLocalProjects());
 
@@ -82,6 +89,22 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleSelectFolderClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSelectFolderNativeClick = async () => {
+    setErrorMessage(null);
+    try {
+      const res = await pickNativeImageFolder();
+      if (res && res.path) {
+        setPickedFolder(res.path);
+        if (onStatusChange) {
+          onStatusChange(`已选文件夹: ${res.path.split(/[/\\]/).pop() || res.path}`);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to pick native folder:', err);
+      setErrorMessage('打开系统文件夹选择器失败');
+    }
   };
 
   const handleRemoveProject = (projectId: string) => {
@@ -373,14 +396,25 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
           {/* Action Buttons */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                onClick={handleSelectFolderClick}
-                disabled={isStarting !== 'none'}
-                className="desktop-button-primary space-x-2 text-xs py-3 px-5 shadow-sm shrink-0"
-              >
-                <FolderOpen className="w-4 h-4" />
-                <span>{isStarting === 'upload' ? '准备导入...' : '选择本地照片文件夹'}</span>
-              </button>
+              {isTauri ? (
+                <button
+                  onClick={handleSelectFolderNativeClick}
+                  disabled={isStarting !== 'none'}
+                  className="desktop-button-primary space-x-2 text-xs py-3 px-5 shadow-sm shrink-0 border border-emerald-500/30 hover:border-emerald-400/50"
+                >
+                  <FolderOpen className="w-4 h-4 text-emerald-300" />
+                  <span>桌面端选择文件夹</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleSelectFolderClick}
+                  disabled={isStarting !== 'none'}
+                  className="desktop-button-primary space-x-2 text-xs py-3 px-5 shadow-sm shrink-0"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  <span>{isStarting === 'upload' ? '准备导入...' : '选择本地照片文件夹'}</span>
+                </button>
+              )}
               
               <button
                 onClick={handleLoadDemoClick}
@@ -391,6 +425,22 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 {isStarting !== 'demo' && <ArrowRight className="w-4 h-4 text-[var(--dt-text-secondary)]" />}
               </button>
             </div>
+
+            {/* Folder picked summary banner */}
+            {pickedFolder && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3.5 rounded-lg text-xs space-y-1.5 max-w-sm animate-pulse">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>已选择并授权本地文件夹</span>
+                </div>
+                <p className="text-[10px] text-[var(--dt-text-secondary)] font-mono truncate">
+                  路径: {pickedFolder}
+                </p>
+                <p className="text-[10px] text-[var(--dt-text-soft)] leading-normal">
+                  已选择文件夹，本轮仅验证桌面端授权入口，暂未开始分析。当前未保存路径，亦不会上传云端，后续会接入本地分析流程。
+                </p>
+              </div>
+            )}
 
             {/* Error Message */}
             {errorMessage && (
