@@ -13,6 +13,7 @@ import {
 import { LocalProjectSummary } from '@/lib/projects/types';
 import { isTauriRuntime } from '@/lib/desktop/tauriEnvironment';
 import { pickNativeImageFolder } from '@/lib/desktop/nativeFolderPicker';
+import { scanNativeFolderMetadata, NativeFolderMetadataSummary } from '@/lib/desktop/nativeFolderScanner';
 
 /**
  * Extract folder basename securely from path string, removing drive letter and full hierarchy.
@@ -33,6 +34,18 @@ const getFolderBasename = (path: string): string => {
   }
   
   return base;
+};
+
+/**
+ * Format bytes to human readable sizes.
+ */
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = 1;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
 interface LocalProjectStartProps {
@@ -67,6 +80,8 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   // 桌面端状态
   const [isTauri, setIsTauri] = useState(false);
   const [pickedFolder, setPickedFolder] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanSummary, setScanSummary] = useState<NativeFolderMetadataSummary | null>(null);
 
   // 稳定性防护相关 Refs 与 timeouts
   const activeFocusListenerRef = useRef<(() => void) | null>(null);
@@ -114,6 +129,8 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleSelectFolderNativeClick = async () => {
     setErrorMessage(null);
+    setPickedFolder(null);
+    setScanSummary(null);
     try {
       const res = await pickNativeImageFolder();
       if (res && res.path) {
@@ -121,10 +138,24 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         if (onStatusChange) {
           onStatusChange(`已选文件夹: ${getFolderBasename(res.path)}`);
         }
+
+        setIsScanning(true);
+        const meta = await scanNativeFolderMetadata(res.path);
+        setIsScanning(false);
+
+        if (meta) {
+          setScanSummary(meta);
+          if (onStatusChange) {
+            onStatusChange(`已选文件夹: ${getFolderBasename(res.path)} | 发现图片 ${meta.imageFilesCount} 张`);
+          }
+        } else {
+          setErrorMessage('当前文件夹暂时无法扫描，请重新选择。');
+        }
       }
     } catch (err) {
-      console.error('Failed to pick native folder:', err);
-      setErrorMessage('打开系统文件夹选择器失败');
+      console.error('Failed to pick or scan native folder:', err);
+      setIsScanning(false);
+      setErrorMessage('当前文件夹暂时无法扫描，请重新选择。');
     }
   };
 
@@ -457,12 +488,33 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 <p className="text-[10.5px] text-[var(--dt-text-primary)] font-semibold truncate">
                   已选择文件夹：{getFolderBasename(pickedFolder)}
                 </p>
-                <p className="text-[9.5px] text-[var(--dt-text-secondary)] leading-normal">
+                
+                {isScanning && (
+                  <div className="flex items-center gap-2 py-1 text-[10px] text-[var(--dt-text-secondary)] animate-pulse">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>正在扫描文件夹元数据...</span>
+                  </div>
+                )}
+
+                {!isScanning && scanSummary && (
+                  <div className="bg-black/20 p-2.5 rounded border border-emerald-500/10 space-y-1 text-[10.5px] font-mono text-[var(--dt-text-secondary)]">
+                    <div>发现图片：<span className="text-emerald-400 font-bold">{scanSummary.imageFilesCount} 张</span></div>
+                    <div>文件总数：<span className="text-[var(--dt-text-primary)]">{scanSummary.totalFiles} 个</span></div>
+                    <div>其他 / 不支持文件：<span>{scanSummary.unsupportedFilesCount} 个</span></div>
+                    <div>图片总大小：<span className="text-[var(--dt-text-primary)] font-bold">{formatBytes(scanSummary.totalSizeBytes)}</span></div>
+                  </div>
+                )}
+
+                <p className="text-[9px] text-[var(--dt-text-secondary)] leading-normal">
                   完整路径仅在本次授权中临时使用，不会保存。
                 </p>
-                <p className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-0.5 border-t border-emerald-500/10">
-                  已选择文件夹，本轮仅验证桌面端授权入口，暂未开始分析。当前未保存路径，亦不会上传云端，后续会接入本地分析流程。
-                </p>
+                <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-emerald-500/10 space-y-1">
+                  <p>💡 本轮仅扫描文件夹第一层元数据，暂未读取图片内容。</p>
+                  <p>💡 暂未开始分析，后续会接入本地整理流程。</p>
+                </div>
               </div>
             )}
 
