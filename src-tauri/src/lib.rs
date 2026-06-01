@@ -334,9 +334,9 @@ fn read_native_preview_bytes(id: String) -> Result<Vec<u8>, String> {
   let metadata = fs::metadata(&file_path)
     .map_err(|_| "无法读取文件元数据。".to_string())?;
 
-  const MAX_FILE_SIZE_BYTES: u64 = 30 * 1024 * 1024; // 30 MB
+  const MAX_FILE_SIZE_BYTES: u64 = 15 * 1024 * 1024; // 15 MB
   if metadata.len() > MAX_FILE_SIZE_BYTES {
-    return Err("安全拒绝：文件大小超过 30MB 限制。".to_string());
+    return Err("安全拒绝：文件大小超过 15MB 限制。".to_string());
   }
 
   let bytes = fs::read(&file_path)

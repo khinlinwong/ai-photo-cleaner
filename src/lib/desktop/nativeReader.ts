@@ -19,9 +19,9 @@ export async function readNativePreviewBytes(id: string): Promise<Uint8Array | n
       return new Uint8Array(bytes);
     }
     return null;
-  } catch (err) {
-    // Avoid console output of paths or files. Log abstract error.
-    console.error('[NativeBridge] Failed to read native preview bytes:', err);
+  } catch {
+    // Avoid console output of paths, files or error objects. Log abstract error.
+    console.error('[NativeBridge] Failed to read native preview bytes.');
     return null;
   }
 }
