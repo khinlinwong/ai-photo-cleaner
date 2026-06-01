@@ -14,6 +14,15 @@ import { LocalProjectSummary } from '@/lib/projects/types';
 import { isTauriRuntime } from '@/lib/desktop/tauriEnvironment';
 import { pickNativeImageFolder } from '@/lib/desktop/nativeFolderPicker';
 
+/**
+ * Extract folder basename securely from path string, removing drive letter and full hierarchy.
+ */
+const getFolderBasename = (path: string): string => {
+  if (!path) return '已选择文件夹';
+  const parts = path.split(/[/\\]/).filter(Boolean);
+  return parts[parts.length - 1] || '已选择文件夹';
+};
+
 interface LocalProjectStartProps {
   onStatusChange?: (status: string) => void;
 }
@@ -428,15 +437,18 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
             {/* Folder picked summary banner */}
             {pickedFolder && (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3.5 rounded-lg text-xs space-y-1.5 max-w-sm animate-pulse">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3.5 rounded-lg text-xs space-y-1.5 max-w-sm">
                 <div className="flex items-center gap-1.5 font-bold">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>已选择并授权本地文件夹</span>
                 </div>
-                <p className="text-[10px] text-[var(--dt-text-secondary)] font-mono truncate">
-                  路径: {pickedFolder}
+                <p className="text-[10.5px] text-[var(--dt-text-primary)] font-semibold truncate">
+                  已选择文件夹：{getFolderBasename(pickedFolder)}
                 </p>
-                <p className="text-[10px] text-[var(--dt-text-soft)] leading-normal">
+                <p className="text-[9.5px] text-[var(--dt-text-secondary)] leading-normal">
+                  完整路径仅在本次授权中临时使用，不会保存。
+                </p>
+                <p className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-0.5 border-t border-emerald-500/10">
                   已选择文件夹，本轮仅验证桌面端授权入口，暂未开始分析。当前未保存路径，亦不会上传云端，后续会接入本地分析流程。
                 </p>
               </div>
