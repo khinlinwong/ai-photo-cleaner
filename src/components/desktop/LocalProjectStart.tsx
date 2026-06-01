@@ -41,6 +41,12 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [relinkingProject, setRelinkingProject] = useState<LocalProjectSummary | null>(null);
   const [mismatchWarning, setMismatchWarning] = useState<{ project: LocalProjectSummary; files: File[] } | null>(null);
 
+  // 稳定性防护相关 Refs 与 timeouts
+  const activeFocusListenerRef = useRef<(() => void) | null>(null);
+  const focusSetupTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusClearTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+
   // 默认项目名称生成器
   const getDefaultProjectName = () => {
     const today = new Date();
@@ -51,8 +57,27 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     setDefaultNamePlaceholder(getDefaultProjectName());
     setRecentProjects(getRecentLocalProjects());
+
+    return () => {
+      isMountedRef.current = false;
+      
+      // 组件卸载时清理全局监听，防止内存泄露与脏回调
+      if (activeFocusListenerRef.current) {
+        window.removeEventListener('focus', activeFocusListenerRef.current);
+        activeFocusListenerRef.current = null;
+      }
+      
+      // 清理未完成的定时器
+      if (focusSetupTimeoutIdRef.current) {
+        clearTimeout(focusSetupTimeoutIdRef.current);
+      }
+      if (focusClearTimeoutIdRef.current) {
+        clearTimeout(focusClearTimeoutIdRef.current);
+      }
+    };
   }, []);
 
   const handleSelectFolderClick = () => {
@@ -61,14 +86,18 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleRemoveProject = (projectId: string) => {
     removeLocalProjectSummary(projectId);
-    setRecentProjects(getRecentLocalProjects());
-    setProjectToRemove(null);
+    if (isMountedRef.current) {
+      setRecentProjects(getRecentLocalProjects());
+      setProjectToRemove(null);
+    }
   };
 
   const handleClearAllProjects = () => {
     clearRecentLocalProjects();
-    setRecentProjects([]);
-    setIsConfirmingClearAll(false);
+    if (isMountedRef.current) {
+      setRecentProjects([]);
+      setIsConfirmingClearAll(false);
+    }
   };
 
   const handleRelinkSelectClick = (project: LocalProjectSummary) => {
@@ -76,20 +105,46 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     if (relinkFileInputRef.current) {
       relinkFileInputRef.current.value = '';
     }
+
+    // 清理前一次残留的监听与定时器，保障时序唯一性
+    if (activeFocusListenerRef.current) {
+      window.removeEventListener('focus', activeFocusListenerRef.current);
+      activeFocusListenerRef.current = null;
+    }
+    if (focusSetupTimeoutIdRef.current) {
+      clearTimeout(focusSetupTimeoutIdRef.current);
+    }
+    if (focusClearTimeoutIdRef.current) {
+      clearTimeout(focusClearTimeoutIdRef.current);
+    }
+
     relinkFileInputRef.current?.click();
 
-    // Listen to window focus to clear relinkingProject state if file selection is cancelled
+    // 监听 window focus 来检测系统文件对话框的取消行为
     const handleWindowFocus = () => {
-      window.removeEventListener('focus', handleWindowFocus);
-      // Wait a short delay to allow onChange to fire first if files were chosen
-      setTimeout(() => {
-        setRelinkingProject(null);
+      if (activeFocusListenerRef.current) {
+        window.removeEventListener('focus', activeFocusListenerRef.current);
+        activeFocusListenerRef.current = null;
+      }
+
+      if (focusClearTimeoutIdRef.current) {
+        clearTimeout(focusClearTimeoutIdRef.current);
+      }
+
+      focusClearTimeoutIdRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setRelinkingProject(null);
+        }
       }, 500);
     };
 
-    // Delay adding focus listener slightly to avoid triggering instantly on button click focus changes
-    setTimeout(() => {
-      window.addEventListener('focus', handleWindowFocus);
+    activeFocusListenerRef.current = handleWindowFocus;
+
+    // 延迟添加焦点监听，避免瞬间触发
+    focusSetupTimeoutIdRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        window.addEventListener('focus', handleWindowFocus);
+      }
     }, 150);
   };
 
@@ -111,8 +166,10 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       uploadFiles(files);
     } catch (err) {
       console.error('Reassociation error:', err);
-      setErrorMessage('关联项目失败，请重试。');
-      setIsStarting('none');
+      if (isMountedRef.current) {
+        setErrorMessage('关联项目失败，请重试。');
+        setIsStarting('none');
+      }
     }
   };
 
@@ -155,10 +212,12 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       uploadFiles(imgFiles);
     } catch (err) {
       console.error('File import error:', err);
-      setErrorMessage('导入失败，请重新选择图片。');
-      setIsStarting('none');
-      if (onStatusChange) {
-        onStatusChange('等待选择本地文件夹');
+      if (isMountedRef.current) {
+        setErrorMessage('导入失败，请重新选择图片。');
+        setIsStarting('none');
+        if (onStatusChange) {
+          onStatusChange('等待选择本地文件夹');
+        }
       }
     }
   };
@@ -168,15 +227,19 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     e.target.value = '';
 
     if (files.length === 0) {
-      setRelinkingProject(null);
+      if (isMountedRef.current) {
+        setRelinkingProject(null);
+      }
       return;
     }
 
     // 过滤图片文件
     const imgFiles = files.filter(file => file.type.startsWith('image/'));
     if (imgFiles.length === 0) {
-      setErrorMessage('请选择至少一张图片。');
-      setRelinkingProject(null);
+      if (isMountedRef.current) {
+        setErrorMessage('请选择至少一张图片。');
+        setRelinkingProject(null);
+      }
       return;
     }
 
@@ -188,20 +251,26 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
     try {
       if (imgFiles.length !== relinkingProject.photoCount) {
-        setMismatchWarning({
-          project: relinkingProject,
-          files: imgFiles
-        });
-        setRelinkingProject(null);
+        if (isMountedRef.current) {
+          setMismatchWarning({
+            project: relinkingProject,
+            files: imgFiles
+          });
+          setRelinkingProject(null);
+        }
         return;
       }
 
       proceedWithReassociation(relinkingProject, imgFiles);
-      setRelinkingProject(null);
+      if (isMountedRef.current) {
+        setRelinkingProject(null);
+      }
     } catch (err) {
       console.error('Relink file change error:', err);
-      setErrorMessage('关联失败，请重新选择图片。');
-      setRelinkingProject(null);
+      if (isMountedRef.current) {
+        setErrorMessage('关联失败，请重新选择图片。');
+        setRelinkingProject(null);
+      }
     }
   };
 
@@ -234,10 +303,12 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       router.push('/processing');
     } catch (err) {
       console.error('Demo load error:', err);
-      setErrorMessage('载入 Demo 失败，请重试。');
-      setIsStarting('none');
-      if (onStatusChange) {
-        onStatusChange('等待选择本地文件夹');
+      if (isMountedRef.current) {
+        setErrorMessage('载入 Demo 失败，请重试。');
+        setIsStarting('none');
+        if (onStatusChange) {
+          onStatusChange('等待选择本地文件夹');
+        }
       }
     }
   };
