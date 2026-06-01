@@ -190,13 +190,13 @@ pub struct NativeImagePreviewScanResult {
 }
 
 static PREVIEW_MAPPING: OnceLock<Mutex<HashMap<String, PathBuf>>> = OnceLock::new();
-static ACTIVE_FOLDER: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+static ACTIVE_FOLDER: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 
 fn get_preview_mapping() -> &'static Mutex<HashMap<String, PathBuf>> {
   PREVIEW_MAPPING.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn set_active_folder(folder: String) {
+fn set_active_folder(folder: PathBuf) {
   let cell = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None));
   if let Ok(mut guard) = cell.lock() {
     *guard = Some(folder);
@@ -204,12 +204,13 @@ fn set_active_folder(folder: String) {
 }
 
 fn verify_in_active_folder(path: &Path) -> bool {
-  let cell = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None));
-  if let Ok(guard) = cell.lock() {
-    if let Some(ref active) = *guard {
-      let active_path = Path::new(active);
-      if let Some(parent) = path.parent() {
-        return parent == active_path;
+  if let Ok(canonical_path) = path.canonicalize() {
+    let cell = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None));
+    if let Ok(guard) = cell.lock() {
+      if let Some(ref active) = *guard {
+        if let Some(parent) = canonical_path.parent() {
+          return parent == active;
+        }
       }
     }
   }
@@ -219,14 +220,17 @@ fn verify_in_active_folder(path: &Path) -> bool {
 #[tauri::command]
 fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewScanResult, String> {
   let path = Path::new(&folder_path);
-  if !path.exists() || !path.is_dir() {
+  let canonical_active = path.canonicalize()
+    .map_err(|_| "无法读取所选文件夹，请重新选择。".to_string())?;
+
+  if !canonical_active.exists() || !canonical_active.is_dir() {
     return Err("无法读取所选文件夹，请重新选择。".to_string());
   }
 
-  // Record the chosen folder path scope
-  set_active_folder(folder_path.clone());
+  // Record the chosen folder path scope (canonicalized)
+  set_active_folder(canonical_active.clone());
 
-  let entries = fs::read_dir(path)
+  let entries = fs::read_dir(&canonical_active)
     .map_err(|_| "当前文件夹暂时无法扫描。".to_string())?;
 
   let mut preview_items = Vec::new();
@@ -251,44 +255,50 @@ fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewS
       if file_type.is_file() {
         let file_path = entry.path();
         
-        let ext = file_path
-          .extension()
-          .and_then(|e| e.to_str())
-          .unwrap_or("")
-          .to_lowercase();
+        // Canonicalize file path to resolve symlinks/junctions
+        if let Ok(canonical_file_path) = file_path.canonicalize() {
+          // Check that the parent of the canonical file is exactly the canonical active folder
+          if canonical_file_path.parent() == Some(&canonical_active) {
+            let ext = canonical_file_path
+              .extension()
+              .and_then(|e| e.to_str())
+              .unwrap_or("")
+              .to_lowercase();
 
-        let is_image = match ext.as_str() {
-          "jpg" | "jpeg" | "png" | "webp" | "heic" | "heif" => true,
-          _ => false,
-        };
+            let is_image = match ext.as_str() {
+              "jpg" | "jpeg" | "png" | "webp" | "heic" | "heif" => true,
+              _ => false,
+            };
 
-        if is_image {
-          let mut size_bytes = 0;
-          if let Ok(metadata) = entry.metadata() {
-            size_bytes = metadata.len();
+            if is_image {
+              let mut size_bytes = 0;
+              if let Ok(metadata) = entry.metadata() {
+                size_bytes = metadata.len();
+              }
+
+              let id = format!("native-preview-{}", idx);
+              idx += 1;
+
+              // Store canonicalized mapping in memory
+              if let Ok(mut guard) = get_preview_mapping().lock() {
+                guard.insert(id.clone(), canonical_file_path.clone());
+              }
+
+              // Format opaque preview URL using custom protocol scheme
+              let preview_url = if cfg!(target_os = "windows") {
+                format!("http://preview.localhost/{}", id)
+              } else {
+                format!("preview://localhost/{}", id)
+              };
+
+              preview_items.push(NativeImagePreviewItem {
+                id,
+                preview_url,
+                extension: ext,
+                size_bytes,
+              });
+            }
           }
-
-          let id = format!("native-preview-{}", idx);
-          idx += 1;
-
-          // Store mapping in memory
-          if let Ok(mut guard) = get_preview_mapping().lock() {
-            guard.insert(id.clone(), file_path.clone());
-          }
-
-          // Format opaque preview URL using custom protocol scheme
-          let preview_url = if cfg!(target_os = "windows") {
-            format!("http://preview.localhost/{}", id)
-          } else {
-            format!("preview://localhost/{}", id)
-          };
-
-          preview_items.push(NativeImagePreviewItem {
-            id,
-            preview_url,
-            extension: ext,
-            size_bytes,
-          });
         }
       }
     }
