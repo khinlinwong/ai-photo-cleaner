@@ -592,28 +592,30 @@ export default function ResultsPage() {
             <Button
               size="sm"
               variant="outline"
+              disabled={getUserVisibleBucket(photo) === 'keep'}
               className={cn(
-                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
+                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold border-0",
                 getUserVisibleBucket(photo) === 'keep'
-                  ? "bg-[#6FA887] text-white border-0" 
-                  : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
+                  ? "bg-[#6FA887]/20 text-[#6FA887]/60 cursor-not-allowed opacity-50" 
+                  : "bg-white/5 hover:bg-[#6FA887]/20 hover:text-[#6FA887] text-[var(--dt-text-muted)]"
               )}
               onClick={() => updatePhotoStatus(photo.id, 'keep')}
             >
-              保留
+              标记为保留
             </Button>
             <Button
               size="sm"
               variant="outline"
+              disabled={getUserVisibleBucket(photo) === 'cull'}
               className={cn(
-                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold",
+                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold border-0",
                 getUserVisibleBucket(photo) === 'cull'
-                  ? "bg-[#B96F68] text-white border-0" 
-                  : "border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-muted)]"
+                  ? "bg-[#B96F68]/20 text-[#B96F68]/60 cursor-not-allowed opacity-50" 
+                  : "bg-white/5 hover:bg-[#B96F68]/20 hover:text-[#B96F68] text-[var(--dt-text-muted)]"
               )}
               onClick={() => updatePhotoStatus(photo.id, 'delete')}
             >
-              淘汰候选
+              标记为淘汰候选
             </Button>
           </div>
         </CardContent>
@@ -745,7 +747,7 @@ export default function ResultsPage() {
                   <div className="text-left space-y-1 select-none">
                     <h2 className="text-sm font-bold text-[var(--dt-text-primary)]">整理结果</h2>
                     <p className="text-[11px] text-[var(--dt-text-soft)] leading-relaxed">
-                      请在这里最终确认要保留和标记为淘汰候选的照片。本步骤只在浏览器中整理结果，不会物理修改你的原图文件。
+                      请在这里最终确认要保留和标记为淘汰候选的照片。这只调整整理结果，不会修改原图。导出时会按当前整理结果生成清单与保留照片 ZIP。
                     </p>
                   </div>
 
@@ -982,25 +984,39 @@ export default function ResultsPage() {
                     onClick={() => setDialogOpen(false)}
                     className="desktop-button-secondary text-xs h-8 px-4 rounded"
                   >
-                    {"\u5173\u95ed"}
+                    {"关闭"}
                   </button>
                   
                   <button
+                    disabled={getUserVisibleBucket(selectedPhoto) === 'keep'}
                     className={cn(
-                      "text-white font-bold text-xs h-8 rounded px-4",
+                      "font-bold text-xs h-8 rounded px-4 transition-all",
                       getUserVisibleBucket(selectedPhoto) === 'keep'
-                        ? 'bg-[#B96F68] hover:bg-[#B96F68]/90'
-                        : 'bg-[#6FA887] hover:bg-[#6FA887]/90'
+                        ? 'bg-[#6FA887]/20 text-[#6FA887]/60 cursor-not-allowed opacity-50 border-0'
+                        : 'bg-[#6FA887] text-white hover:bg-[#6FA887]/90 border-0'
                     )}
                     onClick={() => {
-                      const nextStatus = getUserVisibleBucket(selectedPhoto) === 'keep' ? 'delete' : 'keep';
-                      updatePhotoStatus(selectedPhoto.id, nextStatus);
+                      updatePhotoStatus(selectedPhoto.id, 'keep');
                       setDialogOpen(false);
                     }}
                   >
-                    {getUserVisibleBucket(selectedPhoto) === 'keep' 
-                      ? "\u6807\u4e3a\u6dd8\u6c70\u5019\u9009" 
-                      : "\u6807\u4e3a\u4fdd\u7559"}
+                    标记为保留
+                  </button>
+
+                  <button
+                    disabled={getUserVisibleBucket(selectedPhoto) === 'cull'}
+                    className={cn(
+                      "font-bold text-xs h-8 rounded px-4 transition-all",
+                      getUserVisibleBucket(selectedPhoto) === 'cull'
+                        ? 'bg-[#B96F68]/20 text-[#B96F68]/60 cursor-not-allowed opacity-50 border-0'
+                        : 'bg-[#B96F68] text-white hover:bg-[#B96F68]/90 border-0'
+                    )}
+                    onClick={() => {
+                      updatePhotoStatus(selectedPhoto.id, 'delete');
+                      setDialogOpen(false);
+                    }}
+                  >
+                    标记为淘汰候选
                   </button>
                 </div>
               </DialogFooter>
