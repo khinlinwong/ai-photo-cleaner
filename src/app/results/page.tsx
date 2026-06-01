@@ -42,6 +42,7 @@ export default function ResultsPage() {
   const {
     photos,
     updatePhotoStatus,
+    updateMultiplePhotosStatus,
     resetWorkspace,
     loadDemoPhotos,
     similarGroups,
@@ -57,6 +58,42 @@ export default function ResultsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
+
+  // 批量手动决策选择状态
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+
+  const toggleSelectPhoto = useCallback((id: string) => {
+    setSelectedPhotoIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedPhotoIds([]);
+  }, []);
+
+  const handleBatchKeep = useCallback(() => {
+    if (selectedPhotoIds.length === 0) return;
+    updateMultiplePhotosStatus(selectedPhotoIds, 'keep');
+    clearSelection();
+  }, [selectedPhotoIds, updateMultiplePhotosStatus, clearSelection]);
+
+  const handleBatchCull = useCallback(() => {
+    if (selectedPhotoIds.length === 0) return;
+    updateMultiplePhotosStatus(selectedPhotoIds, 'delete');
+    clearSelection();
+  }, [selectedPhotoIds, updateMultiplePhotosStatus, clearSelection]);
+
+  // 当照片集更新时，自动过滤掉已不存在的照片 ID，确保选择状态的安全与一致性
+  useEffect(() => {
+    setSelectedPhotoIds((prev) => {
+      const validIds = prev.filter((id) => photos.some((p) => p.id === id));
+      if (validIds.length !== prev.length) {
+        return validIds;
+      }
+      return prev;
+    });
+  }, [photos]);
 
   // 本地相似组弹窗控制机制，防止退出时陷入弹出循环
   const [dismissedGroups, setDismissedGroups] = useState<string[]>([]);
@@ -525,17 +562,24 @@ export default function ResultsPage() {
 
   // 渲染单张照片卡片（高度固定为 280px，详情折叠使用悬浮框以免改变卡片高度）
   const renderPhotoCard = (photo: PhotoItem) => {
+    const isSelected = selectedPhotoIds.includes(photo.id);
+
     return (
       <Card 
         className={cn(
           "w-full h-full overflow-visible rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md flex flex-col justify-between",
-          getUserVisibleBucket(photo) === 'cull'
+          isSelected
+            ? "border-emerald-500/80 bg-emerald-500/5 ring-1 ring-emerald-500/35"
+            : getUserVisibleBucket(photo) === 'cull'
             ? "border-[#B96F68]/30 bg-[#B96F68]/5 hover:border-[#B96F68]/60 hover:bg-[#B96F68]/15" 
             : "border-white/5 bg-[var(--dt-card-bg)] hover:border-[#6F8FA8]/40 hover:bg-[#6F8FA8]/5"
         )}
       >
         {/* Image Section */}
-        <div className="relative h-[140px] w-full overflow-hidden bg-black/20 rounded-t-lg">
+        <div 
+          className="relative h-[140px] w-full overflow-hidden bg-black/20 rounded-t-lg cursor-pointer select-none"
+          onClick={() => toggleSelectPhoto(photo.id)}
+        >
           <img
             src={photo.url}
             alt={photo.name}
@@ -544,6 +588,22 @@ export default function ResultsPage() {
           <div className="absolute top-1.5 left-1.5 z-10 scale-90 origin-top-left">
             {renderIssueBadge(photo)}
           </div>
+          {/* Checkbox Overlay */}
+          <button
+            type="button"
+            className={cn(
+              "absolute top-2 right-2 z-20 flex h-5 w-5 items-center justify-center rounded-full border transition-all shadow-md focus:outline-none",
+              isSelected
+                ? "bg-emerald-500 border-emerald-400 text-white"
+                : "bg-black/40 border-white/40 text-transparent hover:border-white hover:bg-black/60"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSelectPhoto(photo.id);
+            }}
+          >
+            {isSelected && <span className="text-[10px] font-bold">✓</span>}
+          </button>
         </div>
 
         {/* Info details */}
@@ -762,6 +822,40 @@ export default function ResultsPage() {
                     totalBattleCount={similarGroups.length}
                   />
 
+                  {/* 批量操作栏 */}
+                  {selectedPhotoIds.length > 0 && (
+                    <div className="p-3 bg-[var(--dt-card-bg)] border border-emerald-500/30 rounded-lg flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                      <div className="flex items-center gap-2 flex-wrap text-left">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold font-mono text-[10px]">
+                          {selectedPhotoIds.length}
+                        </span>
+                        <span className="text-[var(--dt-text-primary)] font-medium">已选择 {selectedPhotoIds.length} 张照片</span>
+                        <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">|</span>
+                        <span className="text-[10px] text-[var(--dt-text-soft)]">只调整整理结果，不会修改原图，不会上传云端</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          onClick={handleBatchKeep}
+                          className="bg-[#6FA887]/20 hover:bg-[#6FA887]/30 border border-[#6FA887]/40 text-[#6FA887] font-semibold h-7 px-3 text-[10px] transition-all hover:text-[#6FA887] shadow-none"
+                        >
+                          标记为保留
+                        </Button>
+                        <Button
+                          onClick={handleBatchCull}
+                          className="bg-[#B96F68]/20 hover:bg-[#B96F68]/30 border border-[#B96F68]/40 text-[#B96F68] font-semibold h-7 px-3 text-[10px] transition-all hover:text-[#B96F68] shadow-none"
+                        >
+                          标记为淘汰候选
+                        </Button>
+                        <Button
+                          onClick={clearSelection}
+                          variant="outline"
+                          className="bg-white/5 hover:bg-white/10 border border-white/10 text-[var(--dt-text-primary)] hover:text-[var(--dt-text-primary)] h-7 px-3 text-[10px] transition-all shadow-none"
+                        >
+                          取消选择
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* PK 流程进度条与指示 */}
                   <div className={cn(
