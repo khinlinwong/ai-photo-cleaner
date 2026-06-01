@@ -18,6 +18,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const router = useRouter();
   const { uploadFiles, loadDemoPhotos } = usePhotoWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const relinkFileInputRef = useRef<HTMLInputElement>(null);
 
   const [isStarting, setIsStarting] = useState<'none' | 'upload' | 'demo'>('none');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -30,8 +31,8 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [recentProjects, setRecentProjects] = useState<LocalProjectSummary[]>([]);
   const [selectedProjectForReassociate, setSelectedProjectForReassociate] = useState<LocalProjectSummary | null>(null);
   
-  // 重新关联机制的状态和 Ref
-  const reassociatingProjectRef = useRef<LocalProjectSummary | null>(null);
+  // 重新关联机制的状态
+  const [relinkingProject, setRelinkingProject] = useState<LocalProjectSummary | null>(null);
   const [mismatchWarning, setMismatchWarning] = useState<{ project: LocalProjectSummary; files: File[] } | null>(null);
 
   // 默认项目名称生成器
@@ -50,6 +51,28 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleSelectFolderClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleRelinkSelectClick = (project: LocalProjectSummary) => {
+    setRelinkingProject(project);
+    if (relinkFileInputRef.current) {
+      relinkFileInputRef.current.value = '';
+    }
+    relinkFileInputRef.current?.click();
+
+    // Listen to window focus to clear relinkingProject state if file selection is cancelled
+    const handleWindowFocus = () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      // Wait a short delay to allow onChange to fire first if files were chosen
+      setTimeout(() => {
+        setRelinkingProject(null);
+      }, 500);
+    };
+
+    // Delay adding focus listener slightly to avoid triggering instantly on button click focus changes
+    setTimeout(() => {
+      window.addEventListener('focus', handleWindowFocus);
+    }, 150);
   };
 
   const proceedWithReassociation = (project: LocalProjectSummary, files: File[]) => {
@@ -77,10 +100,6 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const targetProject = reassociatingProjectRef.current;
-    
-    // Clear ref immediately and reset input value to support selecting same files
-    reassociatingProjectRef.current = null;
     e.target.value = '';
 
     if (files.length === 0) return;
@@ -95,39 +114,27 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     setErrorMessage(null);
 
     try {
-      if (targetProject) {
-        // 重新关联流程
-        if (imgFiles.length !== targetProject.photoCount) {
-          setMismatchWarning({
-            project: targetProject,
-            files: imgFiles
-          });
-          return;
-        }
-        proceedWithReassociation(targetProject, imgFiles);
-      } else {
-        // 创建新项目流程
-        setIsStarting('upload');
-        if (onStatusChange) {
-          onStatusChange('正在准备本地项目');
-        }
-        const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
-        const summary: LocalProjectSummary = {
-          projectId: createProjectId(),
-          projectName: projName,
-          createdAt: new Date().toLocaleString('zh-CN'),
-          updatedAt: new Date().toLocaleString('zh-CN'),
-          photoCount: imgFiles.length,
-          keepCount: 0,
-          cullCount: 0,
-          similarGroupCount: 0,
-          battleCompleted: 0,
-          battleTotal: 0,
-          fileFingerprints: createFileFingerprints(imgFiles)
-        };
-        saveRecentLocalProject(summary);
-        uploadFiles(imgFiles);
+      // 创建新项目流程
+      setIsStarting('upload');
+      if (onStatusChange) {
+        onStatusChange('正在准备本地项目');
       }
+      const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
+      const summary: LocalProjectSummary = {
+        projectId: createProjectId(),
+        projectName: projName,
+        createdAt: new Date().toLocaleString('zh-CN'),
+        updatedAt: new Date().toLocaleString('zh-CN'),
+        photoCount: imgFiles.length,
+        keepCount: 0,
+        cullCount: 0,
+        similarGroupCount: 0,
+        battleCompleted: 0,
+        battleTotal: 0,
+        fileFingerprints: createFileFingerprints(imgFiles)
+      };
+      saveRecentLocalProject(summary);
+      uploadFiles(imgFiles);
     } catch (err) {
       console.error('File import error:', err);
       setErrorMessage('导入失败，请重新选择图片。');
@@ -135,6 +142,48 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       if (onStatusChange) {
         onStatusChange('等待选择本地文件夹');
       }
+    }
+  };
+
+  const handleRelinkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+
+    if (files.length === 0) {
+      setRelinkingProject(null);
+      return;
+    }
+
+    // 过滤图片文件
+    const imgFiles = files.filter(file => file.type.startsWith('image/'));
+    if (imgFiles.length === 0) {
+      setErrorMessage('请选择至少一张图片。');
+      setRelinkingProject(null);
+      return;
+    }
+
+    setErrorMessage(null);
+
+    if (!relinkingProject) {
+      return;
+    }
+
+    try {
+      if (imgFiles.length !== relinkingProject.photoCount) {
+        setMismatchWarning({
+          project: relinkingProject,
+          files: imgFiles
+        });
+        setRelinkingProject(null);
+        return;
+      }
+
+      proceedWithReassociation(relinkingProject, imgFiles);
+      setRelinkingProject(null);
+    } catch (err) {
+      console.error('Relink file change error:', err);
+      setErrorMessage('关联失败，请重新选择图片。');
+      setRelinkingProject(null);
     }
   };
 
@@ -190,6 +239,16 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
+        multiple
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Hidden File Input for Relinking */}
+      <input
+        type="file"
+        ref={relinkFileInputRef}
+        onChange={handleRelinkFileChange}
         multiple
         accept="image/*"
         className="hidden"
@@ -414,9 +473,9 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               </button>
               <button
                 onClick={() => {
-                  reassociatingProjectRef.current = selectedProjectForReassociate;
+                  const projectToRelink = selectedProjectForReassociate;
                   setSelectedProjectForReassociate(null);
-                  handleSelectFolderClick();
+                  handleRelinkSelectClick(projectToRelink);
                 }}
                 className="desktop-button-primary text-xs py-2 px-4 rounded flex items-center gap-1.5"
               >
