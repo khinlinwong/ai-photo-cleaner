@@ -66,3 +66,16 @@ export function clearRecentLocalProjects(): void {
     console.warn('[ProjectStorage] Failed to clear recent projects from localStorage:', err);
   }
 }
+
+export function removeLocalProjectSummary(projectId: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    const current = getRecentLocalProjects();
+    const next = current.filter(item => item.projectId !== projectId);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch (err) {
+    console.warn('[ProjectStorage] Failed to remove project from localStorage:', err);
+  }
+}

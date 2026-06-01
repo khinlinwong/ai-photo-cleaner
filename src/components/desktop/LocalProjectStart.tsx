@@ -6,7 +6,9 @@ import {
   getRecentLocalProjects,
   saveRecentLocalProject,
   createProjectId,
-  createFileFingerprints
+  createFileFingerprints,
+  removeLocalProjectSummary,
+  clearRecentLocalProjects
 } from '@/lib/projects/localProjectStorage';
 import { LocalProjectSummary } from '@/lib/projects/types';
 
@@ -31,6 +33,10 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [recentProjects, setRecentProjects] = useState<LocalProjectSummary[]>([]);
   const [selectedProjectForReassociate, setSelectedProjectForReassociate] = useState<LocalProjectSummary | null>(null);
   
+  // 最近项目管理状态
+  const [projectToRemove, setProjectToRemove] = useState<LocalProjectSummary | null>(null);
+  const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
+  
   // 重新关联机制的状态
   const [relinkingProject, setRelinkingProject] = useState<LocalProjectSummary | null>(null);
   const [mismatchWarning, setMismatchWarning] = useState<{ project: LocalProjectSummary; files: File[] } | null>(null);
@@ -51,6 +57,18 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleSelectFolderClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleRemoveProject = (projectId: string) => {
+    removeLocalProjectSummary(projectId);
+    setRecentProjects(getRecentLocalProjects());
+    setProjectToRemove(null);
+  };
+
+  const handleClearAllProjects = () => {
+    clearRecentLocalProjects();
+    setRecentProjects([]);
+    setIsConfirmingClearAll(false);
   };
 
   const handleRelinkSelectClick = (project: LocalProjectSummary) => {
@@ -327,10 +345,20 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         <div className="md:col-span-5 space-y-6">
           {/* Recent projects */}
           <div className="space-y-2.5">
-            <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
-              <Clock className="w-3.5 h-3.5" />
-              <span>最近照片项目</span>
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
+                <Clock className="w-3.5 h-3.5" />
+                <span>最近照片项目</span>
+              </h3>
+              {recentProjects.length > 0 && (
+                <button
+                  onClick={() => setIsConfirmingClearAll(true)}
+                  className="text-[9px] text-[var(--dt-text-muted)] hover:text-red-400 font-semibold transition-colors"
+                >
+                  清空摘要列表
+                </button>
+              )}
+            </div>
             
             {recentProjects.length === 0 ? (
               <div className="border border-dashed border-white/10 rounded-lg p-6 text-center text-[10px] text-[var(--dt-text-faint)]">
@@ -341,7 +369,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 {recentProjects.map((project) => (
                   <div 
                     key={project.projectId} 
-                    className="bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] transition-colors p-3 rounded-lg flex items-center justify-between cursor-pointer border border-[var(--dt-border)]"
+                    className="bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] transition-colors p-3 rounded-lg flex items-center justify-between cursor-pointer border border-[var(--dt-border)] group"
                     onClick={() => setSelectedProjectForReassociate(project)}
                   >
                     <div className="truncate pr-2 flex-1">
@@ -352,12 +380,24 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                         <span>{project.createdAt}</span>
                       </div>
                     </div>
-                    <div className="text-[9px] text-[var(--dt-text-muted)] shrink-0 font-mono text-right">
-                      {project.keepCount > 0 || project.cullCount > 0 ? (
-                        <span className="text-[#6FA887]">已整理</span>
-                      ) : (
-                        <span className="text-yellow-500/80">未开始</span>
-                      )}
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="text-[9px] text-[var(--dt-text-muted)] font-mono text-right">
+                        {project.keepCount > 0 || project.cullCount > 0 ? (
+                          <span className="text-[#6FA887]">已整理</span>
+                        ) : (
+                          <span className="text-yellow-500/80">未开始</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectToRemove(project);
+                        }}
+                        className="text-[9px] text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity font-medium px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20"
+                        title="移除摘要"
+                      >
+                        移除摘要
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -521,6 +561,80 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 className="desktop-button-primary text-xs py-2 px-4 rounded font-semibold"
               >
                 继续整理
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Project Removal Confirmation Modal */}
+      {projectToRemove && (
+        <div className="fixed inset-0 bg-black/60 backdrop-filter backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1f26] border border-white/10 rounded-xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-left text-[var(--dt-text-primary)]">
+            <h3 className="text-sm font-bold text-[var(--dt-text-primary)] flex items-center gap-2">
+              <span className="text-yellow-500">⚠️</span>
+              确认移除摘要
+            </h3>
+            
+            <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
+              您确定要移除该项目的最近记录吗？
+            </p>
+
+            <div className="bg-black/25 border border-white/5 rounded-lg p-3 text-[10px] text-[var(--dt-text-soft)] space-y-1.5 leading-relaxed">
+              <p>• 只会移除此项目的最近记录摘要。</p>
+              <p>• <span className="font-semibold text-white">不会影响您的本地原图照片</span>，原图保持不变。</p>
+              <p>• 之后您仍可以重新选择照片开始新整理。</p>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setProjectToRemove(null)}
+                className="desktop-button-secondary text-xs py-2 px-4 rounded"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => handleRemoveProject(projectToRemove.projectId)}
+                className="desktop-button-primary text-xs py-2 px-4 rounded font-semibold bg-red-600 hover:bg-red-500 border-red-600"
+              >
+                确认移除摘要
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear All Projects Confirmation Modal */}
+      {isConfirmingClearAll && (
+        <div className="fixed inset-0 bg-black/60 backdrop-filter backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1f26] border border-white/10 rounded-xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-left text-[var(--dt-text-primary)]">
+            <h3 className="text-sm font-bold text-[var(--dt-text-primary)] flex items-center gap-2">
+              <span className="text-yellow-500">⚠️</span>
+              确认清空摘要列表
+            </h3>
+            
+            <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
+              您确定要清空所有最近项目摘要列表吗？
+            </p>
+
+            <div className="bg-black/25 border border-white/5 rounded-lg p-3 text-[10px] text-[var(--dt-text-soft)] space-y-1.5 leading-relaxed">
+              <p>• 只会清空当前浏览器中存储的本地摘要记录。</p>
+              <p>• <span className="font-semibold text-white">绝对不会影响您的本地原图照片</span>，原图保持不变。</p>
+              <p>• 绝对不改动您的本地原图文件。</p>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setIsConfirmingClearAll(false)}
+                className="desktop-button-secondary text-xs py-2 px-4 rounded"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleClearAllProjects}
+                className="desktop-button-primary text-xs py-2 px-4 rounded font-semibold bg-red-600 hover:bg-red-500 border-red-600"
+              >
+                确认清空摘要列表
               </button>
             </div>
           </div>
