@@ -144,14 +144,12 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         setIsScanning(true);
         const meta = await scanNativeFolderMetadata(res.path);
         // Execute scanner command to verify desktop bridge functionality
-        const entries = await scanNativeFolderImageEntries(res.path);
+        await scanNativeFolderImageEntries(res.path);
         setIsScanning(false);
 
         if (meta) {
           setScanSummary(meta);
-          if (entries && onStatusChange) {
-            console.debug(`[NativeImageEntries] Successfully scanned ${entries.totalEntries} entries.`);
-          }
+
           if (onStatusChange) {
             onStatusChange(`已选文件夹: ${getFolderBasename(res.path)} | 发现图片 ${meta.imageFilesCount} 张`);
           }
