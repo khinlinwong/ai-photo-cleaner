@@ -14,6 +14,7 @@ import { LocalProjectSummary } from '@/lib/projects/types';
 import { isTauriRuntime } from '@/lib/desktop/tauriEnvironment';
 import { pickNativeImageFolder } from '@/lib/desktop/nativeFolderPicker';
 import { scanNativeFolderMetadata, NativeFolderMetadataSummary } from '@/lib/desktop/nativeFolderScanner';
+import { scanNativeFolderImageEntries, NativeImageEntriesScanResult } from '@/lib/desktop/nativeImageEntriesScanner';
 
 /**
  * Extract folder basename securely from path string, removing drive letter and full hierarchy.
@@ -82,6 +83,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [pickedFolder, setPickedFolder] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanSummary, setScanSummary] = useState<NativeFolderMetadataSummary | null>(null);
+  const [imageEntriesResult, setImageEntriesResult] = useState<NativeImageEntriesScanResult | null>(null);
 
   // 稳定性防护相关 Refs 与 timeouts
   const activeFocusListenerRef = useRef<(() => void) | null>(null);
@@ -131,6 +133,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     setErrorMessage(null);
     setPickedFolder(null);
     setScanSummary(null);
+    setImageEntriesResult(null);
     try {
       const res = await pickNativeImageFolder();
       if (res && res.path) {
@@ -141,10 +144,14 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
         setIsScanning(true);
         const meta = await scanNativeFolderMetadata(res.path);
+        const entries = await scanNativeFolderImageEntries(res.path);
         setIsScanning(false);
 
         if (meta) {
           setScanSummary(meta);
+          if (entries) {
+            setImageEntriesResult(entries);
+          }
           if (onStatusChange) {
             onStatusChange(`已选文件夹: ${getFolderBasename(res.path)} | 发现图片 ${meta.imageFilesCount} 张`);
           }
@@ -500,11 +507,32 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 )}
 
                 {!isScanning && scanSummary && (
-                  <div className="bg-black/20 p-2.5 rounded border border-emerald-500/10 space-y-1 text-[10.5px] font-mono text-[var(--dt-text-secondary)]">
-                    <div>发现图片：<span className="text-emerald-400 font-bold">{scanSummary.imageFilesCount} 张</span></div>
-                    <div>文件总数：<span className="text-[var(--dt-text-primary)]">{scanSummary.totalFiles} 个</span></div>
-                    <div>其他 / 不支持文件：<span>{scanSummary.unsupportedFilesCount} 个</span></div>
-                    <div>图片总大小：<span className="text-[var(--dt-text-primary)] font-bold">{formatBytes(scanSummary.totalSizeBytes)}</span></div>
+                  <div className="bg-black/20 p-2.5 rounded border border-emerald-500/10 space-y-2 text-[10.5px] font-mono text-[var(--dt-text-secondary)]">
+                    <div className="space-y-1">
+                      <div>发现图片：<span className="text-emerald-400 font-bold">{scanSummary.imageFilesCount} 张</span></div>
+                      <div>文件总数：<span className="text-[var(--dt-text-primary)]">{scanSummary.totalFiles} 个</span></div>
+                      <div>其他 / 不支持文件：<span>{scanSummary.unsupportedFilesCount} 个</span></div>
+                      <div>图片总大小：<span className="text-[var(--dt-text-primary)] font-bold">{formatBytes(scanSummary.totalSizeBytes)}</span></div>
+                      <div>支持格式：<span className="text-[var(--dt-text-soft)]">JPG / PNG / WEBP / HEIC / HEIF</span></div>
+                    </div>
+
+                    {imageEntriesResult && imageEntriesResult.entries.length > 0 && (
+                      <div className="pt-1.5 border-t border-emerald-500/5 space-y-1">
+                        <div className="text-[9.5px] text-[var(--dt-text-soft)]">图片文件示例：</div>
+                        <ul className="list-disc list-inside text-[9.5px] text-[var(--dt-text-secondary)] space-y-0.5 max-w-full overflow-hidden">
+                          {imageEntriesResult.entries.slice(0, 5).map((entry) => (
+                            <li key={entry.id} className="truncate">
+                              {entry.basename} ({formatBytes(entry.sizeBytes)})
+                            </li>
+                          ))}
+                        </ul>
+                        {imageEntriesResult.entries.length > 5 && (
+                          <div className="text-[9px] text-[var(--dt-text-soft)] italic pt-0.5">
+                            ... 还有 {imageEntriesResult.entries.length - 5} 张图片
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
