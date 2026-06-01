@@ -7,7 +7,7 @@ import DesktopTopBar from '@/components/desktop/DesktopTopBar';
 import DesktopSidebar from '@/components/desktop/DesktopSidebar';
 import DesktopStatusBar from '@/components/desktop/DesktopStatusBar';
 import LocalScanProgress from '@/components/desktop/LocalScanProgress';
-import { AlertCircle, UploadCloud, FolderSync } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export default function ProcessingPage() {
   const { 
@@ -18,7 +18,7 @@ export default function ProcessingPage() {
     currentAnalysisIndex,
     currentAnalysisName,
     resetWorkspace,
-    uploadFiles
+    projectName
   } = usePhotoWorkspace();
   
   const router = useRouter();
@@ -89,26 +89,18 @@ export default function ProcessingPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <h2 className="text-lg font-bold text-[var(--dt-text-primary)]">未检测到导入的照片项目</h2>
+                  <h2 className="text-lg font-bold text-[var(--dt-text-primary)]">当前没有可处理的照片。</h2>
                   <p className="text-[var(--dt-text-secondary)] text-xs leading-relaxed max-w-sm">
-                    工作区当前是空的。请先前往主页添加照片，或者直接加载系统预设的旅行测试包以体验 AI 本地分析功能。
+                    请返回开始页重新选择本地照片。
                   </p>
                 </div>
                 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                   <button 
                     onClick={() => router.push('/desktop')}
-                    className="desktop-button-secondary text-xs"
-                  >
-                    <UploadCloud className="mr-2 h-4 w-4" />
-                    返回主页选择文件夹
-                  </button>
-                  <button 
-                    onClick={() => uploadFiles([])}
                     className="desktop-button-primary text-xs"
                   >
-                    <FolderSync className="mr-2 h-4 w-4" />
-                    加载演示数据体验
+                    返回开始页
                   </button>
                 </div>
               </div>
@@ -120,6 +112,7 @@ export default function ProcessingPage() {
                 analysisProgress={analysisProgress}
                 currentAnalysisIndex={currentAnalysisIndex}
                 currentAnalysisName={currentAnalysisName}
+                projectName={projectName}
                 onCancel={handleCancelScan}
               />
             )}

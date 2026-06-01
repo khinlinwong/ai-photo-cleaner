@@ -28,6 +28,7 @@ interface LocalScanProgressProps {
   analysisProgress: number;
   currentAnalysisIndex: number;
   currentAnalysisName: string;
+  projectName?: string;
   onCancel: () => void;
 }
 
@@ -37,6 +38,7 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
   analysisProgress,
   currentAnalysisIndex,
   currentAnalysisName,
+  projectName,
   onCancel
 }) => {
   // 动态判断子任务状态
@@ -56,8 +58,12 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
         if (analysisProgress >= 75) return 'active';
         return 'pending';
       case 3:
-        if (analysisProgress === 100 && !isAnalyzing) return 'completed';
+        if (analysisProgress === 100) return 'completed';
         if (analysisProgress >= 95) return 'active';
+        return 'pending';
+      case 4:
+        if (analysisProgress === 100 && !isAnalyzing) return 'completed';
+        if (analysisProgress === 100) return 'active';
         return 'pending';
       default:
         return 'pending';
@@ -65,10 +71,11 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
   };
 
   const tasks = [
-    { label: '读取本地照片像素流', desc: 'Reading files', index: 0 },
-    { label: '清晰度与对焦质量分析', desc: 'Checking focus & blur', index: 1 },
-    { label: '曝光度与环境亮度检测', desc: 'Checking exposure levels', index: 2 },
-    { label: '感知哈希提取与相似性分组', desc: 'Grouping similar photos', index: 3 }
+    { label: '读取本地照片', desc: 'Reading files', index: 0 },
+    { label: '分析清晰度与曝光', desc: 'Analyzing focus & exposure', index: 1 },
+    { label: '识别相似照片', desc: 'Identifying similar groups', index: 2 },
+    { label: '准备整理结果', desc: 'Preparing results', index: 3 },
+    { label: '进入整理结果页', desc: 'Entering results view', index: 4 }
   ];
 
   // 统计指标
@@ -101,13 +108,18 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
       {/* Title Header */}
       <div className="flex items-center justify-between border-b border-[var(--dt-border)] pb-4">
         <div className="space-y-1">
-          <h1 className="text-xl font-bold text-[var(--dt-text-primary)]">
-            {analysisProgress === 100 && !isAnalyzing ? '本地扫描分析已完成' : '正在本地扫描照片'}
-          </h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl font-bold text-[var(--dt-text-primary)]">
+              {analysisProgress === 100 && !isAnalyzing ? '本地分析已完成' : '正在本地分析照片'}
+            </h1>
+            {projectName && (
+              <span className="text-[10px] text-[var(--dt-text-secondary)] font-mono bg-white/5 px-2 py-0.5 rounded border border-[var(--dt-border)] truncate max-w-[200px]" title={projectName}>
+                项目: {projectName}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed max-w-md">
-            {analysisProgress === 100 && !isAnalyzing
-              ? '分析已完成，正在流转至整理工作区...'
-              : `AI Photo Cleaner 正在分析清晰度、曝光和相似照片组。此阶段默认在本地处理原图。`}
+            照片只在本机浏览器中处理，不会上传云端。原图保持不变，整理结果可在下一步手动调整。
           </p>
         </div>
 
@@ -235,12 +247,12 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
           <div className="bg-[var(--dt-panel-bg-solid)] p-3.5 rounded-lg border border-[var(--dt-border)] text-xs space-y-2">
             <div className="flex items-center space-x-2 text-[var(--dt-text-primary)] font-semibold">
               <ShieldCheck className="w-4 h-4 text-[#6FA887]" />
-              <span>本阶段安全防护说明</span>
+              <span>本地数据安全说明</span>
             </div>
             <ul className="space-y-1 text-[10px] text-[var(--dt-text-secondary)] list-disc pl-4 leading-relaxed">
-              <li>默认在本地处理原图，联网 AI 默认关闭。</li>
-              <li>原图在本地沙箱进行安全分析，不上传云端。</li>
-              <li>本阶段不会主动上传任何本地原图或特征特征。</li>
+              <li>照片只在本机浏览器中处理，不会上传云端。</li>
+              <li>原图保持不变，整理结果可在下一步手动调整。</li>
+              <li>完成后会进入整理结果页，您可以继续标记保留或淘汰候选。</li>
             </ul>
           </div>
         </div>
