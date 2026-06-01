@@ -78,6 +78,8 @@ export interface PhotoItem {
   displayLabel?: '技术风险低' | '建议复核' | '淘汰候选';
   reasonLabel?: string;
   userDecision?: 'keep' | 'review' | 'delete';
+  sourceId?: string;
+  sourceType?: 'browser-file' | 'native-folder-preview' | 'native-folder-file';
 }
 
 // 预设的高质量旅行 Mock 照片（对应新版的类型定义）
