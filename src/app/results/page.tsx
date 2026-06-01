@@ -368,22 +368,15 @@ export default function ResultsPage() {
     }
   };
 
-  // 纯客户端分批打包下载特定分区照片 (JSZip)
-  const downloadPhotosZip = async (status: 'keep' | 'delete') => {
-    const targetPhotos = photos.filter((p) => {
-      if (status === 'keep') {
-        return getUserVisibleBucket(p) === 'keep';
-      }
-      return getUserVisibleBucket(p) === 'cull';
-    });
+  // 纯客户端分批打包下载保留照片整理包 (JSZip)
+  const downloadPhotosZip = async () => {
+    const targetPhotos = photos.filter((p) => getUserVisibleBucket(p) === 'keep');
     if (targetPhotos.length === 0) return;
     setIsZipping(true);
     setZipExportWarning(null);
     try {
       const JSZip = (await import('jszip')).default;
-      const baseFilename = status === 'keep'
-        ? buildZipExportFilename(projectName).replace(/\.zip$/, '')
-        : `ai-photo-cleaner-cull-${buildZipExportFilename(projectName).replace(/^ai-photo-cleaner-/, '').replace(/\.zip$/, '')}`;
+      const baseFilename = buildZipExportFilename(projectName).replace(/\.zip$/, '');
       const batches = buildZipBatches(targetPhotos, baseFilename);
 
       for (let b = 0; b < batches.length; b++) {
@@ -429,7 +422,7 @@ export default function ResultsPage() {
     } catch (err) {
       console.error('Failed to download ZIP pack:', err);
       setZipExportWarning(
-        'ZIP 下载未完成。浏览器在处理超大相册时可能会中断下载。请尝试减少单次导出数量，或分批导出保留区和淘汰候选区。'
+        'ZIP 下载未完成。浏览器在处理超大相册时可能会中断下载。请尝试减少单次导出数量，或分批下载。'
       );
     } finally {
       setIsZipping(false);
@@ -819,7 +812,7 @@ export default function ResultsPage() {
                     pendingGroupsCount={pendingGroupsCount}
                     similarGroupsCount={similarGroups.length}
                     projectName={projectName}
-                    onExportKeepZip={() => downloadPhotosZip('keep')}
+                    onExportKeepZip={downloadPhotosZip}
                     onExportManifestCsv={handleExportManifestCsv}
                     onExportManifestJson={handleExportManifestJson}
                     onContinueBattle={() => {
