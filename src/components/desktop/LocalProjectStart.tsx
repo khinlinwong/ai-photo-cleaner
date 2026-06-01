@@ -153,6 +153,10 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         const previewResult = await scanNativeFolderImagePreviews(res.path);
         if (previewResult && previewResult.items) {
           setPreviews(previewResult.items);
+          
+          // Trigger background sample verification of native reader
+          const { analyzeNativePreviewSample } = await import('@/lib/desktop/nativeReader');
+          analyzeNativePreviewSample(previewResult.items).catch(() => {});
         }
 
         setIsScanning(false);

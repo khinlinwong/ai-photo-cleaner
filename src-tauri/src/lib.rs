@@ -311,6 +311,40 @@ fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewS
   })
 }
 
+#[tauri::command]
+fn read_native_preview_bytes(id: String) -> Result<Vec<u8>, String> {
+  let file_path = {
+    let mapping = get_preview_mapping();
+    if let Ok(guard) = mapping.lock() {
+      guard.get(&id).cloned()
+    } else {
+      None
+    }
+  };
+
+  let file_path = match file_path {
+    Some(path) => path,
+    None => return Err("无效或过期的预览标识，请重新选择文件夹。".to_string()),
+  };
+
+  if !verify_in_active_folder(&file_path) {
+    return Err("安全拒绝：请求的文件超出当前文件夹授权范围。".to_string());
+  }
+
+  let metadata = fs::metadata(&file_path)
+    .map_err(|_| "无法读取文件元数据。".to_string())?;
+
+  const MAX_FILE_SIZE_BYTES: u64 = 30 * 1024 * 1024; // 30 MB
+  if metadata.len() > MAX_FILE_SIZE_BYTES {
+    return Err("安全拒绝：文件大小超过 30MB 限制。".to_string());
+  }
+
+  let bytes = fs::read(&file_path)
+    .map_err(|_| "读取本地文件内容失败。".to_string())?;
+
+  Ok(bytes)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -364,7 +398,8 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       scan_folder_metadata,
       scan_folder_image_entries,
-      scan_folder_image_previews
+      scan_folder_image_previews,
+      read_native_preview_bytes
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
