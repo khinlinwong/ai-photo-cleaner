@@ -16,11 +16,23 @@ import { pickNativeImageFolder } from '@/lib/desktop/nativeFolderPicker';
 
 /**
  * Extract folder basename securely from path string, removing drive letter and full hierarchy.
+ * Returns fallback if the path is a disk root (like C:\ or D:\) or contains only drive letter.
  */
 const getFolderBasename = (path: string): string => {
   if (!path) return '已选择文件夹';
   const parts = path.split(/[/\\]/).filter(Boolean);
-  return parts[parts.length - 1] || '已选择文件夹';
+  const base = parts[parts.length - 1];
+  
+  if (!base) {
+    return '本地文件夹';
+  }
+  
+  // Check if it looks like a Windows drive letter (e.g., C: or D:)
+  if (/^[a-zA-Z]:$/.test(base)) {
+    return '本地文件夹';
+  }
+  
+  return base;
 };
 
 interface LocalProjectStartProps {
@@ -107,7 +119,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       if (res && res.path) {
         setPickedFolder(res.path);
         if (onStatusChange) {
-          onStatusChange(`已选文件夹: ${res.path.split(/[/\\]/).pop() || res.path}`);
+          onStatusChange(`已选文件夹: ${getFolderBasename(res.path)}`);
         }
       }
     } catch (err) {
