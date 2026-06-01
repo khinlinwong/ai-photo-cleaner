@@ -41,10 +41,10 @@ import { PhotoBucketSection } from '@/components/results/PhotoBucketSection';
 export default function ResultsPage() {
   const {
     photos,
-    updatePhotoStatus,
-    updateMultiplePhotosStatus,
-    resetWorkspace,
-    loadDemoPhotos,
+    updatePhotoStatus: contextUpdatePhotoStatus,
+    updateMultiplePhotosStatus: contextUpdateMultiplePhotosStatus,
+    resetWorkspace: contextResetWorkspace,
+    loadDemoPhotos: contextLoadDemoPhotos,
     similarGroups,
     activeBattle,
     startBattleForGroup,
@@ -53,11 +53,64 @@ export default function ResultsPage() {
     projectName
   } = usePhotoWorkspace();
 
+  interface UndoAction {
+    actionLabel: string;
+    affectedPhotos: Array<{
+      photoId: string;
+      previousStatus: 'keep' | 'review' | 'delete';
+    }>;
+    createdAt: number;
+  }
+
   const router = useRouter();
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
+
+  // 最近一次手动决策操作撤销状态
+  const [lastDecisionAction, setLastDecisionAction] = useState<UndoAction | null>(null);
+
+  // 本地包裹的用户单张照片决策订正
+  const updatePhotoStatus = useCallback((id: string, status: 'keep' | 'review' | 'delete') => {
+    const photo = photos.find(p => p.id === id);
+    if (photo) {
+      setLastDecisionAction({
+        actionLabel: status === 'keep' ? '标记为保留' : '标记为淘汰候选',
+        affectedPhotos: [{ photoId: id, previousStatus: photo.status }],
+        createdAt: Date.now()
+      });
+    }
+    contextUpdatePhotoStatus(id, status);
+  }, [photos, contextUpdatePhotoStatus]);
+
+  // 本地包裹的用户多张照片批量决策订正
+  const updateMultiplePhotosStatus = useCallback((ids: string[], status: 'keep' | 'review' | 'delete') => {
+    const affected = ids.map(id => {
+      const photo = photos.find(p => p.id === id);
+      return photo ? { photoId: id, previousStatus: photo.status } : null;
+    }).filter((x): x is { photoId: string; previousStatus: 'keep' | 'review' | 'delete' } => x !== null);
+
+    if (affected.length > 0) {
+      setLastDecisionAction({
+        actionLabel: status === 'keep' ? '批量标记为保留' : '批量标记为淘汰候选',
+        affectedPhotos: affected,
+        createdAt: Date.now()
+      });
+    }
+    contextUpdateMultiplePhotosStatus(ids, status);
+  }, [photos, contextUpdateMultiplePhotosStatus]);
+
+  // 本地包裹的重置工作台与载入 Demo (清空撤销记录)
+  const resetWorkspace = useCallback(() => {
+    setLastDecisionAction(null);
+    contextResetWorkspace();
+  }, [contextResetWorkspace]);
+
+  const loadDemoPhotos = useCallback(() => {
+    setLastDecisionAction(null);
+    contextLoadDemoPhotos();
+  }, [contextLoadDemoPhotos]);
 
   // 批量手动决策选择状态
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
@@ -83,6 +136,41 @@ export default function ResultsPage() {
     updateMultiplePhotosStatus(selectedPhotoIds, 'delete');
     clearSelection();
   }, [selectedPhotoIds, updateMultiplePhotosStatus, clearSelection]);
+
+  const undoLastDecisionAction = useCallback(() => {
+    if (!lastDecisionAction) return;
+
+    const keepIds: string[] = [];
+    const reviewIds: string[] = [];
+    const deleteIds: string[] = [];
+
+    lastDecisionAction.affectedPhotos.forEach((item) => {
+      if (item.previousStatus === 'keep') {
+        keepIds.push(item.photoId);
+      } else if (item.previousStatus === 'review') {
+        reviewIds.push(item.photoId);
+      } else if (item.previousStatus === 'delete') {
+        deleteIds.push(item.photoId);
+      }
+    });
+
+    if (keepIds.length > 0) {
+      contextUpdateMultiplePhotosStatus(keepIds, 'keep');
+    }
+    if (reviewIds.length > 0) {
+      contextUpdateMultiplePhotosStatus(reviewIds, 'review');
+    }
+    if (deleteIds.length > 0) {
+      contextUpdateMultiplePhotosStatus(deleteIds, 'delete');
+    }
+
+    setLastDecisionAction(null);
+
+    setToastMessage("已撤销最近一次整理调整。");
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  }, [lastDecisionAction, contextUpdateMultiplePhotosStatus]);
 
   // 当照片集更新时，自动过滤掉已不存在的照片 ID，确保选择状态的安全与一致性
   useEffect(() => {
@@ -852,6 +940,35 @@ export default function ResultsPage() {
                           className="bg-white/5 hover:bg-white/10 border border-white/10 text-[var(--dt-text-primary)] hover:text-[var(--dt-text-primary)] h-7 px-3 text-[10px] transition-all shadow-none"
                         >
                           取消选择
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 撤销提示条 */}
+                  {lastDecisionAction && (
+                    <div className="p-3 bg-[var(--dt-card-bg)] border border-yellow-500/20 rounded-lg flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                      <div className="flex items-center gap-2 flex-wrap text-left">
+                        <span className="inline-flex h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+                        <span className="text-[var(--dt-text-primary)] font-medium">
+                          已调整 {lastDecisionAction.affectedPhotos.length} 张照片的整理结果。
+                        </span>
+                        <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">|</span>
+                        <span className="text-[10px] text-[var(--dt-text-soft)]">只调整整理结果，不会修改原图，原图保持不变</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          onClick={undoLastDecisionAction}
+                          className="bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 font-semibold h-7 px-3 text-[10px] transition-all hover:text-yellow-400 shadow-none"
+                        >
+                          撤销
+                        </Button>
+                        <Button
+                          onClick={() => setLastDecisionAction(null)}
+                          variant="ghost"
+                          className="text-[var(--dt-text-soft)] hover:text-[var(--dt-text-primary)] hover:bg-white/5 h-7 w-7 p-0 rounded-full transition-all flex items-center justify-center border-0"
+                        >
+                          <X className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
