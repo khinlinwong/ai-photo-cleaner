@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ShieldCheck,
   Download,
-  Trash2,
   AlertTriangle,
   GitCompare,
   RotateCcw
@@ -20,7 +19,6 @@ export interface ExportPanelProps {
   similarGroupsCount: number;
   projectName?: string;
   onExportKeepZip: () => void;
-  onExportCullZip: () => void;
   onExportManifestCsv: () => void;
   onExportManifestJson: () => void;
   onContinueBattle: () => void;
@@ -35,14 +33,12 @@ const LABELS = {
   keepPhotosHeader: "🟢 保留照片",
   keepPhotosDesc: "安全打包所有标记为【保留】的照片（共约 ",
   zippingStatus: "正在导出中...",
-  exportKeepZipBtn: "导出保留区 ZIP",
+  exportKeepZipBtn: "导出保留照片 ZIP",
   zippingKeepDesc: "正在生成 ZIP，请等待当前导出完成。",
   noKeepPhotosDesc: "暂无可导出的保留照片",
   cullPhotosHeader: "🔴 淘汰候选照片",
   cullPhotosDesc: "标记为淘汰候选的照片（约 ",
-  cullPhotosDescEnd: "）。淘汰候选仅代表整理建议，原图在您的电脑上仍保持原样，我们仅为您打包一份独立的压缩包供后续确认，绝对不改动您的本地原图文件。",
-  exportCullZipBtn: "导出淘汰候选区 ZIP",
-  noCullPhotosDesc: "暂无可导出的淘汰候选照片",
+  cullPhotosDescEnd: "）。淘汰候选仅作为整理建议记录在清单中，原图在您的电脑上仍保持原样，绝不改动您的本地原图文件，也不会上传云端。",
   manifestHeader: "📊 整理清单导出",
   exportCsvBtn: "导出整理清单 CSV",
   exportJsonBtn: "导出整理清单 JSON",
@@ -84,7 +80,6 @@ export function ExportPanel({
   similarGroupsCount,
   projectName,
   onExportKeepZip,
-  onExportCullZip,
   onExportManifestCsv,
   onExportManifestJson,
   onContinueBattle,
@@ -196,25 +191,10 @@ export function ExportPanel({
                 {LABELS.cullPhotosDesc}{spaceSavedMB} MB{LABELS.cullPhotosDescEnd}
               </p>
             </div>
-            <div className="mt-3">
-              <button
-                onClick={onExportCullZip}
-                disabled={cullCount === 0 || isZipping}
-                className="desktop-button-secondary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 border border-white/5 font-bold transition-all"
-              >
-                <Trash2 className="h-3.5 w-3.5 text-amber-500/80" />
-                {isZipping ? LABELS.zippingStatus : LABELS.exportCullZipBtn}
-              </button>
-              {(cullCount === 0 || isZipping) && (
-                <p className="text-[9px] text-[var(--dt-text-soft)] text-center mt-1.5 select-none leading-relaxed">
-                  {isZipping ? LABELS.zippingKeepDesc : LABELS.noCullPhotosDesc}
-                </p>
-              )}
-              {cullCount > 0 && !isZipping && pendingGroupsCount > 0 && (
-                <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
-                  {LABELS.exportWarningTip}
-                </p>
-              )}
+            <div className="mt-3 border-t border-white/5 pt-2">
+              <p className="text-[9.5px] text-[var(--dt-text-muted)] leading-relaxed text-center">
+                🔒 本地原图保持不变，无需进行打包导出
+              </p>
             </div>
           </div>
         </div>

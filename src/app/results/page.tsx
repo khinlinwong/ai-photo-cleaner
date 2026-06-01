@@ -820,7 +820,6 @@ export default function ResultsPage() {
                     similarGroupsCount={similarGroups.length}
                     projectName={projectName}
                     onExportKeepZip={() => downloadPhotosZip('keep')}
-                    onExportCullZip={() => downloadPhotosZip('delete')}
                     onExportManifestCsv={handleExportManifestCsv}
                     onExportManifestJson={handleExportManifestJson}
                     onContinueBattle={() => {
