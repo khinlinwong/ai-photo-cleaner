@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 type VirtualPhotoGridProps<T> = {
   items: T[];
   getItemKey: (item: T) => string;
-  renderItem: (item: T) => React.ReactNode;
+  renderItem: (item: T, index: number) => React.ReactNode;
   minCardWidth: number;
   rowHeight: number;
   gap: number;
@@ -163,14 +163,17 @@ export default function VirtualPhotoGrid<T>({
           gap: `${gap}px`,
         }}
       >
-        {visibleItems.map((item) => (
-          <div 
-            key={getItemKey(item)} 
-            style={{ height: `${rowHeight}px`, overflow: 'visible' }}
-          >
-            {renderItem(item)}
-          </div>
-        ))}
+        {visibleItems.map((item, localIdx) => {
+          const globalIndex = startIndex + localIdx;
+          return (
+            <div 
+              key={getItemKey(item)} 
+              style={{ height: `${rowHeight}px`, overflow: 'visible' }}
+            >
+              {renderItem(item, globalIndex)}
+            </div>
+          );
+        })}
       </div>
 
       {/* 底部高度填充占位 */}

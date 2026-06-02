@@ -367,3 +367,107 @@ a,
   }
 }
 
+/* ---------------------------------------------------- */
+/* Global Micro-Interactions (Hover / Active) */
+/* ---------------------------------------------------- */
+
+button:active:not(:disabled),
+.desktop-clickable:active:not(:disabled) {
+  transform: scale(0.98) translateY(0.5px) !important;
+}
+
+button, 
+a,
+.cursor-pointer,
+.desktop-clickable {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease !important;
+}
+
+/* ---------------------------------------------------- */
+/* Card pop entrance (0.28s, with stagger delay) */
+/* ---------------------------------------------------- */
+
+.animate-card-pop {
+  animation: cardPopEntrance 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+@keyframes cardPopEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ---------------------------------------------------- */
+/* Export Popover side-aligned panel animations */
+/* ---------------------------------------------------- */
+
+.animate-export-in {
+  animation: exportPanelIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-export-out {
+  animation: exportPanelOut 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes exportPanelIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes exportPanelOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+/* ---------------------------------------------------- */
+/* A/B Battle modal popover / overlay transition */
+/* ---------------------------------------------------- */
+
+.animate-battle-in {
+  animation: battleStageIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-battle-out {
+  animation: battleStageOut 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes battleStageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes battleStageOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { usePhotoWorkspace, PhotoItem } from '@/context/PhotoWorkspaceContext';
+import { usePhotoWorkspace, PhotoItem, ActiveBattleState } from '@/context/PhotoWorkspaceContext';
 import { getUserVisibleBucket, getReasonTags } from '@/lib/utils/photoLabelMapping';
 import DesktopTopBar from '@/components/desktop/DesktopTopBar';
 import DesktopSidebar from '@/components/desktop/DesktopSidebar';
@@ -69,6 +69,9 @@ export default function ResultsPage() {
   const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'keep' | 'cull' | 'similar' | 'battle-status'>('keep');
   const [exportOpen, setExportOpen] = useState(false);
+  const [isExportClosing, setIsExportClosing] = useState(false);
+  const [localActiveBattle, setLocalActiveBattle] = useState<ActiveBattleState | null>(null);
+  const [isBattleClosing, setIsBattleClosing] = useState(false);
 
   // 最近一次手动决策操作撤销状态
   const [lastDecisionAction, setLastDecisionAction] = useState<UndoAction | null>(null);
@@ -208,15 +211,59 @@ export default function ResultsPage() {
   // 当对比照片组切换或回合递进时，自动重置缩放比例，防跨幅拉伸
   useEffect(() => {
     handleResetZoom();
-  }, [activeBattle?.roundIndex, activeBattle?.groupId]);
+  }, [localActiveBattle?.roundIndex, localActiveBattle?.groupId]);
 
-  // A/B 对局弹窗的安全退出控制
-  const handleCloseBattle = useCallback(() => {
+  // 同步本地 A/B 对局状态以管理淡出退出动效
+  useEffect(() => {
     if (activeBattle) {
-      setDismissedGroups((prev) => [...prev, activeBattle.groupId]);
+      setLocalActiveBattle(activeBattle);
+      setIsBattleClosing(false);
+    } else if (localActiveBattle && !isBattleClosing) {
+      setIsBattleClosing(true);
+      const timer = setTimeout(() => {
+        setLocalActiveBattle(null);
+        setIsBattleClosing(false);
+      }, 280);
+      return () => clearTimeout(timer);
     }
-    closeBattle();
-  }, [activeBattle, closeBattle]);
+  }, [activeBattle, localActiveBattle, isBattleClosing]);
+
+  // A/B 对局弹窗的安全退出控制 (带有退出收缩动画)
+  const handleCloseBattleWithAnimation = useCallback(() => {
+    const battleToClose = activeBattle || localActiveBattle;
+    if (battleToClose) {
+      setDismissedGroups((prev) => [...prev, battleToClose.groupId]);
+    }
+    setIsBattleClosing(true);
+    setTimeout(() => {
+      closeBattle();
+      setLocalActiveBattle(null);
+      setIsBattleClosing(false);
+    }, 280);
+  }, [activeBattle, localActiveBattle, closeBattle]);
+
+  // 导出面板关闭动画控制器
+  const handleCloseExport = useCallback(() => {
+    setIsExportClosing(true);
+    setTimeout(() => {
+      setExportOpen(false);
+      setIsExportClosing(false);
+    }, 220);
+  }, []);
+
+  // 全局 Escape 键监听，用于关闭导出弹出框
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (exportOpen && !isExportClosing) {
+          e.preventDefault();
+          handleCloseExport();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [exportOpen, isExportClosing, handleCloseExport]);
 
   // 当检测到当前组对比 PK 结束时，自动关闭当前对比，并流转到下一组或展示 Toast
   useEffect(() => {
@@ -252,7 +299,7 @@ export default function ResultsPage() {
 
   // 键盘快捷键监听
   useEffect(() => {
-    if (!activeBattle) return;
+    if (!activeBattle || isBattleClosing) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
@@ -277,13 +324,13 @@ export default function ResultsPage() {
         applyBattleDecision('skip');
       } else if (key === 'escape') {
         e.preventDefault();
-        handleCloseBattle();
+        handleCloseBattleWithAnimation();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeBattle, applyBattleDecision, handleCloseBattle]);
+  }, [activeBattle, isBattleClosing, applyBattleDecision, handleCloseBattleWithAnimation]);
 
 
   // 鼠标滚轮缩放处理 (1x 到 4x)
@@ -699,13 +746,16 @@ export default function ResultsPage() {
   }
 
   // 渲染单张照片卡片（高度固定为 280px，详情折叠使用悬浮框以免改变卡片高度）
-  const renderPhotoCard = (photo: PhotoItem) => {
+  const renderPhotoCard = (photo: PhotoItem, index: number) => {
     const isSelected = selectedPhotoIds.includes(photo.id);
 
     return (
       <Card 
+        style={{
+          animationDelay: `${Math.min((index % 20) * 20, 120)}ms`
+        }}
         className={cn(
-          "w-full h-full overflow-visible rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md flex flex-col justify-between",
+          "w-full h-full overflow-visible rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md flex flex-col justify-between animate-card-pop",
           isSelected
             ? "border-emerald-500/80 bg-emerald-500/5 ring-1 ring-emerald-500/35"
             : getUserVisibleBucket(photo) === 'cull'
@@ -1169,40 +1219,48 @@ export default function ResultsPage() {
         <DesktopStatusBar statusText={statusText} />
       </div>
 
-      {/* 导出弹出面板 (整合至 Workflow 导出入口，带 0.2s 缩放渐入动效) */}
-        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-          <DialogContent 
-            className="sm:max-w-xl w-[90vw] bg-[var(--dt-panel-bg)] border border-[var(--dt-border)] text-[var(--dt-text-primary)] p-0 rounded-md shadow-2xl overflow-hidden focus:outline-none transition-all duration-200 ease-out transform scale-98 opacity-0 scale-100 opacity-100 animate-fade-in-scale"
+      {/* 导出弹出面板 (整合至 Workflow 导出入口，带 0.25s/0.2s 缩放渐显/隐动效，定位在 sidebar 旁边) */}
+      {(exportOpen || isExportClosing) && (
+        <>
+          {/* 点击外部遮罩 */}
+          <div 
+            className="fixed inset-0 z-40 bg-black/10 transition-opacity duration-200"
+            onClick={handleCloseExport}
+          />
+          <div 
+            className={cn(
+              "fixed left-[170px] bottom-[70px] z-50 w-[420px] bg-[var(--dt-panel-bg)] border border-[var(--dt-border-strong)] p-4 rounded shadow-2xl overflow-hidden focus:outline-none",
+              isExportClosing ? "animate-export-out" : "animate-export-in"
+            )}
           >
-            <div className="p-4">
-              <ExportPanel
-                totalPhotoCount={photos.length}
-                keepCount={keepPhotos.length}
-                keepSpaceMB={keepSpaceMB}
-                cullCount={deletePhotos.length}
-                spaceSavedMB={spaceSavedMB}
-                isZipping={isZipping}
-                zipExportWarning={zipExportWarning}
-                pendingGroupsCount={pendingGroupsCount}
-                similarGroupsCount={similarGroups.length}
-                projectName={projectName}
-                onExportKeepZip={downloadPhotosZip}
-                onExportManifestCsv={handleExportManifestCsv}
-                onExportManifestJson={handleExportManifestJson}
-                onContinueBattle={() => {
-                  const group = similarGroups.find(g => !g.battleCompleted);
-                  if (group) startBattleForGroup(group.id);
-                  setExportOpen(false);
-                }}
-                onRestart={() => {
-                  handleRestart();
-                  setExportOpen(false);
-                }}
-                hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+            <ExportPanel
+              totalPhotoCount={photos.length}
+              keepCount={keepPhotos.length}
+              keepSpaceMB={keepSpaceMB}
+              cullCount={deletePhotos.length}
+              spaceSavedMB={spaceSavedMB}
+              isZipping={isZipping}
+              zipExportWarning={zipExportWarning}
+              pendingGroupsCount={pendingGroupsCount}
+              similarGroupsCount={similarGroups.length}
+              projectName={projectName}
+              onExportKeepZip={downloadPhotosZip}
+              onExportManifestCsv={handleExportManifestCsv}
+              onExportManifestJson={handleExportManifestJson}
+              onContinueBattle={() => {
+                const group = similarGroups.find(g => !g.battleCompleted);
+                if (group) startBattleForGroup(group.id);
+                handleCloseExport();
+              }}
+              onRestart={() => {
+                handleRestart();
+                handleCloseExport();
+              }}
+              hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
+            />
+          </div>
+        </>
+      )}
 
         {/* Photo Diagnostics Detail Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -1376,41 +1434,45 @@ export default function ResultsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Photo Battle Overlay (A/B Compare) */}
-      {activeBattle && (() => {
-        const leftId = activeBattle.currentCandidateId;
-        const rightId = activeBattle.contenderIds[activeBattle.nextIndex];
+      {/* Photo Battle Overlay (A/B Compare) - 带有 0.3s 弹出和收紧退出过渡动画的自定义模态比对比对面板 */}
+      {(localActiveBattle || isBattleClosing) && (() => {
+        const battleObj = localActiveBattle || activeBattle;
+        if (!battleObj) return null;
+
+        const leftId = battleObj.currentCandidateId;
+        const rightId = battleObj.contenderIds[battleObj.nextIndex];
         const leftPhoto = photos.find(p => p.id === leftId);
         const rightPhoto = photos.find(p => p.id === rightId);
-        const isBattleCompleted = activeBattle.nextIndex >= activeBattle.contenderIds.length;
-        const activeGroup = similarGroups.find(g => g.id === activeBattle.groupId);
+        const isBattleCompleted = battleObj.nextIndex >= battleObj.contenderIds.length;
+        const activeGroup = similarGroups.find(g => g.id === battleObj.groupId);
         const groupPhotos = photos.filter(p => activeGroup?.photoIds.includes(p.id));
 
         if (isBattleCompleted) return null;
 
         return (
-          <Dialog open={true} onOpenChange={handleCloseBattle}>
-            <DialogContent 
+          <div className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 select-none">
+            <div 
               style={{
                 background: 'linear-gradient(135deg, rgba(30, 35, 42, 0.98), rgba(40, 46, 54, 0.99))',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                boxShadow: '0 24px 50px rgba(0, 0, 0, 0.55)'
+                border: '1px solid var(--dt-border-strong)',
               }}
-              className="sm:max-w-6xl w-[96vw] max-h-[85vh] flex flex-col text-[var(--dt-text-primary)] p-0 overflow-hidden rounded-xl border-white/5"
+              className={cn(
+                "sm:max-w-6xl w-[96vw] max-h-[85vh] h-[80vh] flex flex-col text-[var(--dt-text-primary)] p-0 overflow-hidden rounded shadow-2xl relative",
+                isBattleClosing ? "animate-battle-out" : "animate-battle-in"
+              )}
             >
-              <DialogHeader className="p-3.5 border-b border-white/5 flex flex-row items-center justify-between space-y-0 shrink-0">
+              <div className="p-3.5 border-b border-white/5 flex flex-row items-center justify-between space-y-0 shrink-0">
                 <div className="flex flex-col text-left">
-                  <DialogTitle className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
                     <GitCompare className="h-4 w-4 text-yellow-400" />
                     选择更想保留的一张
-                  </DialogTitle>
+                  </h3>
                   <span className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">
                     这组照片较相似，请直接选择你想保留的结果。未选照片会标记为淘汰候选，原图保持不变。
                   </span>
                 </div>
                 <div className="bg-black/25 border border-white/5 rounded px-2.5 py-1 text-[10px] text-[var(--dt-text-primary)] font-mono font-bold">
-                  当前组: {activeBattle.roundIndex} / {activeBattle.totalRounds}
+                  当前组: {battleObj.roundIndex} / {battleObj.totalRounds}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="desktop-pill text-[9px] scale-90 border-white/5 bg-white/5">
@@ -1419,12 +1481,12 @@ export default function ResultsPage() {
                   <Button 
                     size="icon" 
                     className="h-7 w-7 text-[var(--dt-text-soft)] bg-transparent hover:bg-white/5 hover:text-[var(--dt-text-primary)] border-0"
-                    onClick={handleCloseBattle}
+                    onClick={handleCloseBattleWithAnimation}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </DialogHeader>
+              </div>
 
               <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-between min-h-0 bg-[var(--dt-workspace-bg)]">
                 
@@ -1568,9 +1630,9 @@ export default function ResultsPage() {
                     {groupPhotos.map((photo) => {
                       const isLeft = photo.id === leftId;
                       const isRight = photo.id === rightId;
-                      const isKeep = activeBattle.recommendedKeepIds.includes(photo.id);
-                      const isReview = activeBattle.similarBackupIds.includes(photo.id);
-                      const isDelete = activeBattle.cullCandidateIds.includes(photo.id);
+                      const isKeep = battleObj.recommendedKeepIds.includes(photo.id);
+                      const isReview = battleObj.similarBackupIds.includes(photo.id);
+                      const isDelete = battleObj.cullCandidateIds.includes(photo.id);
 
                       return (
                         <div
@@ -1617,13 +1679,13 @@ export default function ResultsPage() {
                 <div className="mt-3.5 pt-2.5 border-t border-white/5 flex flex-col gap-2 shrink-0 animate-fade-in">
                   {/* Keyboard Shortcuts Hint Panel */}
                   <div className="hidden md:flex items-center justify-center gap-4 py-1.5 px-3 rounded-lg bg-black/20 border border-white/5 text-[10px] text-[var(--dt-text-soft)] select-none">
-                    <span className="font-bold text-[var(--dt-text-secondary)]">{"\ud83d\udcbb \u5feb\u6377\u952e\u63d0\u793a\uff1a"}</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">{"\u2190"}</kbd> {"\u4fdd\u7559\u5de6\u56fe"}</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">{"\u2192"}</kbd> {"\u4fdd\u7559\u53f3\u56fe"}</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">B</kbd> {"\u4e24\u5f20\u90fd\u4fdd\u7559"}</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">C</kbd> {"\u4e24\u5f20\u90fd\u6807\u8bb0\u4e3a\u6dd8\u6c70\u5019\u9009"}</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">S</kbd> {"\u8df3\u8fc7"}</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">Esc</kbd> {"\u5173\u95ed / \u8fd4\u56de"}</span>
+                    <span className="font-bold text-[var(--dt-text-secondary)]">💻 快捷键提示：</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">←</kbd> 保留左图</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">→</kbd> 保留右图</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">B</kbd> 两张都保留</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">C</kbd> 两张都标记为淘汰候选</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">S</kbd> 跳过</span>
+                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">Esc</kbd> 关闭 / 返回</span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
@@ -1684,8 +1746,8 @@ export default function ResultsPage() {
                   </p>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
+            </div>
+          </div>
         );
       })()}
     </div>
