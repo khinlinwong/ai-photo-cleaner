@@ -77,8 +77,9 @@ export default function ResultsPage() {
   const [isBattleClosing, setIsBattleClosing] = useState(false);
 
   // A/B 对局细分动画状态机
-  const [battleMotionState, setBattleMotionState] = useState<'idle' | 'choosing-left' | 'choosing-right' | 'swapping' | 'group-enter'>('idle');
+  const [battleMotionState, setBattleMotionState] = useState<'idle' | 'choosing-left' | 'choosing-right' | 'swapping' | 'group-enter' | 'group-exiting'>('idle');
   const lastGroupIdRef = useRef<string | null>(null);
+  const isTransitioningRef = useRef(false);
 
   // 导出面板锚定元素 rect
   const [exportAnchorRect, setExportAnchorRect] = useState<DOMRect | null>(null);
@@ -317,22 +318,40 @@ export default function ResultsPage() {
 
   // 当检测到当前组对比 PK 结束时，自动关闭当前对比，并流转到下一组或展示 Toast
   useEffect(() => {
-    if (activeBattle) {
+    if (activeBattle && !isTransitioningRef.current) {
       const isBattleCompleted = activeBattle.nextIndex >= activeBattle.contenderIds.length;
       if (isBattleCompleted) {
-        const remainingPendingCount = similarGroups.filter(
-          g => g.id !== activeBattle.groupId && !g.battleCompleted
-        ).length;
-        if (remainingPendingCount === 0) {
-          setToastMessage("A/B 对比已完成，结果已更新。");
+        isTransitioningRef.current = true;
+        
+        // 寻找是否有下一个未完成的组
+        const nextPendingGroup = similarGroups.find(
+          g => g.id !== activeBattle.groupId && !g.battleCompleted && !dismissedGroups.includes(g.id)
+        );
+
+        if (nextPendingGroup) {
+          // 直接在同一个窗口内流转到下一组，先播放淡出动画
+          setBattleMotionState('group-exiting');
           setTimeout(() => {
-            setToastMessage(null);
-          }, 3000);
+            startBattleForGroup(nextPendingGroup.id);
+            isTransitioningRef.current = false;
+          }, 250);
+        } else {
+          // 没有更多对局了，关闭 overlay
+          const remainingPendingCount = similarGroups.filter(
+            g => g.id !== activeBattle.groupId && !g.battleCompleted
+          ).length;
+          if (remainingPendingCount === 0) {
+            setToastMessage("A/B 对比已完成，结果已更新。");
+            setTimeout(() => {
+              setToastMessage(null);
+            }, 3000);
+          }
+          handleCloseBattleWithAnimation();
+          isTransitioningRef.current = false;
         }
-        closeBattle();
       }
     }
-  }, [activeBattle, closeBattle, similarGroups]);
+  }, [activeBattle, similarGroups, dismissedGroups, startBattleForGroup, handleCloseBattleWithAnimation]);
 
   // 自动弹出相似照片组 PK 流程（寻找首个 battleCompleted===false 且非忽略组）
   useEffect(() => {
@@ -1564,6 +1583,7 @@ export default function ResultsPage() {
                       "desktop-battle-photo-card",
                       battleMotionState === 'choosing-left' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
                       battleMotionState === 'choosing-right' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
+                      battleMotionState === 'group-exiting' && "opacity-0 scale-[0.96] translate-y-[-6px] transition-all duration-250 ease-in",
                       battleMotionState === 'group-enter' && "animate-battle-challenger-in"
                     )}>
                       <div 
@@ -1632,6 +1652,7 @@ export default function ResultsPage() {
                       "desktop-battle-photo-card",
                       battleMotionState === 'choosing-right' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
                       battleMotionState === 'choosing-left' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
+                      battleMotionState === 'group-exiting' && "opacity-0 scale-[0.96] translate-y-[-6px] transition-all duration-250 ease-in",
                       battleMotionState === 'swapping' && "animate-battle-challenger-in",
                       battleMotionState === 'group-enter' && "animate-battle-challenger-in"
                     )}>

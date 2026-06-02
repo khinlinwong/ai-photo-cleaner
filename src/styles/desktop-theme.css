@@ -504,3 +504,24 @@ a,
 
 /* This frosted popover is strictly for small float layers (e.g. Export panel, small menus). */
 /* NOT applicable to main workspace panels, photo lists, sidebars, or topbars. */
+
+/* ---------------------------------------------------- */
+/* Horizontal Scan Progress Card Entrance Animation    */
+/* ---------------------------------------------------- */
+
+.animate-scan-card-pop {
+  animation: scanCardPopEntrance 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+@keyframes scanCardPopEntrance {
+  from {
+    opacity: 0;
+    transform: translateX(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+

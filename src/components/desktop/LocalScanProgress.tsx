@@ -267,51 +267,59 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
           </span>
         </div>
         
-        <div className="bg-[var(--dt-panel-bg)] rounded-lg p-3.5 min-h-[140px] max-h-[220px] overflow-y-auto border border-[var(--dt-border)]">
+        <div className="bg-[var(--dt-panel-bg)] rounded-lg p-3.5 h-[134px] overflow-hidden border border-[var(--dt-border)] relative flex items-center">
           {revealPhotos.length === 0 ? (
-            <div className="h-[100px] flex items-center justify-center text-xs text-[var(--dt-text-muted)]">
+            <div className="h-[100px] w-full flex items-center justify-center text-xs text-[var(--dt-text-muted)]">
               正在初始化本地照片通道...
             </div>
           ) : (
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2.5">
-              {revealPhotos.map((photo, index) => {
-                const isCurrent = index === currentAnalysisIndex && analysisProgress < 100;
-                
-                let statusText = "已分析";
-                let statusColor = "bg-[#6FA887]/15 text-[#6FA887] border-[#6FA887]/25";
-                
-                if (isCurrent) {
-                  statusText = "分析中";
-                  statusColor = "bg-[var(--dt-nav-active-bg)] text-[var(--dt-text-primary)] border-[var(--dt-border-strong)] animate-pulse font-bold";
-                } else if (photo.status === 'delete') {
-                  statusText = "淘汰候选";
-                  statusColor = "bg-[#B96F68]/15 text-[#B96F68] border-[#B96F68]/25";
-                }
-                
-                return (
-                  <div 
-                    key={`${photo.id}-${isCurrent}`} 
-                    className={`relative aspect-square rounded-md overflow-hidden bg-black/20 border transition-all duration-200 shadow-sm animate-card-pop ${
-                      isCurrent ? 'border-[var(--dt-border-strong)] ring-1 ring-[var(--dt-border-strong)]' : 'border-[var(--dt-border)]'
-                    }`}
-                  >
-                    <img 
-                      src={photo.url} 
-                      alt={photo.name}
-                      className="w-full h-full object-cover"
-                    />
-                    
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-1">
-                      <span className="text-[7.5px] text-[#EEF2F6] truncate max-w-full font-mono font-medium block" title={photo.name}>
-                        {photo.name}
-                      </span>
-                      <span className={`text-[6.5px] px-1 py-0.2 rounded border font-bold origin-left scale-90 mt-0.5 inline-block text-center truncate ${statusColor}`}>
-                        {statusText}
-                      </span>
+            <div className="w-full overflow-hidden relative">
+              <div 
+                className="flex flex-row gap-2.5 transition-transform duration-300 ease-out w-max"
+                style={{ transform: `translateX(-${Math.max(0, revealPhotos.length - 8) * 106}px)` }}
+              >
+                {revealPhotos.map((photo, index) => {
+                  const isCurrent = index === currentAnalysisIndex && analysisProgress < 100;
+                  const isExited = index < revealPhotos.length - 8;
+                  
+                  let statusText = "已分析";
+                  let statusColor = "bg-[#6FA887]/15 text-[#6FA887] border-[#6FA887]/25";
+                  
+                  if (isCurrent) {
+                    statusText = "分析中";
+                    statusColor = "bg-[var(--dt-nav-active-bg)] text-[var(--dt-text-primary)] border-[var(--dt-border-strong)] animate-pulse font-bold";
+                  } else if (photo.status === 'delete') {
+                    statusText = "淘汰候选";
+                    statusColor = "bg-[#B96F68]/15 text-[#B96F68] border-[#B96F68]/25";
+                  }
+                  
+                  return (
+                    <div 
+                      key={`${photo.id}-${isCurrent}`} 
+                      className={`relative w-[96px] h-[96px] shrink-0 rounded-md overflow-hidden bg-black/20 border transition-all duration-300 shadow-sm animate-scan-card-pop ${
+                        isCurrent ? 'border-[var(--dt-border-strong)] ring-1 ring-[var(--dt-border-strong)]' : 'border-[var(--dt-border)]'
+                      } ${
+                        isExited ? 'opacity-0 scale-90 pointer-events-none' : 'opacity-100'
+                      }`}
+                    >
+                      <img 
+                        src={photo.url} 
+                        alt={photo.name}
+                        className="w-full h-full object-cover"
+                      />
+                      
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-1">
+                        <span className="text-[7.5px] text-[#EEF2F6] truncate max-w-full font-mono font-medium block" title={photo.name}>
+                          {photo.name}
+                        </span>
+                        <span className={`text-[6.5px] px-1 py-0.2 rounded border font-bold origin-left scale-90 mt-0.5 inline-block text-center truncate ${statusColor}`}>
+                          {statusText}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
