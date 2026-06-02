@@ -1521,14 +1521,14 @@ export default function ResultsPage() {
         if (!battleObj) return null;
 
         const leftId = battleObj.currentCandidateId;
-        const rightId = battleObj.contenderIds[battleObj.nextIndex];
+        const isBattleCompleted = battleObj.nextIndex >= battleObj.contenderIds.length;
+        const rightId = isBattleCompleted 
+          ? battleObj.contenderIds[battleObj.contenderIds.length - 1] 
+          : battleObj.contenderIds[battleObj.nextIndex];
         const leftPhoto = photos.find(p => p.id === leftId);
         const rightPhoto = photos.find(p => p.id === rightId);
-        const isBattleCompleted = battleObj.nextIndex >= battleObj.contenderIds.length;
         const activeGroup = similarGroups.find(g => g.id === battleObj.groupId);
         const groupPhotos = photos.filter(p => activeGroup?.photoIds.includes(p.id));
-
-        if (isBattleCompleted) return null;
 
         return (
           <div className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 select-none">
