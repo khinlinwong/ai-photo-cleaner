@@ -33,6 +33,7 @@ interface LocalScanProgressProps {
   skippedCount?: number;
   failedCount?: number;
   hasNativeSource?: boolean;
+  onViewResults?: () => void;
 }
 
 export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
@@ -45,7 +46,8 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
   onCancel,
   skippedCount = 0,
   failedCount = 0,
-  hasNativeSource = false
+  hasNativeSource = false,
+  onViewResults
 }) => {
   // 动态判断子任务状态
   const getSubtaskStatus = (taskIndex: number) => {
@@ -139,6 +141,23 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
             <XCircle className="w-3.5 h-3.5" />
             <span>取消扫描</span>
           </button>
+        )}
+
+        {analysisProgress === 100 && !isAnalyzing && hasNativeSource && (
+          <div className="flex items-center space-x-2.5">
+            <button
+              onClick={onCancel}
+              className="flex items-center space-x-1.5 text-xs text-[var(--dt-text-secondary)] hover:text-white bg-white/5 hover:bg-white/10 border border-[var(--dt-border)] px-3.5 py-1.5 rounded-lg transition-all"
+            >
+              重新选择文件夹
+            </button>
+            <button
+              onClick={() => onViewResults?.()}
+              className="flex items-center space-x-1.5 text-xs font-semibold text-white bg-[var(--dt-button-primary)] hover:bg-[var(--dt-button-primary-hover)] px-4 py-1.5 rounded-lg transition-all shadow-md"
+            >
+              查看整理结果
+            </button>
+          </div>
         )}
       </div>
 
@@ -280,8 +299,9 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
               <li>原图保持不变，整理结果可在后续手动调整。</li>
               {hasNativeSource ? (
                 <>
-                  <li>本地分析完成后会停留在当前页面。</li>
-                  <li>下一步将接入整理结果页。</li>
+                  <li>本地分析已完成，原图保持不变。</li>
+                  <li>部分照片可能因格式或读取原因未完成分析并跳过。</li>
+                  <li>请点击“查看整理结果”手动查看。</li>
                 </>
               ) : (
                 <li>完成后会进入整理结果页，您可以继续标记保留或淘汰候选。</li>

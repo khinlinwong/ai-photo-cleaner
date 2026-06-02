@@ -66,6 +66,7 @@ export default function ResultsPage() {
   }
 
   const router = useRouter();
+  const hasNativeSource = photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
@@ -612,10 +613,7 @@ export default function ResultsPage() {
   // 纯客户端分批打包下载保留照片整理包 (JSZip)
   const downloadPhotosZip = async () => {
     // 增加 helper 判断，Native source 不允许 ZIP 导出
-    const hasNative = photos.some(
-      (p) => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file'
-    );
-    if (hasNative) {
+    if (hasNativeSource) {
       console.warn('ZIP export is disabled for local native sources.');
       return;
     }
@@ -1095,6 +1093,7 @@ export default function ResultsPage() {
                     totalBattleCount={similarGroups.length}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
+                    hasNativeSource={hasNativeSource}
                   />
 
                   {/* 批量操作栏 */}
@@ -1375,7 +1374,7 @@ export default function ResultsPage() {
                 handleRestart();
                 handleCloseExport();
               }}
-              hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
+              hasNativeSource={hasNativeSource}
             />
           </div>
         </>

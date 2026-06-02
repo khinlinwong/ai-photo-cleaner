@@ -120,6 +120,7 @@ export default function ProcessingPage() {
                 skippedCount={skippedCount}
                 failedCount={failedCount}
                 hasNativeSource={hasNativeSource}
+                onViewResults={() => router.push('/results')}
               />
             )}
           </main>
