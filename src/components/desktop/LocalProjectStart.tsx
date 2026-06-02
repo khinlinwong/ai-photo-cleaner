@@ -56,7 +56,7 @@ interface LocalProjectStartProps {
 
 export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusChange }) => {
   const router = useRouter();
-  const { uploadFiles, loadDemoPhotos } = usePhotoWorkspace();
+  const { uploadFiles, loadDemoPhotos, startNativeFolderAnalysis } = usePhotoWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const relinkFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -563,6 +563,22 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 <p className="text-[9px] text-[var(--dt-text-secondary)] leading-normal">
                   完整路径仅在本次授权中临时使用，不会保存。
                 </p>
+
+                {!isScanning && previews.length > 0 && (
+                  <div className="pt-2.5 border-t border-emerald-500/10">
+                    <button
+                      onClick={() => {
+                        const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
+                        startNativeFolderAnalysis(previews, projName);
+                      }}
+                      className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold py-2 px-4 rounded text-xs transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                      开始本地分析
+                    </button>
+                  </div>
+                )}
+
                 <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-emerald-500/10 space-y-1">
                   <p>💡 本轮仅扫描文件夹第一层元数据，暂未读取图片内容。</p>
                   <p>💡 暂未开始分析，后续会接入本地整理流程。</p>

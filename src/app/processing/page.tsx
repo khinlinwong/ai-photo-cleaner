@@ -18,11 +18,14 @@ export default function ProcessingPage() {
     currentAnalysisIndex,
     currentAnalysisName,
     resetWorkspace,
-    projectName
+    projectName,
+    skippedCount,
+    failedCount
   } = usePhotoWorkspace();
   
   const router = useRouter();
   const hasStartedRef = useRef(false);
+  const hasNativeSource = photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
 
   // 1. 进入页面后：如果有照片，且尚未开始分析（进度为 0 且未在分析），则自动触发分析
   useEffect(() => {
@@ -32,15 +35,15 @@ export default function ProcessingPage() {
     }
   }, [photos, isAnalyzing, analysisProgress, startAnalysis]);
 
-  // 2. 自动跳转逻辑：当进度到达 100 且分析状态结束，1.5 秒后自动路由至结果页
+  // 2. 自动跳转逻辑：当进度到达 100 且分析状态结束，1.5 秒后自动路由至结果页 (如果是 Native Processing，则先不自动跳转 /results)
   useEffect(() => {
-    if (analysisProgress === 100 && !isAnalyzing) {
+    if (analysisProgress === 100 && !isAnalyzing && !hasNativeSource) {
       const timer = setTimeout(() => {
         router.push('/results');
       }, 1550);
       return () => clearTimeout(timer);
     }
-  }, [analysisProgress, isAnalyzing, router]);
+  }, [analysisProgress, isAnalyzing, router, hasNativeSource]);
 
   // 取消扫描
   const handleCancelScan = () => {
@@ -114,6 +117,9 @@ export default function ProcessingPage() {
                 currentAnalysisName={currentAnalysisName}
                 projectName={projectName}
                 onCancel={handleCancelScan}
+                skippedCount={skippedCount}
+                failedCount={failedCount}
+                hasNativeSource={hasNativeSource}
               />
             )}
           </main>

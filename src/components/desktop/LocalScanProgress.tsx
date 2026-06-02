@@ -30,6 +30,9 @@ interface LocalScanProgressProps {
   currentAnalysisName: string;
   projectName?: string;
   onCancel: () => void;
+  skippedCount?: number;
+  failedCount?: number;
+  hasNativeSource?: boolean;
 }
 
 export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
@@ -39,7 +42,10 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
   currentAnalysisIndex,
   currentAnalysisName,
   projectName,
-  onCancel
+  onCancel,
+  skippedCount = 0,
+  failedCount = 0,
+  hasNativeSource = false
 }) => {
   // 动态判断子任务状态
   const getSubtaskStatus = (taskIndex: number) => {
@@ -119,7 +125,9 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
             )}
           </div>
           <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed max-w-md">
-            照片只在本机浏览器中处理，不会上传云端。原图保持不变，整理结果可在下一步手动调整。
+            {hasNativeSource
+              ? '本地处理 / 原图保持不变 / 不上传云端。整理结果可在后续手动调整。'
+              : '照片只在本机浏览器中处理，不会上传云端。原图保持不变，整理结果可在下一步手动调整。'}
           </p>
         </div>
 
@@ -241,6 +249,24 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
                 {similarCount}
               </span>
             </div>
+
+            {hasNativeSource && (
+              <>
+                <div className="bg-[var(--dt-panel-bg)] p-3 rounded-lg border border-[var(--dt-border)] text-center">
+                  <span className="text-[9px] font-mono text-[var(--dt-text-secondary)] block uppercase">已跳过照片</span>
+                  <span className="text-xl font-bold text-yellow-500/80 font-mono block mt-1">
+                    {skippedCount}
+                  </span>
+                </div>
+
+                <div className="bg-[var(--dt-panel-bg)] p-3 rounded-lg border border-[var(--dt-border)] text-center">
+                  <span className="text-[9px] font-mono text-[var(--dt-text-secondary)] block uppercase">分析失败</span>
+                  <span className="text-xl font-bold text-red-500/80 font-mono block mt-1">
+                    {failedCount}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Privacy Box */}

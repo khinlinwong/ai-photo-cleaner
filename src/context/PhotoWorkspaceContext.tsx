@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { analyzeImage } from '@/lib/imageAnalysis';
+import { analyzeImage, analyzeImageFromBlob } from '@/lib/imageAnalysis';
 import { AnalysisMode, SimilarGroup, BattleDecision } from '@/lib/analysis/vision/types';
 import { detectDuplicates, buildDuplicateSignals, DuplicateAnalysisResult, buildSimilarGroupsFromSignals, QASimilarGroupSignalForBattle, adaptSignalGroupsToLegacySimilarGroups } from '@/lib/analysis/local/duplicate';
 import { USE_SIGNAL_GROUPS_FOR_BATTLE } from '@/lib/config/featureFlags';
+import { NativeImagePreviewItem } from '@/lib/desktop/nativeImagePreviewScanner';
 
 declare global {
   interface Window {
@@ -80,6 +81,7 @@ export interface PhotoItem {
   userDecision?: 'keep' | 'review' | 'delete';
   sourceId?: string;
   sourceType?: 'browser-file' | 'native-folder-preview' | 'native-folder-file';
+  extension?: string;
 }
 
 // 预设的高质量旅行 Mock 照片（对应新版的类型定义）
@@ -546,6 +548,9 @@ interface PhotoWorkspaceContextType {
   deleteSuggestedPhotos: () => void;
   resetWorkspace: () => void;
   loadDemoPhotos: () => void;
+  startNativeFolderAnalysis: (previews: NativeImagePreviewItem[], name?: string) => void;
+  skippedCount: number;
+  failedCount: number;
   // Checkpoint 6 Battle methods and state:
   similarGroups: SimilarGroup[];
   activeBattle: ActiveBattleState | null;
@@ -650,6 +655,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [currentAnalysisName, setCurrentAnalysisName] = useState('');
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('local');
   const [projectName, setProjectName] = useState<string>('');
+  const [skippedCount, setSkippedCount] = useState(0);
+  const [failedCount, setFailedCount] = useState(0);
   const router = useRouter();
 
   // Development-only guard.
@@ -1097,6 +1104,58 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     router.push('/processing');
   };
 
+  // 新增 Native Processing 独立入口
+  const startNativeFolderAnalysis = (previews: NativeImagePreviewItem[], name?: string) => {
+    // 释放旧的预览 URL 防止泄露
+    photos.forEach(p => revokeBlobUrl(p.url));
+
+    // 设置项目名称
+    setProjectName(name || '');
+
+    // 重置所有分析和 Battle 相关状态
+    setAnalysisProgress(0);
+    setAnalysisLogs([]);
+    setCurrentAnalysisIndex(-1);
+    setCurrentAnalysisName('');
+    setSimilarGroups([]);
+    setActiveBattle(null);
+    setIsAnalyzing(false);
+    isAnalyzingRef.current = false;
+    setSkippedCount(0);
+    setFailedCount(0);
+
+    // 最多取 previews.slice(0, 10)
+    const activePreviews = previews.slice(0, 10);
+
+    if (activePreviews.length > 0) {
+      const nativeItems: PhotoItem[] = activePreviews.map((item, index) => {
+        return {
+          id: item.id,
+          url: item.previewUrl,
+          name: `Photo-${String(index + 1).padStart(3, '0')}`,
+          size: `${(item.sizeBytes / (1024 * 1024)).toFixed(1)} MB`,
+          status: 'keep', // 默认状态为保留
+          issue: 'good',  // 默认问题良好
+          score: 0,
+          blurValue: 0,
+          exposureValue: 0,
+          resolution: '待分析',
+          category: '待分类',
+          file: undefined, // 必须为 undefined
+          sharpnessScore: 0,
+          exposureScore: 0,
+          sourceId: item.id,
+          sourceType: 'native-folder-preview',
+          extension: item.extension
+        };
+      });
+      setPhotos(nativeItems);
+    }
+
+    // 跳转到分析页面
+    router.push('/processing');
+  };
+
   // 开始 AI 真实图像分析流程
   const startAnalysis = async () => {
     if (isAnalyzingRef.current) {
@@ -1116,11 +1175,13 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setAnalysisLogs([]);
     setCurrentAnalysisIndex(0);
     setCurrentAnalysisName(currentPhotos[0]?.name || '');
+    setSkippedCount(0);
+    setFailedCount(0);
 
     const updatedPhotos = [...currentPhotos];
     const total = updatedPhotos.length;
 
-    setAnalysisLogs((prev) => [...prev, '⚡ 正在初始化浏览器端 Canvas 像素诊断仪...']);
+    setAnalysisLogs((prev) => [...prev, '⚡ 正在初始化本地扫描计算模块...']);
 
     for (let i = 0; i < total; i++) {
       const photo = updatedPhotos[i];
@@ -1185,6 +1246,98 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
             `  ❌ 像素读取失败: ${errMsg}`
           ]);
         }
+      } else if (photo.sourceType === 'native-folder-preview') {
+        const ext = (photo.extension || '').toLowerCase();
+        
+        // HEIC / HEIF 跳过策略
+        if (ext === 'heic' || ext === 'heif') {
+          setAnalysisLogs((prev) => [
+            ...prev,
+            `  ⚠️ 跳过不支持的格式 (HEIC/HEIF): ${photo.name}`
+          ]);
+          setSkippedCount((prev) => prev + 1);
+          
+          updatedPhotos[i] = {
+            ...photo,
+            status: 'keep',
+            issue: 'good',
+            score: 0,
+            resolution: '格式不支持',
+            category: '已跳过',
+            reasonLabel: '文件格式不支持 (HEIC/HEIF)，已跳过处理'
+          };
+        } else {
+          try {
+            // 串行读取二进制字节流
+            const { readNativePreviewBytes } = await import('@/lib/desktop/nativeReader');
+            const bytes = await readNativePreviewBytes(photo.id);
+            
+            if (!bytes) {
+              throw new Error('安全拒绝：文件大小超过 15MB 限制或读取失败。');
+            }
+            
+            // bytes -> Blob
+            const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+            const blob = new Blob([bytes as unknown as BlobPart], { type: mimeType });
+            
+            // analyzeImageFromBlob
+            const res = await analyzeImageFromBlob(blob);
+            
+            const blurValue = 100 - res.sharpnessScore;
+            const exposureValue = Math.round((res.averageBrightness - 127) * (100 / 127));
+
+            let category = '标准曝光';
+            if (res.averageBrightness > 170) {
+              category = '高对比亮光';
+            } else if (res.averageBrightness < 80) {
+              category = '夜景/暗光';
+            }
+
+            updatedPhotos[i] = {
+              ...photo,
+              status: res.status,
+              issue: res.issue,
+              score: res.qualityScore,
+              blurValue,
+              exposureValue,
+              resolution: `${res.width} × ${res.height}`,
+              category,
+              sharpnessScore: res.sharpnessScore,
+              exposureScore: res.exposureScore,
+              focusStatus: res.focusStatus,
+              perceptualHash: res.perceptualHash,
+              exposureSeverity: res.exposureSeverity,
+              technicalRiskFlags: res.technicalRiskFlags,
+              confidence: res.confidence,
+              suggestedStatus: res.suggestedStatus,
+              displayLabel: res.displayLabel,
+              reasonLabel: res.reasonLabel
+            };
+
+            setAnalysisLogs((prev) => [
+              ...prev,
+              `  ✓ 综合得分: ${res.qualityScore} | 清晰度: ${res.sharpnessScore} | 亮度偏差: ${exposureValue > 0 ? '+' : ''}${exposureValue}`
+            ]);
+          } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : '读取失败';
+            setAnalysisLogs((prev) => [
+              ...prev,
+              `  ❌ 像素读取失败: ${errMsg}`
+            ]);
+            setFailedCount((prev) => prev + 1);
+            
+            // 失败时安全跳过，状态保持默认 keep
+            updatedPhotos[i] = {
+              ...photo,
+              status: 'keep',
+              issue: 'needs_review',
+              score: 0,
+              resolution: '读取失败',
+              category: '已跳过',
+              reasonLabel: `本地读取或分析失败: ${errMsg}`
+            };
+          }
+        }
       } else {
         // 安全降级：对于 Demo 外链图片，使用预存的分析参数以防止 Canvas CORS 报错
         await new Promise((resolve) => setTimeout(resolve, 800)); // 模拟异步加载
@@ -1241,17 +1394,20 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       setAnalysisProgress(percentEnd);
     }
 
-    setAnalysisLogs((prev) => [...prev, '✅ 智能物理整理已完成，正在生成诊断报表...']);
+    setAnalysisLogs((prev) => [...prev, '✅ 本地扫描分析已完成！']);
     const finalPhotos = detectDuplicates(updatedPhotos);
     setPhotos(finalPhotos);
     runDuplicateQA(finalPhotos);
     initializeSimilarGroups(finalPhotos);
 
     // 延时跳转，提供更好的交互感知
+    const hasNativeSource = updatedPhotos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
     setTimeout(() => {
       setIsAnalyzing(false);
       isAnalyzingRef.current = false;
-      router.push('/results');
+      if (!hasNativeSource) {
+        router.push('/results');
+      }
     }, 1200);
   };
 
@@ -1316,6 +1472,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setCurrentAnalysisIndex(-1);
     setCurrentAnalysisName('');
     setProjectName('');
+    setSkippedCount(0);
+    setFailedCount(0);
   };
 
   // 载入演示图片数据包
@@ -1332,6 +1490,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setIsAnalyzing(false);
     isAnalyzingRef.current = false;
     setProjectName('演示旅行照片项目');
+    setSkippedCount(0);
+    setFailedCount(0);
 
     const processed = detectDuplicates(MOCK_TRAVEL_PHOTOS);
     setPhotos(processed);
@@ -1361,6 +1521,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         deleteSuggestedPhotos,
         resetWorkspace,
         loadDemoPhotos,
+        startNativeFolderAnalysis,
+        skippedCount,
+        failedCount,
         similarGroups,
         activeBattle,
         startBattleForGroup,
