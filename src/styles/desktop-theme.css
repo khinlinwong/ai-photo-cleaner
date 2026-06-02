@@ -1,37 +1,41 @@
 /* src/styles/desktop-theme.css */
 
 :root {
-  /* 强制暗灰 Dark Mode 色彩变量，实现温和防疲劳的照片工作台 */
-  --dt-root-bg: #1F2329;
-  --dt-window-bg: #2A2F36;
-  --dt-workspace-bg: #303640;
-  --dt-sidebar-bg: #252B33;
-  --dt-topbar-bg: #242A31;
-  --dt-statusbar-bg: #242A31;
+  /* 实体深色色板 - Graphite Pro Identity (深石墨 / 哑光碳黑) */
+  --dt-root-bg: #0A0C0F;           /* 极暗背景 */
+  --dt-window-bg: #12151A;         /* 实体暗黑底色 */
+  --dt-workspace-bg: #16191E;      /* 照片打样工作台底色 */
+  --dt-sidebar-bg: #0F1115;        /* 哑光碳黑侧边栏 */
+  --dt-topbar-bg: #0D0F13;         /* 顶栏深石墨色 */
+  --dt-statusbar-bg: #0D0F13;      /* 状态栏深石墨色 */
 
-  --dt-panel-bg: rgba(54, 61, 72, 0.82);
-  --dt-panel-bg-solid: #363D48;
-  --dt-card-bg: rgba(62, 69, 81, 0.76);
-  --dt-card-hover-bg: rgba(72, 80, 94, 0.86);
+  --dt-panel-bg: #1A1F26;          /* 实体暗灰面板 */
+  --dt-panel-bg-solid: #1A1F26;
+  --dt-card-bg: #202630;           /* 实体卡片暗色背景 */
+  --dt-card-hover-bg: #262D38;     /* 卡片 hover 实体背景 */
 
-  --dt-nav-active-bg: rgba(74, 84, 99, 0.72);
-  --dt-nav-hover-bg: rgba(74, 84, 99, 0.42);
+  /* 工业软件式指示器 (实色，无毛玻璃) */
+  --dt-nav-active-bg: #222933;     
+  --dt-nav-hover-bg: #1A1F27;      
 
-  --dt-border: rgba(180, 190, 205, 0.12);
-  --dt-border-strong: rgba(200, 210, 225, 0.18);
+  --dt-border: #262D37;            /* 中灰色线宽 border */
+  --dt-border-strong: #333C4A;     /* 强硬质分割线 */
 
-  --dt-text: #EEF2F6;
-  --dt-text-muted: #B9C1CC;
-  --dt-text-soft: #96A0AE;
-  --dt-text-faint: #727D8D;
+  --dt-text: #EEF2F6;              /* 冷白高对比文本 */
+  --dt-text-muted: #A3ADB9;        /* 亚光中灰 */
+  --dt-text-soft: #848F9E;         /* 蓝灰辅助信息 */
+  --dt-text-faint: #5F6A78;        /* 暗灰注解 */
 
-  --dt-button-primary: #E8EDF3;
-  --dt-button-primary-hover: #FFFFFF;
-  --dt-button-primary-text: #1E2631;
+  --dt-accent: #3A86FF;            /* 钛金/极光冷蓝作为强调 */
+  --dt-nav-active-border: var(--dt-border-strong);
 
-  --dt-button-secondary: rgba(70, 78, 92, 0.86);
-  --dt-button-secondary-hover: rgba(84, 94, 110, 0.94);
-  --dt-button-secondary-text: #E8EDF3;
+  --dt-button-primary: #D2D9E4;
+  --dt-button-primary-hover: #E4ECF6;
+  --dt-button-primary-text: #0D1116;
+
+  --dt-button-secondary: #222832;
+  --dt-button-secondary-hover: #2C3440;
+  --dt-button-secondary-text: #D2D9E4;
 
   /* 兼容组件内部使用的原有文字别名 */
   --dt-text-primary: var(--dt-text);
@@ -48,7 +52,7 @@
   min-height: 100vh;
   background-color: var(--dt-root-bg);
   overflow: hidden;
-  padding: 16px;
+  padding: 0;                      /* 铺满界面，取消 macOS 浮动套娃感 */
   font-family: var(--font-sans), sans-serif;
   user-select: none;
 }
@@ -58,22 +62,18 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  max-width: 1360px;
-  max-height: 850px;
   background-color: var(--dt-window-bg);
-  border: 1px solid var(--dt-border-strong);
-  border-radius: 12px;
-  box-shadow: 
-    0 16px 40px rgba(0, 0, 0, 0.24),
-    0 4px 16px rgba(0, 0, 0, 0.15);
+  border: none;                    /* 移除外浮窗边框 */
+  border-radius: 0;                /* 直角无大圆角 */
+  box-shadow: none;                /* 去除 macOS 浮沉投影 */
   overflow: hidden;
   position: relative;
 }
 
 .desktop-glass {
   background: var(--dt-panel-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: none !important; /* 彻底去除高斯模糊 */
+  -webkit-backdrop-filter: none !important;
   border: 1px solid var(--dt-border);
 }
 
@@ -81,30 +81,30 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 20px;
-  font-size: 0.875rem;
+  padding: 8px 16px;
+  font-size: 0.8125rem;            /* 紧凑微缩字号 */
   font-weight: 600;
   color: var(--dt-button-primary-text);
   background-color: var(--dt-button-primary);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  transition: all 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2px;              /* 从 6px 缩窄为 2px */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.1s ease;
   cursor: pointer;
 }
 
 .desktop-button-primary:hover:not(:disabled) {
   background-color: var(--dt-button-primary-hover);
-  transform: translateY(-0.5px);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transform: none;                 /* 移除拟物化上浮 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .desktop-button-primary:active:not(:disabled) {
-  transform: translateY(0);
+  transform: none;
 }
 
 .desktop-button-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -112,61 +112,61 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 20px;
-  font-size: 0.875rem;
+  padding: 8px 16px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--dt-button-secondary-text);
   background-color: var(--dt-button-secondary);
   border: 1px solid var(--dt-border);
-  border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  transition: all 0.15s ease;
+  border-radius: 2px;              /* 从 6px 缩窄为 2px */
+  box-shadow: none;
+  transition: all 0.1s ease;
   cursor: pointer;
 }
 
 .desktop-button-secondary:hover:not(:disabled) {
   background-color: var(--dt-button-secondary-hover);
-  transform: translateY(-0.5px);
+  transform: none;
 }
 
 .desktop-button-secondary:active:not(:disabled) {
-  transform: translateY(0);
+  transform: none;
 }
 
 .desktop-button-secondary:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .desktop-pill {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 2px;              /* 药丸改为直角状态标签 */
+  font-size: 0.6875rem;
   font-weight: 500;
-  border: 1px solid rgba(200, 210, 225, 0.12);
-  background-color: rgba(60, 68, 80, 0.75); /* 暗色半透明灰 */
+  border: 1px solid var(--dt-border);
+  background-color: #191E25;
   color: var(--dt-text-secondary);
 }
 
 .desktop-panel {
   background-color: var(--dt-panel-bg);
   border: 1px solid var(--dt-border);
-  border-radius: 8px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: 2px;              /* 从 8px 缩窄为 2px */
+  box-shadow: none;
 }
 
-/* A/B Battle Workspace Styles */
+/* A/B 对决及打样板 (Contact Sheet) 暗色舞台 */
 .desktop-battle-window {
   background-color: var(--dt-window-bg);
   border: 1px solid var(--dt-border-strong);
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55);
+  box-shadow: none;
 }
 
 .desktop-battle-stage {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: stretch;
   flex: 1;
   min-height: 0;
@@ -176,16 +176,16 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: rgba(30, 36, 44, 0.72);
+  background-color: #0D0F13;        /* 极黑比对背景 */
   border: 1px solid var(--dt-border);
-  border-radius: 8px;
+  border-radius: 2px;
   overflow: hidden;
   position: relative;
 }
 
 .desktop-battle-photo-wrapper {
   flex: 1;
-  background-color: #12161A;
+  background-color: #07080A;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -197,15 +197,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 9999px;
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;              /* 圆形改直角 */
   border: 1px solid var(--dt-border-strong);
   background-color: var(--dt-workspace-bg);
-  color: var(--dt-text-faint);
+  color: var(--dt-text-soft);
   font-size: 8px;
   font-weight: 800;
-  font-mono: true;
   user-select: none;
 }
 
@@ -213,12 +212,95 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1px 4px;
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
+  padding: 1px 3px;
+  background-color: #1B2027;
+  border: 1px solid var(--dt-border-strong);
+  border-radius: 1px;
   font-family: monospace;
-  font-size: 8.5px;
+  font-size: 8px;
   color: var(--dt-text-muted);
-  box-shadow: 0 1px 0px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
+}
+
+/* 侧边栏工作流导轨高亮指示条 */
+.desktop-root button.bg-\[var\(--dt-nav-active-bg\)\] {
+  border-radius: 2px !important;
+  border-left: 3px solid var(--dt-accent) !important;
+  background-color: var(--dt-nav-active-bg) !important;
+}
+
+/* ---------------------------------------------------- */
+/* Tailwind 全局圆角、模糊及柔和阴影覆盖 - 去苹果化 */
+/* ---------------------------------------------------- */
+.desktop-root .rounded-lg,
+.desktop-window .rounded-lg {
+  border-radius: 3px !important;
+}
+
+.desktop-root .rounded-xl,
+.desktop-window .rounded-xl {
+  border-radius: 4px !important;
+}
+
+.desktop-root .rounded-2xl,
+.desktop-window .rounded-2xl {
+  border-radius: 4px !important;
+}
+
+.desktop-root .rounded-md,
+.desktop-window .rounded-md {
+  border-radius: 2px !important;
+}
+
+.desktop-root .rounded-sm,
+.desktop-window .rounded-sm {
+  border-radius: 1px !important;
+}
+
+/* 消除所有毛玻璃高斯模糊 */
+.desktop-root .backdrop-blur-sm,
+.desktop-window .backdrop-blur-sm,
+.desktop-root .backdrop-blur,
+.desktop-window .backdrop-blur,
+.desktop-root .backdrop-filter,
+.desktop-window .backdrop-filter {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 消除弥散软阴影 */
+.desktop-root .shadow-2xl,
+.desktop-window .shadow-2xl,
+.desktop-root .shadow-xl,
+.desktop-window .shadow-xl,
+.desktop-root .shadow-lg,
+.desktop-window .shadow-lg,
+.desktop-root .shadow-md,
+.desktop-window .shadow-md,
+.desktop-root .shadow,
+.desktop-window .shadow {
+  box-shadow: none !important;
+}
+
+/* 将透明半白描边转换为实体暗描边 */
+.desktop-root .border-white\/5,
+.desktop-window .border-white\/5,
+.desktop-root .border-white\/10,
+.desktop-window .border-white\/10,
+.desktop-root .border-white\/20,
+.desktop-window .border-white\/20 {
+  border-color: var(--dt-border) !important;
+}
+
+/* 工作区网格与面板半透明叠层转换为实体暗色 */
+.desktop-root .bg-black\/20,
+.desktop-window .bg-black\/20,
+.desktop-root .bg-black\/15,
+.desktop-window .bg-black\/15,
+.desktop-root .bg-black\/25,
+.desktop-window .bg-black\/25,
+.desktop-root .bg-black\/10,
+.desktop-window .bg-black\/10 {
+  background-color: #101217 !important;
+  border: 1px solid var(--dt-border) !important;
 }
