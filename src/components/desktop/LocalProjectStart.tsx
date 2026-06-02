@@ -383,12 +383,12 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         projectName: projName,
         createdAt: new Date().toLocaleString('zh-CN'),
         updatedAt: new Date().toLocaleString('zh-CN'),
-        photoCount: 8,
-        keepCount: 5,
-        cullCount: 1,
-        similarGroupCount: 1,
+        photoCount: 20,
+        keepCount: 18,
+        cullCount: 2,
+        similarGroupCount: 6,
         battleCompleted: 0,
-        battleTotal: 1,
+        battleTotal: 6,
         fileFingerprints: []
       };
       saveRecentLocalProject(summary);

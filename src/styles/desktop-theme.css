@@ -490,3 +490,17 @@ a,
   }
 }
 
+/* ---------------------------------------------------- */
+/* Frosted Glass Style for Small Popovers / Dropdowns    */
+/* ---------------------------------------------------- */
+
+.desktop-frosted-popover {
+  background-color: rgba(44, 52, 64, 0.78) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(62, 71, 86, 0.7) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3), 0 0 1px 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+/* This frosted popover is strictly for small float layers (e.g. Export panel, small menus). */
+/* NOT applicable to main workspace panels, photo lists, sidebars, or topbars. */

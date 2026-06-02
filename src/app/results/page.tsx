@@ -1291,7 +1291,7 @@ export default function ResultsPage() {
               top: `${Math.max(20, Math.min(typeof window !== 'undefined' ? window.innerHeight - 260 : 300, exportAnchorRect.top + (exportAnchorRect.height / 2) - 120))}px`
             } : undefined}
             className={cn(
-              "fixed z-50 w-[420px] bg-[#2C3440] border border-[#3E4756]/80 p-4 rounded shadow-lg overflow-hidden focus:outline-none",
+              "fixed z-50 w-[420px] desktop-frosted-popover p-4 rounded overflow-hidden focus:outline-none",
               isExportClosing ? "animate-export-out" : "animate-export-in"
             )}
           >
