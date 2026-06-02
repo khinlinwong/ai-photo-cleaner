@@ -290,8 +290,8 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
                 
                 return (
                   <div 
-                    key={photo.id} 
-                    className={`relative aspect-square rounded-md overflow-hidden bg-black/20 border transition-all duration-200 shadow-sm ${
+                    key={`${photo.id}-${isCurrent}`} 
+                    className={`relative aspect-square rounded-md overflow-hidden bg-black/20 border transition-all duration-200 shadow-sm animate-card-pop ${
                       isCurrent ? 'border-[var(--dt-border-strong)] ring-1 ring-[var(--dt-border-strong)]' : 'border-[var(--dt-border)]'
                     }`}
                   >

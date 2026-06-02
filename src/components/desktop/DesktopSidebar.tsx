@@ -10,7 +10,7 @@ import {
 
 interface DesktopSidebarProps {
   activeId?: string;
-  onExportClick?: () => void;
+  onExportClick?: (rect: DOMRect) => void;
 }
 
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'start', onExportClick }) => {
@@ -46,7 +46,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
                 onClick={(e) => {
                   if (isClickableExport && onExportClick) {
                     e.preventDefault();
-                    onExportClick();
+                    onExportClick(e.currentTarget.getBoundingClientRect());
                   }
                 }}
                 className={`w-full flex items-center space-x-3 px-2.5 py-2 rounded text-xs font-semibold transition-all duration-150 ${

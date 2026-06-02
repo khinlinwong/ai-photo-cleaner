@@ -384,18 +384,18 @@ a,
 }
 
 /* ---------------------------------------------------- */
-/* Card pop entrance (0.28s, with stagger delay) */
+/* Card pop entrance (0.3s, with stagger delay) */
 /* ---------------------------------------------------- */
 
 .animate-card-pop {
-  animation: cardPopEntrance 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: cardPopEntrance 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
 }
 
 @keyframes cardPopEntrance {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.985);
+    transform: translateY(8px) scale(0.975);
   }
   to {
     opacity: 1;
@@ -468,6 +468,25 @@ a,
   to {
     opacity: 0;
     transform: scale(0.96);
+  }
+}
+
+/* ---------------------------------------------------- */
+/* A/B Challenger Zoom/Fade Entrance Animation (0.3s) */
+/* ---------------------------------------------------- */
+
+.animate-battle-challenger-in {
+  animation: battleChallengerIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes battleChallengerIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

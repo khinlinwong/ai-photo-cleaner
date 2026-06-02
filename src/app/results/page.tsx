@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePhotoWorkspace, PhotoItem, ActiveBattleState } from '@/context/PhotoWorkspaceContext';
 import { getUserVisibleBucket, getReasonTags } from '@/lib/utils/photoLabelMapping';
@@ -38,6 +38,9 @@ import { ExportPanel } from '@/components/results/ExportPanel';
 import { PhotoBucketSection } from '@/components/results/PhotoBucketSection';
 
 
+// 延时辅助函数
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export default function ResultsPage() {
   const {
     photos,
@@ -48,7 +51,7 @@ export default function ResultsPage() {
     similarGroups,
     activeBattle,
     startBattleForGroup,
-    applyBattleDecision,
+    applyBattleDecision: contextApplyBattleDecision,
     closeBattle,
     projectName
   } = usePhotoWorkspace();
@@ -72,6 +75,53 @@ export default function ResultsPage() {
   const [isExportClosing, setIsExportClosing] = useState(false);
   const [localActiveBattle, setLocalActiveBattle] = useState<ActiveBattleState | null>(null);
   const [isBattleClosing, setIsBattleClosing] = useState(false);
+
+  // A/B 对局细分动画状态机
+  const [battleMotionState, setBattleMotionState] = useState<'idle' | 'choosing-left' | 'choosing-right' | 'swapping' | 'group-enter'>('idle');
+  const lastGroupIdRef = useRef<string | null>(null);
+
+  // 导出面板锚定元素 rect
+  const [exportAnchorRect, setExportAnchorRect] = useState<DOMRect | null>(null);
+
+  // 包装对局决策函数以加入 300ms 缓冲确认/退出/淡入过渡动画
+  const applyBattleDecision = useCallback(async (decision: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => {
+    if (battleMotionState !== 'idle') return;
+
+    if (decision === 'keep_left') {
+      setBattleMotionState('choosing-left');
+      await sleep(300);
+      contextApplyBattleDecision('keep_left');
+      setBattleMotionState('swapping');
+      await sleep(300);
+      setBattleMotionState('idle');
+    } else if (decision === 'keep_right') {
+      setBattleMotionState('choosing-right');
+      await sleep(300);
+      contextApplyBattleDecision('keep_right');
+      setBattleMotionState('swapping');
+      await sleep(300);
+      setBattleMotionState('idle');
+    } else {
+      setBattleMotionState('swapping');
+      contextApplyBattleDecision(decision);
+      await sleep(300);
+      setBattleMotionState('idle');
+    }
+  }, [battleMotionState, contextApplyBattleDecision]);
+
+  // 对比对局组流转（进入下一组）的双图弹出动效监听
+  useEffect(() => {
+    if (activeBattle?.groupId) {
+      if (lastGroupIdRef.current && lastGroupIdRef.current !== activeBattle.groupId) {
+        setBattleMotionState('group-enter');
+        const timer = setTimeout(() => {
+          setBattleMotionState('idle');
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+      lastGroupIdRef.current = activeBattle.groupId;
+    }
+  }, [activeBattle?.groupId]);
 
   // 最近一次手动决策操作撤销状态
   const [lastDecisionAction, setLastDecisionAction] = useState<UndoAction | null>(null);
@@ -436,8 +486,6 @@ export default function ResultsPage() {
     filename: string;
   };
 
-  // 延时辅助函数
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // 分批打包辅助函数
   function buildZipBatches(
@@ -954,7 +1002,17 @@ export default function ResultsPage() {
         {/* Main Workspace Area */}
         <div className="flex-1 flex overflow-hidden relative">
           {/* Sidebar Navigation */}
-          <DesktopSidebar activeId="review" onExportClick={() => setExportOpen(true)} />
+          <DesktopSidebar 
+            activeId="review" 
+            onExportClick={(rect) => {
+              setExportAnchorRect(rect);
+              if (exportOpen) {
+                handleCloseExport();
+              } else {
+                setExportOpen(true);
+              }
+            }} 
+          />
 
           {/* Right Workstation Content */}
           <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -1224,12 +1282,16 @@ export default function ResultsPage() {
         <>
           {/* 点击外部遮罩 */}
           <div 
-            className="fixed inset-0 z-40 bg-black/10 transition-opacity duration-200"
+            className="fixed inset-0 z-40 bg-black/5 transition-opacity duration-200"
             onClick={handleCloseExport}
           />
           <div 
+            style={exportAnchorRect ? {
+              left: `${exportAnchorRect.right + 12}px`,
+              top: `${Math.max(20, Math.min(typeof window !== 'undefined' ? window.innerHeight - 260 : 300, exportAnchorRect.top + (exportAnchorRect.height / 2) - 120))}px`
+            } : undefined}
             className={cn(
-              "fixed left-[170px] bottom-[70px] z-50 w-[420px] bg-[var(--dt-panel-bg)] border border-[var(--dt-border-strong)] p-4 rounded shadow-2xl overflow-hidden focus:outline-none",
+              "fixed z-50 w-[420px] bg-[#2C3440] border border-[#3E4756]/80 p-4 rounded shadow-lg overflow-hidden focus:outline-none",
               isExportClosing ? "animate-export-out" : "animate-export-in"
             )}
           >
@@ -1498,7 +1560,12 @@ export default function ResultsPage() {
                 <div className="desktop-battle-stage">
                   {/* Left Photo (current best candidate) */}
                   {leftPhoto ? (
-                    <div className="desktop-battle-photo-card">
+                    <div className={cn(
+                      "desktop-battle-photo-card",
+                      battleMotionState === 'choosing-left' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
+                      battleMotionState === 'choosing-right' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
+                      battleMotionState === 'group-enter' && "animate-battle-challenger-in"
+                    )}>
                       <div 
                         className={cn(
                           "desktop-battle-photo-wrapper overflow-hidden relative",
@@ -1561,7 +1628,13 @@ export default function ResultsPage() {
 
                   {/* Right Photo (challenger) */}
                   {rightPhoto ? (
-                    <div className="desktop-battle-photo-card">
+                    <div className={cn(
+                      "desktop-battle-photo-card",
+                      battleMotionState === 'choosing-right' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
+                      battleMotionState === 'choosing-left' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
+                      battleMotionState === 'swapping' && "animate-battle-challenger-in",
+                      battleMotionState === 'group-enter' && "animate-battle-challenger-in"
+                    )}>
                       <div 
                         className={cn(
                           "desktop-battle-photo-wrapper overflow-hidden relative",
