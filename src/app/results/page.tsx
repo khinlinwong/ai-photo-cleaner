@@ -53,7 +53,8 @@ export default function ResultsPage() {
     startBattleForGroup,
     applyBattleDecision: contextApplyBattleDecision,
     closeBattle,
-    projectName
+    projectName,
+    identifyNativeSimilarGroups
   } = usePhotoWorkspace();
 
   interface UndoAction {
@@ -68,10 +69,16 @@ export default function ResultsPage() {
   const router = useRouter();
   const hasNativeSource = photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
+  const [filteredGroupId, setFilteredGroupId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'keep' | 'cull' | 'similar' | 'battle-status'>('keep');
+
+  // 当 Tab 切换时，自动清除相似组过滤状态
+  useEffect(() => {
+    setFilteredGroupId(null);
+  }, [activeTab]);
   const [exportOpen, setExportOpen] = useState(false);
   const [isExportClosing, setIsExportClosing] = useState(false);
   const [localActiveBattle, setLocalActiveBattle] = useState<ActiveBattleState | null>(null);
@@ -356,6 +363,7 @@ export default function ResultsPage() {
 
   // 自动弹出相似照片组 PK 流程（寻找首个 battleCompleted===false 且非忽略组）
   useEffect(() => {
+    if (hasNativeSource) return; // Native source 不自动启动 A/B PK 流程
     if (activeBattle) return;
 
     const nextPendingGroup = similarGroups.find(g => !g.battleCompleted);
@@ -365,7 +373,7 @@ export default function ResultsPage() {
       }
       startBattleForGroup(nextPendingGroup.id);
     }
-  }, [similarGroups, activeBattle, dismissedGroups, startBattleForGroup]);
+  }, [similarGroups, activeBattle, dismissedGroups, startBattleForGroup, hasNativeSource]);
 
   // 键盘快捷键监听
   useEffect(() => {
@@ -1196,81 +1204,150 @@ export default function ResultsPage() {
 
                   {activeTab === 'similar' && (
                     <div className="space-y-3 text-left animate-fade-in-up select-none">
-                      <div className="border-b border-[var(--dt-border)] pb-2 flex items-center justify-between">
-                        <h3 className="text-xs font-bold text-[var(--dt-text-primary)]">📊 相似照片组列表</h3>
-                        <span className="text-[10px] text-[var(--dt-text-soft)] font-mono">共 {similarGroups.length} 组</span>
-                      </div>
-                      {similarGroups.length === 0 ? (
-                        <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
-                          未发现相似照片。
+                      {hasNativeSource && similarGroups.length === 0 ? (
+                        <div className="max-w-md mx-auto py-12 text-center select-none bg-[var(--dt-panel-bg)] border border-[var(--dt-border)] p-6 rounded-lg space-y-4">
+                          <div className="space-y-1">
+                            <h3 className="text-sm font-bold text-[var(--dt-text-primary)]">识别本地相似照片</h3>
+                            <p className="text-[10.5px] text-[var(--dt-text-soft)] leading-relaxed">
+                              系统将通过客观图像哈希检测本地相似组。
+                            </p>
+                          </div>
+                          
+                          <div className="bg-[var(--dt-panel-bg-solid)] p-3 rounded text-[10px] text-[var(--dt-text-soft)] space-y-1 text-left">
+                            <p>• 本地处理，不上传云端</p>
+                            <p>• 原图保持不变，不会物理修改</p>
+                            <p>• 最多分析当前已导入的本地图片</p>
+                          </div>
+
+                          <button
+                            onClick={identifyNativeSimilarGroups}
+                            className="desktop-button-primary text-xs w-full py-2 font-bold"
+                          >
+                            识别本地相似照片
+                          </button>
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {similarGroups.map((group, idx) => {
-                            const groupPhotos = group.photoIds
+                      ) : filteredGroupId ? (() => {
+                        const group = similarGroups.find(g => g.id === filteredGroupId);
+                        const groupPhotos = group
+                          ? group.photoIds
                               .map(id => photos.find(p => p.id === id))
-                              .filter((p): p is PhotoItem => !!p);
-                            const displayedPhotos = groupPhotos.slice(0, 5);
-                            const remainingCount = groupPhotos.length - 5;
+                              .filter((p): p is PhotoItem => !!p)
+                          : [];
+                        const groupIdx = similarGroups.findIndex(g => g.id === filteredGroupId);
 
-                            return (
-                              <button 
-                                key={group.id} 
-                                onClick={() => startBattleForGroup(group.id)}
-                                className={cn(
-                                  "w-full text-left p-3 rounded border flex flex-col justify-between gap-3 transition-all duration-200 select-none outline-none",
-                                  group.battleCompleted
-                                    ? "bg-[#222832]/50 border-[var(--dt-border)] hover:bg-[#2C3440]/60 hover:border-[var(--dt-border-strong)]"
-                                    : "bg-amber-500/5 border-amber-500/20 hover:bg-[#2C3440]/60 hover:border-[var(--dt-border-strong)]",
-                                  "active:scale-[0.99] active:translate-y-[0.5px]"
-                                )}
+                        return (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between border-b border-[var(--dt-border)] pb-2 select-none">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-[var(--dt-text-primary)]">
+                                  当前查看：相似组 #{groupIdx + 1}
+                                </span>
+                                <span className="text-[10px] text-[var(--dt-text-soft)]">
+                                  (包含 {groupPhotos.length} 张照片)
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => setFilteredGroupId(null)}
+                                className="desktop-button-secondary text-[10px] py-1 h-7 px-3 font-bold border border-[var(--dt-border)]"
                               >
-                                <div className="flex items-center justify-between w-full gap-3">
-                                  <div className="space-y-1">
-                                    <p className="text-[11px] font-bold text-[var(--dt-text-primary)]">相似组 #{idx + 1}</p>
-                                    <p className="text-[10px] text-[var(--dt-text-soft)]">
-                                      包含 {group.photoIds.length} 张照片 • {group.battleCompleted ? "⚔️ 对决已完成" : "⏳ 待筛选对决"}
-                                    </p>
-                                  </div>
-                                  <div className="shrink-0 flex items-center gap-1.5">
-                                    {group.battleCompleted ? (
-                                      <span className="text-[10px] text-[var(--dt-text-soft)] border border-[var(--dt-border)] bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
-                                        重新对决
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                                        <GitCompare className="h-2.5 w-2.5" /> 开始对决
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Thumbnails Rail */}
-                                <div className="flex items-center gap-1.5 mt-1 w-full overflow-hidden">
-                                  {displayedPhotos.map(photo => (
-                                    <div 
-                                      key={photo.id}
-                                      className="w-12 h-12 border border-white/10 rounded bg-black/30 overflow-hidden flex items-center justify-center shrink-0"
-                                    >
-                                      <img 
-                                        src={photo.url} 
-                                        alt="" 
-                                        className="w-full h-full object-cover pointer-events-none" 
-                                      />
-                                    </div>
-                                  ))}
-                                  {remainingCount > 0 && (
-                                    <div 
-                                      className="w-12 h-12 border border-white/10 rounded bg-black/60 flex items-center justify-center shrink-0 text-[10px] font-bold text-white"
-                                    >
-                                      +{remainingCount}
-                                    </div>
-                                  )}
-                                </div>
+                                清除相似组过滤
                               </button>
-                            );
-                          })}
-                        </div>
+                            </div>
+                            
+                            <div>
+                              {renderPartitionGrid(groupPhotos, 'keep')}
+                            </div>
+                          </div>
+                        );
+                      })() : (
+                        <>
+                          <div className="border-b border-[var(--dt-border)] pb-2 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-[var(--dt-text-primary)]">📊 相似照片组列表</h3>
+                            <span className="text-[10px] text-[var(--dt-text-soft)] font-mono">共 {similarGroups.length} 组</span>
+                          </div>
+                          {similarGroups.length === 0 ? (
+                            <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
+                              未发现相似照片。
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {similarGroups.map((group, idx) => {
+                                const groupPhotos = group.photoIds
+                                  .map(id => photos.find(p => p.id === id))
+                                  .filter((p): p is PhotoItem => !!p);
+                                const displayedPhotos = groupPhotos.slice(0, 5);
+                                const remainingCount = groupPhotos.length - 5;
+
+                                return (
+                                  <button 
+                                    key={group.id} 
+                                    onClick={() => {
+                                      if (hasNativeSource) {
+                                        setFilteredGroupId(group.id);
+                                      } else {
+                                        startBattleForGroup(group.id);
+                                      }
+                                    }}
+                                    className={cn(
+                                      "w-full text-left p-3 rounded border flex flex-col justify-between gap-3 transition-all duration-200 select-none outline-none",
+                                      group.battleCompleted
+                                        ? "bg-[#222832]/50 border-[var(--dt-border)] hover:bg-[#2C3440]/60 hover:border-[var(--dt-border-strong)]"
+                                        : "bg-amber-500/5 border-amber-500/20 hover:bg-[#2C3440]/60 hover:border-[var(--dt-border-strong)]",
+                                      "active:scale-[0.99] active:translate-y-[0.5px]"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between w-full gap-3">
+                                      <div className="space-y-1">
+                                        <p className="text-[11px] font-bold text-[var(--dt-text-primary)]">相似组 #{idx + 1}</p>
+                                        <p className="text-[10px] text-[var(--dt-text-soft)]">
+                                          包含 {group.photoIds.length} 张照片 • {hasNativeSource ? "已识别" : (group.battleCompleted ? "⚔️ 对决已完成" : "⏳ 待筛选对决")}
+                                        </p>
+                                      </div>
+                                      <div className="shrink-0 flex items-center gap-1.5">
+                                        {hasNativeSource ? (
+                                          <span className="text-[10px] text-[var(--dt-text-soft)] border border-[var(--dt-border)] bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
+                                            查看组内照片
+                                          </span>
+                                        ) : group.battleCompleted ? (
+                                          <span className="text-[10px] text-[var(--dt-text-soft)] border border-[var(--dt-border)] bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
+                                            重新对决
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                            <GitCompare className="h-2.5 w-2.5" /> 开始对决
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Thumbnails Rail */}
+                                    <div className="flex items-center gap-1.5 mt-1 w-full overflow-hidden">
+                                      {displayedPhotos.map(photo => (
+                                        <div 
+                                          key={photo.id}
+                                          className="w-12 h-12 border border-white/10 rounded bg-black/30 overflow-hidden flex items-center justify-center shrink-0"
+                                        >
+                                          <img 
+                                            src={photo.url} 
+                                            alt="" 
+                                            className="w-full h-full object-cover pointer-events-none" 
+                                          />
+                                        </div>
+                                      ))}
+                                      {remainingCount > 0 && (
+                                        <div 
+                                          className="w-12 h-12 border border-white/10 rounded bg-black/60 flex items-center justify-center shrink-0 text-[10px] font-bold text-white"
+                                        >
+                                          +{remainingCount}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

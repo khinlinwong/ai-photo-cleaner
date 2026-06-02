@@ -59,22 +59,19 @@ export function ResultsSummaryCards({
       </button>
 
       <button
-        disabled={hasNativeSource}
         onClick={() => onTabChange('similar')}
         className={cn(
-          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none",
-          hasNativeSource
-            ? "bg-[var(--dt-card-bg)] border-[var(--dt-border)] opacity-50 cursor-not-allowed"
-            : activeTab === 'similar'
-            ? "bg-[var(--dt-nav-active-bg)] border-[var(--dt-accent)] cursor-pointer"
-            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)] cursor-pointer"
+          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none cursor-pointer",
+          activeTab === 'similar'
+            ? "bg-[var(--dt-nav-active-bg)] border-[var(--dt-accent)]"
+            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)]"
         )}
       >
         <span className="text-[10px] text-[var(--dt-text-soft)] font-semibold">
-          📊 {hasNativeSource ? "相似组 (下一步接入)" : "相似组"}
+          📊 相似组
         </span>
         <span className="text-xs font-bold text-[var(--dt-text-primary)] mt-1 font-mono">
-          {hasNativeSource ? "-" : `${similarGroupCount} 组`}
+          {similarGroupCount} 组
         </span>
       </button>
 

@@ -549,6 +549,7 @@ interface PhotoWorkspaceContextType {
   resetWorkspace: () => void;
   loadDemoPhotos: () => void;
   startNativeFolderAnalysis: (previews: NativeImagePreviewItem[], name?: string) => void;
+  identifyNativeSimilarGroups: () => void;
   skippedCount: number;
   failedCount: number;
   // Checkpoint 6 Battle methods and state:
@@ -829,6 +830,12 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   const startBattleForGroup = (groupId: string) => {
+    const hasNative = photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
+    if (hasNative) {
+      console.warn('Battle is disabled for local native sources.');
+      return;
+    }
+
     const group = similarGroups.find(g => g.id === groupId);
     if (!group) return;
 
@@ -1504,6 +1511,34 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     initializeSimilarGroups(processed);
   };
 
+  const identifyNativeSimilarGroups = () => {
+    const originalPhotosMap = new Map(photos.map(p => [p.id, {
+      status: p.status,
+      suggestedStatus: p.suggestedStatus,
+      displayLabel: p.displayLabel,
+      reasonLabel: p.reasonLabel
+    }]));
+
+    const processed = detectDuplicates(photos);
+
+    const nativeProcessed = processed.map(p => {
+      const orig = originalPhotosMap.get(p.id);
+      if (orig) {
+        return {
+          ...p,
+          status: orig.status,
+          suggestedStatus: orig.suggestedStatus,
+          displayLabel: orig.displayLabel,
+          reasonLabel: orig.reasonLabel
+        };
+      }
+      return p;
+    });
+
+    setPhotos(nativeProcessed);
+    initializeSimilarGroups(nativeProcessed);
+  };
+
   return (
     <PhotoWorkspaceContext.Provider
       value={{
@@ -1527,6 +1562,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         resetWorkspace,
         loadDemoPhotos,
         startNativeFolderAnalysis,
+        identifyNativeSimilarGroups,
         skippedCount,
         failedCount,
         similarGroups,
