@@ -937,14 +937,22 @@ export default function ResultsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   
                   {/* 页面标题区 */}
-                  <div className="text-left space-y-1 select-none">
-                    <h2 className="text-sm font-bold text-[var(--dt-text-primary)]">整理结果</h2>
-                    <p className="text-[11px] text-[var(--dt-text-soft)] leading-relaxed">
-                      请在这里最终确认要保留和标记为淘汰候选的照片。这只调整整理结果，不会修改原图。导出时会按当前整理结果生成清单与保留照片 ZIP。
-                    </p>
+                  <div className="flex items-center justify-between gap-4 border-b border-[var(--dt-border)] pb-3 select-none text-left">
+                    <div className="space-y-0.5">
+                      <h2 className="text-sm font-bold text-[var(--dt-text-primary)]">整理结果</h2>
+                      <p className="text-[10.5px] text-[var(--dt-text-soft)] leading-relaxed">
+                        这只调整整理结果，不会修改原图，原图在您的电脑上保持不变。
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleRestart}
+                      className="desktop-button-secondary text-[10px] py-1.5 h-8 flex items-center gap-1.5 font-bold shrink-0 border border-[var(--dt-border)]"
+                    >
+                      重新选择文件夹
+                    </button>
                   </div>
 
                   {/* 统计摘要区 */}
@@ -960,7 +968,7 @@ export default function ResultsPage() {
 
                   {/* 批量操作栏 */}
                   {selectedPhotoIds.length > 0 && (
-                    <div className="p-3 bg-[var(--dt-card-bg)] border border-emerald-500/30 rounded-lg flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                    <div className="p-3 bg-[var(--dt-card-bg)] border border-emerald-500/30 rounded-md flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
                       <div className="flex items-center gap-2 flex-wrap text-left">
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold font-mono text-[10px]">
                           {selectedPhotoIds.length}
@@ -997,7 +1005,7 @@ export default function ResultsPage() {
 
                   {/* 撤销提示条 */}
                   {lastDecisionAction && (
-                    <div className="p-3 bg-[var(--dt-card-bg)] border border-yellow-500/20 rounded-lg flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                    <div className="p-3 bg-[var(--dt-card-bg)] border border-yellow-500/20 rounded-md flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
                       <div className="flex items-center gap-2 flex-wrap text-left">
                         <span className="inline-flex h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
                         <span className="text-[var(--dt-text-primary)] font-medium">
@@ -1026,26 +1034,26 @@ export default function ResultsPage() {
 
                   {/* PK 流程进度条与指示 */}
                   <div className={cn(
-                    "p-3 rounded-lg border flex items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300",
+                    "p-2.5 rounded-md border flex items-center justify-between gap-3 text-[11px] select-none transition-all duration-300",
                     pendingGroupsCount > 0 
-                      ? "bg-amber-500/5 border-amber-500/10 text-amber-300/95"
-                      : "bg-emerald-500/5 border-emerald-500/10 text-emerald-400/95"
+                      ? "bg-amber-950/10 border-amber-500/20 text-amber-400/90"
+                      : "bg-emerald-950/10 border-emerald-500/20 text-emerald-400/90"
                   )}>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-left">
                       {similarGroups.length === 0 ? (
                         <>
-                          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
-                          <span>未发现明显相似组。你仍可以手动查看照片结果。</span>
+                          <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                          <span>未发现相似照片。您可以直接查看结果。</span>
                         </>
                       ) : pendingGroupsCount > 0 ? (
                         <>
-                          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
-                          <span>还有相似照片未完成 A/B 对比，建议先完成筛选以获得最佳整理效果。当前待处理：<strong>{pendingGroupsCount} 组</strong></span>
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          <span>还有相似照片未完成 A/B 对决。当前剩余：<strong>{pendingGroupsCount} 组</strong></span>
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
-                          <span>相似照片对局已完成。你可以继续检查保留区和淘汰候选区，或导出结果。</span>
+                          <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                          <span>相似照片对局已完成。原图保持不变，您可以继续检查结果或导出整理清单。</span>
                         </>
                       )}
                     </div>
@@ -1055,7 +1063,7 @@ export default function ResultsPage() {
                           const group = similarGroups.find(g => !g.battleCompleted);
                           if (group) startBattleForGroup(group.id);
                         }}
-                        className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1 rounded text-[10px] flex items-center gap-1 transition-all shrink-0"
+                        className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold px-2.5 py-1 rounded text-[10px] flex items-center gap-1 transition-all shrink-0"
                       >
                         <GitCompare className="h-3 w-3" />
                         继续 A/B 对局
@@ -1063,31 +1071,8 @@ export default function ResultsPage() {
                     )}
                   </div>
 
-                  {/* Workspace Summary & Secure Export Row */}
-                  <ExportPanel
-                    totalPhotoCount={photos.length}
-                    keepCount={keepPhotos.length}
-                    keepSpaceMB={keepSpaceMB}
-                    cullCount={deletePhotos.length}
-                    spaceSavedMB={spaceSavedMB}
-                    isZipping={isZipping}
-                    zipExportWarning={zipExportWarning}
-                    pendingGroupsCount={pendingGroupsCount}
-                    similarGroupsCount={similarGroups.length}
-                    projectName={projectName}
-                    onExportKeepZip={downloadPhotosZip}
-                    onExportManifestCsv={handleExportManifestCsv}
-                    onExportManifestJson={handleExportManifestJson}
-                    onContinueBattle={() => {
-                      const group = similarGroups.find(g => !g.battleCompleted);
-                      if (group) startBattleForGroup(group.id);
-                    }}
-                    onRestart={handleRestart}
-                    hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
-                  />
-
-                  {/* Partition List Areas */}
-                  <div className="space-y-6">
+                  {/* Partition List Areas - 双栏并排排版 */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                     {/* Partition A: Keep list */}
                     <PhotoBucketSection
                       bucketType="keep"
@@ -1112,6 +1097,31 @@ export default function ResultsPage() {
                     >
                       {renderPartitionGrid(deletePhotos, 'cull')}
                     </PhotoBucketSection>
+                  </div>
+
+                  {/* Workspace Summary & Secure Export Row - 移动到最下方以改善信息流 */}
+                  <div className="pt-4 border-t border-[var(--dt-border)]">
+                    <ExportPanel
+                      totalPhotoCount={photos.length}
+                      keepCount={keepPhotos.length}
+                      keepSpaceMB={keepSpaceMB}
+                      cullCount={deletePhotos.length}
+                      spaceSavedMB={spaceSavedMB}
+                      isZipping={isZipping}
+                      zipExportWarning={zipExportWarning}
+                      pendingGroupsCount={pendingGroupsCount}
+                      similarGroupsCount={similarGroups.length}
+                      projectName={projectName}
+                      onExportKeepZip={downloadPhotosZip}
+                      onExportManifestCsv={handleExportManifestCsv}
+                      onExportManifestJson={handleExportManifestJson}
+                      onContinueBattle={() => {
+                        const group = similarGroups.find(g => !g.battleCompleted);
+                        if (group) startBattleForGroup(group.id);
+                      }}
+                      onRestart={handleRestart}
+                      hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
+                    />
                   </div>
                 </div>
               )}

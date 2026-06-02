@@ -4,22 +4,22 @@
   /* 实体深色色板 - Graphite Pro Identity (深石墨 / 哑光碳黑) */
   --dt-root-bg: #0A0C0F;           /* 极暗背景 */
   --dt-window-bg: #12151A;         /* 实体暗黑底色 */
-  --dt-workspace-bg: #16191E;      /* 照片打样工作台底色 */
-  --dt-sidebar-bg: #0F1115;        /* 哑光碳黑侧边栏 */
-  --dt-topbar-bg: #0D0F13;         /* 顶栏深石墨色 */
-  --dt-statusbar-bg: #0D0F13;      /* 状态栏深石墨色 */
+  --dt-workspace-bg: #1A1E24;      /* 照片打样工作台底色 - 略微提亮以改善视觉压抑 */
+  --dt-sidebar-bg: #0E1114;        /* 哑光碳黑侧边栏 */
+  --dt-topbar-bg: #0C0E12;         /* 顶栏深石墨色 */
+  --dt-statusbar-bg: #0C0E12;      /* 状态栏深石墨色 */
 
-  --dt-panel-bg: #1A1F26;          /* 实体暗灰面板 */
-  --dt-panel-bg-solid: #1A1F26;
-  --dt-card-bg: #202630;           /* 实体卡片暗色背景 */
-  --dt-card-hover-bg: #262D38;     /* 卡片 hover 实体背景 */
+  --dt-panel-bg: #222831;          /* 实体暗灰面板 - 略微提亮 */
+  --dt-panel-bg-solid: #222831;
+  --dt-card-bg: #2A313C;           /* 实体卡片暗色背景 - 提亮以增强层次感 */
+  --dt-card-hover-bg: #323A47;     /* 卡片 hover 实体背景 */
 
   /* 工业软件式指示器 (实色，无毛玻璃) */
-  --dt-nav-active-bg: #222933;     
-  --dt-nav-hover-bg: #1A1F27;      
+  --dt-nav-active-bg: #2A313C;     
+  --dt-nav-hover-bg: #20262E;      
 
-  --dt-border: #262D37;            /* 中灰色线宽 border */
-  --dt-border-strong: #333C4A;     /* 强硬质分割线 */
+  --dt-border: #1E232B;            /* 中灰色线宽 border - 变暗变淡以降低存在感 */
+  --dt-border-strong: #2A303A;     /* 强硬质分割线 */
 
   --dt-text: #EEF2F6;              /* 冷白高对比文本 */
   --dt-text-muted: #A3ADB9;        /* 亚光中灰 */
