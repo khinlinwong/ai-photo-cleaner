@@ -580,8 +580,19 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 )}
 
                 <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-emerald-500/10 space-y-1">
-                  <p>💡 本轮仅扫描文件夹第一层元数据，暂未读取图片内容。</p>
-                  <p>💡 暂未开始分析，后续会接入本地整理流程。</p>
+                  {!isScanning && previews.length > 0 ? (
+                    <>
+                      <p>💡 已可进行本地预览与小批量分析。</p>
+                      <p>💡 当前最多分析 10 张。</p>
+                      <p>💡 原图保持不变，不上传云端。</p>
+                      <p>💡 整理结果页接入将在下一步完成。</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>💡 本轮仅扫描文件夹第一层元数据，暂未读取图片内容。</p>
+                      <p>💡 暂未开始分析，后续会接入本地整理流程。</p>
+                    </>
+                  )}
                 </div>
               </div>
             )}

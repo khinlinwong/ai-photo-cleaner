@@ -1395,13 +1395,18 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     }
 
     setAnalysisLogs((prev) => [...prev, '✅ 本地扫描分析已完成！']);
-    const finalPhotos = detectDuplicates(updatedPhotos);
-    setPhotos(finalPhotos);
-    runDuplicateQA(finalPhotos);
-    initializeSimilarGroups(finalPhotos);
+    const hasNativeSource = updatedPhotos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
+    
+    if (hasNativeSource) {
+      setPhotos(updatedPhotos);
+    } else {
+      const finalPhotos = detectDuplicates(updatedPhotos);
+      setPhotos(finalPhotos);
+      runDuplicateQA(finalPhotos);
+      initializeSimilarGroups(finalPhotos);
+    }
 
     // 延时跳转，提供更好的交互感知
-    const hasNativeSource = updatedPhotos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
     setTimeout(() => {
       setIsAnalyzing(false);
       isAnalyzingRef.current = false;

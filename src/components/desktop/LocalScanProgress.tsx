@@ -276,9 +276,16 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
               <span>本地数据安全说明</span>
             </div>
             <ul className="space-y-1 text-[10px] text-[var(--dt-text-secondary)] list-disc pl-4 leading-relaxed">
-              <li>照片只在本机浏览器中处理，不会上传云端。</li>
-              <li>原图保持不变，整理结果可在下一步手动调整。</li>
-              <li>完成后会进入整理结果页，您可以继续标记保留或淘汰候选。</li>
+              <li>本地处理，不上传云端。</li>
+              <li>原图保持不变，整理结果可在后续手动调整。</li>
+              {hasNativeSource ? (
+                <>
+                  <li>本地分析完成后会停留在当前页面。</li>
+                  <li>下一步将接入整理结果页。</li>
+                </>
+              ) : (
+                <li>完成后会进入整理结果页，您可以继续标记保留或淘汰候选。</li>
+              )}
             </ul>
           </div>
         </div>
