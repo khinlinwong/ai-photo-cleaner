@@ -44,7 +44,8 @@ function parseResolution(value: unknown): { width: string; height: string } {
 export function buildManifestRows(photos: PhotoItem[]): ManifestRow[] {
   const exportedAt = new Date().toISOString();
   
-  return photos.map(photo => {
+  return photos.map((photo, i) => {
+    const isNative = photo.sourceType === 'native-folder-preview' || photo.sourceType === 'native-folder-file';
     const bucket = getUserVisibleBucket(photo);
     const visibleBucket = bucket === 'cull' ? 'cullCandidate' : 'keep';
     
@@ -54,9 +55,14 @@ export function buildManifestRows(photos: PhotoItem[]): ManifestRow[] {
     const fileType = photo.file?.type || '';
     
     const localTags = photo.technicalRiskFlags ? photo.technicalRiskFlags.join(';') : '';
+ 
+    let originalName = photo.file?.name || photo.name || '';
+    if (isNative) {
+      originalName = `Photo-${String(i + 1).padStart(3, '0')}`;
+    }
 
     return {
-      originalName: photo.file?.name || photo.name || '',
+      originalName,
       visibleBucket,
       fileSize,
       fileType,
@@ -69,7 +75,7 @@ export function buildManifestRows(photos: PhotoItem[]): ManifestRow[] {
       exposureScore: photo.exposureScore !== undefined ? String(photo.exposureScore) : '',
       reasonLabel: photo.reasonLabel || '',
       localTags,
-      sourceMode: 'local-browser-prototype'
+      sourceMode: isNative ? 'native-desktop-app' : 'local-browser-prototype'
     };
   });
 }
@@ -126,10 +132,11 @@ export function buildManifestCsv(rows: ManifestRow[]): string {
 }
 
 export function buildManifestJson(rows: ManifestRow[], projectName?: string): string {
+  const isAnyNative = rows.some(row => row.sourceMode === 'native-desktop-app');
   const data = {
     metadata: {
       exportedAt: new Date().toISOString(),
-      sourceMode: 'local-browser-prototype',
+      sourceMode: isAnyNative ? 'native-desktop-app' : 'local-browser-prototype',
       projectName: projectName || 'Untitled Project',
       totalCount: rows.length
     },

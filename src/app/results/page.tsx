@@ -474,7 +474,7 @@ export default function ResultsPage() {
     if (photos.length === 0) return;
     try {
       const rows = buildManifestRows(photos);
-      const jsonContent = buildManifestJson(rows);
+      const jsonContent = buildManifestJson(rows, projectName);
       
       const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -495,14 +495,38 @@ export default function ResultsPage() {
 
   // 纯客户端分批打包下载保留照片整理包 (JSZip)
   const downloadPhotosZip = async () => {
+    // 增加 helper 判断，Native source 不允许 ZIP 导出
+    const hasNative = photos.some(
+      (p) => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file'
+    );
+    if (hasNative) {
+      console.warn('ZIP export is disabled for local native sources.');
+      return;
+    }
+
     const targetPhotos = photos.filter((p) => getUserVisibleBucket(p) === 'keep');
     if (targetPhotos.length === 0) return;
+
+    // 如果待导出照片中存在 file 缺失，也不能把 undefined file 传给 JSZip，更不能通过 fetch(photo.url) 去打包 Native preview/custom protocol URL
+    const safeTargetPhotos = targetPhotos.filter((photo) => {
+      const isNative = photo.sourceType === 'native-folder-preview' || photo.sourceType === 'native-folder-file';
+      if (isNative) return false;
+      const isNativeUrl = photo.url?.startsWith('preview:') || photo.url?.includes('preview.localhost');
+      if (isNativeUrl) return false;
+      return !!photo.file || !!photo.url;
+    });
+
+    if (safeTargetPhotos.length === 0) {
+      console.warn('No valid web photos available to package into ZIP.');
+      return;
+    }
+
     setIsZipping(true);
     setZipExportWarning(null);
     try {
       const JSZip = (await import('jszip')).default;
       const baseFilename = buildZipExportFilename(projectName).replace(/\.zip$/, '');
-      const batches = buildZipBatches(targetPhotos, baseFilename);
+      const batches = buildZipBatches(safeTargetPhotos, baseFilename);
 
       for (let b = 0; b < batches.length; b++) {
         const batch = batches[b];
@@ -513,7 +537,13 @@ export default function ResultsPage() {
           const photo = batch.photos[i];
           if (photo.file) {
             zip.file(photo.name, photo.file);
-          } else {
+          } else if (photo.url) {
+            // 确保不 fetch 任何 Native preview URL
+            const isNativeUrl = photo.url.startsWith('preview:') || photo.url.includes('preview.localhost');
+            if (isNativeUrl) {
+              console.warn('Skipping fetch for native preview URL in ZIP batch:', photo.url);
+              continue;
+            }
             try {
               const res = await fetch(photo.url);
               if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -1053,6 +1083,7 @@ export default function ResultsPage() {
                       if (group) startBattleForGroup(group.id);
                     }}
                     onRestart={handleRestart}
+                    hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
                   />
 
                   {/* Partition List Areas */}

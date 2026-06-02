@@ -23,6 +23,7 @@ export interface ExportPanelProps {
   onExportManifestJson: () => void;
   onContinueBattle: () => void;
   onRestart: () => void;
+  hasNativeSource?: boolean;
 }
 
 const LABELS = {
@@ -83,7 +84,8 @@ export function ExportPanel({
   onExportManifestCsv,
   onExportManifestJson,
   onContinueBattle,
-  onRestart
+  onRestart,
+  hasNativeSource = false
 }: ExportPanelProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -155,23 +157,40 @@ export function ExportPanel({
               </p>
             </div>
             <div className="mt-3">
-              <button
-                onClick={onExportKeepZip}
-                disabled={keepCount === 0 || isZipping}
-                className="desktop-button-primary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all"
-              >
-                <Download className="h-3.5 w-3.5" />
-                {isZipping ? LABELS.zippingStatus : LABELS.exportKeepZipBtn}
-              </button>
-              {(keepCount === 0 || isZipping) && (
-                <p className="text-[9px] text-[var(--dt-text-soft)] text-center mt-1.5 select-none leading-relaxed">
-                  {isZipping ? LABELS.zippingKeepDesc : LABELS.noKeepPhotosDesc}
-                </p>
-              )}
-              {keepCount > 0 && !isZipping && pendingGroupsCount > 0 && (
-                <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
-                  {LABELS.exportWarningTip}
-                </p>
+              {hasNativeSource ? (
+                <div className="space-y-2">
+                  <button
+                    disabled={true}
+                    className="desktop-button-primary w-full text-[10px] py-2 opacity-40 cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {LABELS.exportKeepZipBtn}
+                  </button>
+                  <p className="text-[9.5px] text-amber-400/90 text-center leading-relaxed select-none bg-amber-500/5 p-2 rounded border border-amber-500/10">
+                    💡 桌面端本地照片暂不提供 ZIP 打包，本地原图保持不变。您可以先导出整理清单。后续会加入本地导出副本。
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={onExportKeepZip}
+                    disabled={keepCount === 0 || isZipping}
+                    className="desktop-button-primary w-full text-[10px] py-2 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold transition-all"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {isZipping ? LABELS.zippingStatus : LABELS.exportKeepZipBtn}
+                  </button>
+                  {(keepCount === 0 || isZipping) && (
+                    <p className="text-[9px] text-[var(--dt-text-soft)] text-center mt-1.5 select-none leading-relaxed">
+                      {isZipping ? LABELS.zippingKeepDesc : LABELS.noKeepPhotosDesc}
+                    </p>
+                  )}
+                  {keepCount > 0 && !isZipping && pendingGroupsCount > 0 && (
+                    <p className="text-[9px] text-amber-400/90 text-center mt-1.5 leading-relaxed select-none">
+                      {LABELS.exportWarningTip}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
