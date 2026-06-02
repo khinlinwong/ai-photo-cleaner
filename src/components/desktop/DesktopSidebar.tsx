@@ -10,9 +10,10 @@ import {
 
 interface DesktopSidebarProps {
   activeId?: string;
+  onExportClick?: () => void;
 }
 
-export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'start' }) => {
+export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'start', onExportClick }) => {
   const menuItems = [
     { id: 'start', step: '01', label: '开始', icon: Play },
     { id: 'scan', step: '02', label: '扫描', icon: Search },
@@ -22,7 +23,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
   ];
 
   return (
-    <div className="w-48 bg-[var(--dt-sidebar-bg)] border-r border-[var(--dt-border)] flex flex-col justify-between py-6 px-4 shrink-0 select-none">
+    <div className="w-40 bg-[var(--dt-sidebar-bg)] border-r border-[var(--dt-border)] flex flex-col justify-between py-6 px-4 shrink-0 select-none">
       <div className="space-y-4">
         {/* Sidebar Header */}
         <div className="px-2">
@@ -35,14 +36,25 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
         <div className="space-y-1.5">
           {menuItems.map((item) => {
             const isActive = item.id === activeId;
+            const isClickableExport = item.id === 'export' && !!onExportClick;
+            const isDisabled = !isActive && !isClickableExport;
+
             return (
               <button
                 key={item.id}
-                disabled={!isActive}
-                className={`w-full flex items-center space-x-3 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                disabled={isDisabled}
+                onClick={(e) => {
+                  if (isClickableExport && onExportClick) {
+                    e.preventDefault();
+                    onExportClick();
+                  }
+                }}
+                className={`w-full flex items-center space-x-3 px-2.5 py-2 rounded text-xs font-semibold transition-all duration-150 ${
                   isActive
-                    ? 'bg-[var(--dt-nav-active-bg)] text-[var(--dt-text-primary)] shadow-sm border border-[var(--dt-nav-active-border)] cursor-default'
-                    : 'text-[var(--dt-text-faint)] cursor-not-allowed'
+                    ? 'bg-[var(--dt-nav-active-bg)] text-[var(--dt-text-primary)] border-l-2 border-[var(--dt-accent)] cursor-default'
+                    : isDisabled
+                      ? 'text-[var(--dt-text-faint)] cursor-not-allowed opacity-50'
+                      : 'text-[var(--dt-text-faint)] hover:text-[var(--dt-text-primary)] hover:bg-[var(--dt-nav-hover-bg)] cursor-pointer'
                 }`}
               >
                 <span className="text-[10px] font-mono opacity-50 shrink-0">{item.step}</span>
@@ -58,7 +70,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
         <div className="border-t border-[var(--dt-border)] pt-3">
           <button
             disabled
-            className="w-full flex items-center space-x-3 px-2.5 py-2 rounded-lg text-xs font-semibold text-[var(--dt-text-faint)] cursor-not-allowed"
+            className="w-full flex items-center space-x-3 px-2.5 py-2 rounded text-xs font-semibold text-[var(--dt-text-faint)] cursor-not-allowed"
           >
             <Settings className="w-3.5 h-3.5 stroke-[1.8]" />
             <span className="flex-1 text-left">设置</span>

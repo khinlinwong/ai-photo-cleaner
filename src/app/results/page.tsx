@@ -67,6 +67,8 @@ export default function ResultsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'keep' | 'cull' | 'similar' | 'battle-status'>('keep');
+  const [exportOpen, setExportOpen] = useState(false);
 
   // 最近一次手动决策操作撤销状态
   const [lastDecisionAction, setLastDecisionAction] = useState<UndoAction | null>(null);
@@ -902,7 +904,7 @@ export default function ResultsPage() {
         {/* Main Workspace Area */}
         <div className="flex-1 flex overflow-hidden relative">
           {/* Sidebar Navigation */}
-          <DesktopSidebar activeId="review" />
+          <DesktopSidebar activeId="review" onExportClick={() => setExportOpen(true)} />
 
           {/* Right Workstation Content */}
           <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -964,6 +966,8 @@ export default function ResultsPage() {
                     similarGroupCount={similarGroups.length}
                     completedBattleCount={similarGroups.filter(g => g.battleCompleted).length}
                     totalBattleCount={similarGroups.length}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
                   />
 
                   {/* 批量操作栏 */}
@@ -1032,97 +1036,129 @@ export default function ResultsPage() {
                     </div>
                   )}
 
-                  {/* PK 流程进度条与指示 */}
-                  <div className={cn(
-                    "p-2.5 rounded-md border flex items-center justify-between gap-3 text-[11px] select-none transition-all duration-300",
-                    pendingGroupsCount > 0 
-                      ? "bg-amber-950/10 border-amber-500/20 text-amber-400/90"
-                      : "bg-emerald-950/10 border-emerald-500/20 text-emerald-400/90"
-                  )}>
-                    <div className="flex items-center gap-2 text-left">
+                  {/* Active Tab Area Rendering with 0.18s transition */}
+                  {activeTab === 'keep' && (
+                    <div className="animate-fade-in-up">
+                      <PhotoBucketSection
+                        bucketType="keep"
+                        photosCount={keepPhotos.length}
+                        onSelectAll={() => selectAllInBucket('keep')}
+                        onClearSelection={() => clearSelectionInBucket('keep')}
+                        isAllSelected={selectedKeepCount === keepPhotos.length && keepPhotos.length > 0}
+                        hasSelected={selectedKeepCount > 0}
+                      >
+                        {renderPartitionGrid(keepPhotos, 'keep')}
+                      </PhotoBucketSection>
+                    </div>
+                  )}
+
+                  {activeTab === 'cull' && (
+                    <div className="animate-fade-in-up">
+                      <PhotoBucketSection
+                        bucketType="cull"
+                        photosCount={deletePhotos.length}
+                        spaceMB={spaceSavedMB}
+                        onSelectAll={() => selectAllInBucket('cull')}
+                        onClearSelection={() => clearSelectionInBucket('cull')}
+                        isAllSelected={selectedCullCount === deletePhotos.length && deletePhotos.length > 0}
+                        hasSelected={selectedCullCount > 0}
+                      >
+                        {renderPartitionGrid(deletePhotos, 'cull')}
+                      </PhotoBucketSection>
+                    </div>
+                  )}
+
+                  {activeTab === 'similar' && (
+                    <div className="space-y-3 text-left animate-fade-in-up select-none">
+                      <div className="border-b border-[var(--dt-border)] pb-2 flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-[var(--dt-text-primary)]">📊 相似照片组列表</h3>
+                        <span className="text-[10px] text-[var(--dt-text-soft)] font-mono">共 {similarGroups.length} 组</span>
+                      </div>
                       {similarGroups.length === 0 ? (
-                        <>
-                          <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                          <span>未发现相似照片。您可以直接查看结果。</span>
-                        </>
-                      ) : pendingGroupsCount > 0 ? (
-                        <>
-                          <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                          <span>还有相似照片未完成 A/B 对决。当前剩余：<strong>{pendingGroupsCount} 组</strong></span>
-                        </>
+                        <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
+                          未发现相似照片。
+                        </div>
                       ) : (
-                        <>
-                          <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                          <span>相似照片对局已完成。原图保持不变，您可以继续检查结果或导出整理清单。</span>
-                        </>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {similarGroups.map((group, idx) => (
+                            <div 
+                              key={group.id} 
+                              className={cn(
+                                "p-3 rounded border flex items-center justify-between gap-3 transition-colors",
+                                group.battleCompleted
+                                  ? "bg-[#222832]/50 border-[var(--dt-border)]"
+                                  : "bg-amber-500/5 border-amber-500/20"
+                              )}
+                            >
+                              <div className="space-y-1">
+                                <p className="text-[11px] font-bold text-[var(--dt-text-primary)]">相似组 #{idx + 1}</p>
+                                <p className="text-[10px] text-[var(--dt-text-soft)]">
+                                  包含 {group.photoIds.length} 张照片 • {group.battleCompleted ? "⚔️ 对决已完成" : "⏳ 待筛选对决"}
+                                </p>
+                              </div>
+                              {!group.battleCompleted && (
+                                <button
+                                  onClick={() => startBattleForGroup(group.id)}
+                                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold px-2.5 py-1 rounded text-[10px] transition-all flex items-center gap-1 shrink-0"
+                                >
+                                  <GitCompare className="h-2.5 w-2.5" /> 对决
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    {pendingGroupsCount > 0 && (
-                      <button
-                        onClick={() => {
-                          const group = similarGroups.find(g => !g.battleCompleted);
-                          if (group) startBattleForGroup(group.id);
-                        }}
-                        className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold px-2.5 py-1 rounded text-[10px] flex items-center gap-1 transition-all shrink-0"
-                      >
-                        <GitCompare className="h-3 w-3" />
-                        继续 A/B 对局
-                      </button>
-                    )}
-                  </div>
+                  )}
 
-                  {/* Partition List Areas - 双栏并排排版 */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                    {/* Partition A: Keep list */}
-                    <PhotoBucketSection
-                      bucketType="keep"
-                      photosCount={keepPhotos.length}
-                      onSelectAll={() => selectAllInBucket('keep')}
-                      onClearSelection={() => clearSelectionInBucket('keep')}
-                      isAllSelected={selectedKeepCount === keepPhotos.length && keepPhotos.length > 0}
-                      hasSelected={selectedKeepCount > 0}
-                    >
-                      {renderPartitionGrid(keepPhotos, 'keep')}
-                    </PhotoBucketSection>
+                  {activeTab === 'battle-status' && (
+                    <div className="space-y-4 text-left animate-fade-in-up select-none">
+                      <div className="border-b border-[var(--dt-border)] pb-2">
+                        <h3 className="text-xs font-bold text-[var(--dt-text-primary)]">⚔️ A/B 对局进度与指示</h3>
+                      </div>
+                      
+                      <div className={cn(
+                        "p-3.5 rounded border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs",
+                        pendingGroupsCount > 0 
+                          ? "bg-amber-950/10 border-amber-500/20 text-amber-400/90"
+                          : "bg-emerald-950/10 border-emerald-500/20 text-emerald-400/90"
+                      )}>
+                        <div className="space-y-1">
+                          <p className="font-bold flex items-center gap-2">
+                            {pendingGroupsCount > 0 ? (
+                              <>
+                                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                                <span>有 {pendingGroupsCount} 组相似照片尚未完成对决</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+                                <span>所有相似照片对局均已完成</span>
+                              </>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-[var(--dt-text-soft)]">
+                            {pendingGroupsCount > 0 
+                              ? "建议您先完成相似照片的 A/B 筛选对比，系统将自动推荐保留清晰度高、曝光好的照片，这有利于获取最佳的整理效果。"
+                              : "您已完成全部对决。保留照片和淘汰候选照片目前处于最优状态，可直接查看结果或导出。"}
+                          </p>
+                        </div>
+                        {pendingGroupsCount > 0 && (
+                          <button
+                            onClick={() => {
+                              const group = similarGroups.find(g => !g.battleCompleted);
+                              if (group) startBattleForGroup(group.id);
+                            }}
+                            className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1.5 rounded text-[10px] flex items-center gap-1.5 transition-all self-start sm:self-center shrink-0"
+                          >
+                            <GitCompare className="h-3 w-3" />
+                            开始/继续 A/B 对局
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                    {/* Partition B: Delete Candidate List */}
-                    <PhotoBucketSection
-                      bucketType="cull"
-                      photosCount={deletePhotos.length}
-                      spaceMB={spaceSavedMB}
-                      onSelectAll={() => selectAllInBucket('cull')}
-                      onClearSelection={() => clearSelectionInBucket('cull')}
-                      isAllSelected={selectedCullCount === deletePhotos.length && deletePhotos.length > 0}
-                      hasSelected={selectedCullCount > 0}
-                    >
-                      {renderPartitionGrid(deletePhotos, 'cull')}
-                    </PhotoBucketSection>
-                  </div>
-
-                  {/* Workspace Summary & Secure Export Row - 移动到最下方以改善信息流 */}
-                  <div className="pt-4 border-t border-[var(--dt-border)]">
-                    <ExportPanel
-                      totalPhotoCount={photos.length}
-                      keepCount={keepPhotos.length}
-                      keepSpaceMB={keepSpaceMB}
-                      cullCount={deletePhotos.length}
-                      spaceSavedMB={spaceSavedMB}
-                      isZipping={isZipping}
-                      zipExportWarning={zipExportWarning}
-                      pendingGroupsCount={pendingGroupsCount}
-                      similarGroupsCount={similarGroups.length}
-                      projectName={projectName}
-                      onExportKeepZip={downloadPhotosZip}
-                      onExportManifestCsv={handleExportManifestCsv}
-                      onExportManifestJson={handleExportManifestJson}
-                      onContinueBattle={() => {
-                        const group = similarGroups.find(g => !g.battleCompleted);
-                        if (group) startBattleForGroup(group.id);
-                      }}
-                      onRestart={handleRestart}
-                      hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
-                    />
-                  </div>
                 </div>
               )}
             </main>
@@ -1133,8 +1169,43 @@ export default function ResultsPage() {
         <DesktopStatusBar statusText={statusText} />
       </div>
 
-      {/* Photo Diagnostics Detail Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* 导出弹出面板 (整合至 Workflow 导出入口，带 0.2s 缩放渐入动效) */}
+        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+          <DialogContent 
+            className="sm:max-w-xl w-[90vw] bg-[var(--dt-panel-bg)] border border-[var(--dt-border)] text-[var(--dt-text-primary)] p-0 rounded-md shadow-2xl overflow-hidden focus:outline-none transition-all duration-200 ease-out transform scale-98 opacity-0 scale-100 opacity-100 animate-fade-in-scale"
+          >
+            <div className="p-4">
+              <ExportPanel
+                totalPhotoCount={photos.length}
+                keepCount={keepPhotos.length}
+                keepSpaceMB={keepSpaceMB}
+                cullCount={deletePhotos.length}
+                spaceSavedMB={spaceSavedMB}
+                isZipping={isZipping}
+                zipExportWarning={zipExportWarning}
+                pendingGroupsCount={pendingGroupsCount}
+                similarGroupsCount={similarGroups.length}
+                projectName={projectName}
+                onExportKeepZip={downloadPhotosZip}
+                onExportManifestCsv={handleExportManifestCsv}
+                onExportManifestJson={handleExportManifestJson}
+                onContinueBattle={() => {
+                  const group = similarGroups.find(g => !g.battleCompleted);
+                  if (group) startBattleForGroup(group.id);
+                  setExportOpen(false);
+                }}
+                onRestart={() => {
+                  handleRestart();
+                  setExportOpen(false);
+                }}
+                hasNativeSource={photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file')}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Photo Diagnostics Detail Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent 
           style={{
             background: 'linear-gradient(135deg, rgba(30, 35, 42, 0.96), rgba(40, 46, 54, 0.98))',

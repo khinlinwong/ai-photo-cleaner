@@ -304,3 +304,66 @@
   background-color: #101217 !important;
   border: 1px solid var(--dt-border) !important;
 }
+
+/* ---------------------------------------------------- */
+/* Pro-Graphite 动效微调 (0.12s - 0.2s) */
+/* ---------------------------------------------------- */
+
+/* 统一的 Hover/Active 状态过渡效果 */
+button, 
+a,
+.cursor-pointer {
+  transition: all 0.12s ease-in-out !important;
+}
+
+/* Sidebar 当前激活步骤的高亮切换过渡效果 */
+.desktop-root button.bg-\[var\(--dt-nav-active-bg\)\] {
+  transition: all 0.15s ease-in-out !important;
+}
+
+/* Results Tab / 区域切换淡入效果 (0.15s) */
+.animate-fade-in {
+  animation: fadeInReview 0.15s ease-out forwards;
+}
+
+@keyframes fadeInReview {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 区域切换带有微偏位渐入动效 (0.18s) */
+.animate-fade-in-up {
+  animation: fadeInUpReview 0.18s ease-out forwards;
+}
+
+@keyframes fadeInUpReview {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 导出面板 / Popover 弹出缩放渐入效果 (0.2s) */
+.animate-fade-in-scale {
+  animation: fadeInScaleReview 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInScaleReview {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
