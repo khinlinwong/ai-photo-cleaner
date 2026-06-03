@@ -77,8 +77,7 @@ Dry-run 校验流程：
 ### 4.3 权限最小化与写入范围控制设计
 - **当前阶段**：绝对不新增任何 Tauri 权限，保持 `core:default` 与 `dialog:allow-open` 的最小权限配置。不引入 `shell` 权限，不引入 `fs:allow-all` 或任何全局文件系统读写权限。
 - **未来 Copy-only MVP 写入阶段**：
-  - 必须单独设计针对目标输出文件夹的最小写入范围。
-  - 用户必须显式选择目标输出目录（通过 dialog plugin 临时获取该目录的受限写权限）。
+  - Dialog 只用于用户主动选择 output folder，不是写权限来源。copy-only 真实复制只由 Rust command 在内部基于 planId、outputFolderToken 与 canonical 校验执行；前端不获得文件系统写权限。
   - 写入范围严格受控于 Rust 侧。Rust 侧仅允许向用户指定的 `outputFolderToken` 对应目录进行写入。
   - 严禁任何由前端直接传入物理绝对路径去请求 Rust 侧写入的接口行为。
   - 严禁写回原图所在的 `source folder` 根目录下，且禁止 output folder 与 source folder 有任何层级交叉或重叠（例如：output folder 不能是 source folder 本身，不能是其子目录或父目录）。如果发生交叉，Rust 侧应立即中断并返回安全拒绝错误。

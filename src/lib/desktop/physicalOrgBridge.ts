@@ -1,5 +1,5 @@
 import { isTauriRuntime } from './tauriEnvironment';
-import { PhysicalOrgDryRunRequest, PhysicalOrgDryRunResult } from './physicalOrgTypes';
+import { PhysicalOrgDryRunRequest, PhysicalOrgDryRunResult, PhysicalOrgExecutionResult } from './physicalOrgTypes';
 
 /**
  * Opens folder picker, saves path in Rust, returns desensitized token & display label.
@@ -39,6 +39,27 @@ export async function createPhysicalOrgDryRun(
     return result;
   } catch {
     console.error('[PhysicalOrgBridge] Failed to generate dry-run plan.');
+    return null;
+  }
+}
+
+/**
+ * Executes copy-only operation for a dry-run plan on Rust side.
+ */
+export async function executePhysicalOrgCopy(planId: string): Promise<PhysicalOrgExecutionResult | null> {
+  if (!isTauriRuntime()) {
+    console.warn('[PhysicalOrgBridge] executePhysicalOrgCopy is only available in Tauri runtime.');
+    return null;
+  }
+
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const result = await invoke<PhysicalOrgExecutionResult>('execute_physical_org_copy', {
+      planId,
+    });
+    return result;
+  } catch {
+    console.error('[PhysicalOrgBridge] Failed to execute physical organization copy.');
     return null;
   }
 }

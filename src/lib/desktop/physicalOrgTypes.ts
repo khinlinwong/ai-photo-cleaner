@@ -31,3 +31,24 @@ export interface PhysicalOrgDryRunResult {
   warnings: string[];
   items: PhysicalOrgPlanItem[];
 }
+
+export interface PhysicalOrgExecutionReportItem {
+  photoId: string;
+  displayName: string;
+  targetBucket: PhysicalOrgTargetBucket;
+  outputRelativePath: string;
+  status: "copied" | "skipped" | "failed";
+  reason?: string;
+}
+
+export interface PhysicalOrgExecutionResult {
+  planId: string;
+  executionId: string;
+  outputDisplayLabel: string;
+  totalItems: number;
+  copiedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  reportItems: PhysicalOrgExecutionReportItem[];
+  warnings: string[];
+}

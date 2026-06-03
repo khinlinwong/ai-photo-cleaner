@@ -231,6 +231,7 @@ fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewS
 
   // Record the chosen folder path scope (canonicalized)
   set_active_folder(canonical_active.clone());
+  expire_all_plans();
 
   let entries = fs::read_dir(&canonical_active)
     .map_err(|_| "当前文件夹暂时无法扫描。".to_string())?;
@@ -347,6 +348,27 @@ fn read_native_preview_bytes(id: String) -> Result<Vec<u8>, String> {
   Ok(bytes)
 }
 
+#[derive(Clone)]
+struct PlanState {
+  result: PhysicalOrgDryRunResult,
+  output_folder_token: String,
+  status: String, // "planned", "executing", "completed", "failed", "expired"
+}
+
+static DRY_RUN_PLANS: OnceLock<Mutex<HashMap<String, PlanState>>> = OnceLock::new();
+
+fn get_dry_run_plans() -> &'static Mutex<HashMap<String, PlanState>> {
+  DRY_RUN_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn expire_all_plans() {
+  if let Ok(mut guard) = get_dry_run_plans().lock() {
+    for state in guard.values_mut() {
+      state.status = "expired".to_string();
+    }
+  }
+}
+
 static OUTPUT_FOLDER_MAPPING: OnceLock<Mutex<HashMap<String, PathBuf>>> = OnceLock::new();
 
 fn get_output_folder_mapping() -> &'static Mutex<HashMap<String, PathBuf>> {
@@ -420,10 +442,30 @@ pub struct PhysicalOrgDryRunResult {
   items: Vec<PhysicalOrgPlanItem>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
+pub struct PhysicalOrgExecutionReportItem {
+  #[serde(rename = "photoId")]
+  photo_id: String,
+  #[serde(rename = "displayName")]
+  display_name: String,
+  #[serde(rename = "targetBucket")]
+  target_bucket: String,
+  #[serde(rename = "outputRelativePath")]
+  output_relative_path: String,
+  status: String, // "copied", "skipped", "failed"
+  reason: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
 pub struct PhysicalOrgExecutionResult {
   #[serde(rename = "planId")]
   plan_id: String,
+  #[serde(rename = "executionId")]
+  execution_id: String,
+  #[serde(rename = "outputDisplayLabel")]
+  output_display_label: String,
+  #[serde(rename = "totalItems")]
+  total_items: usize,
   #[serde(rename = "copiedCount")]
   copied_count: usize,
   #[serde(rename = "skippedCount")]
@@ -431,7 +473,8 @@ pub struct PhysicalOrgExecutionResult {
   #[serde(rename = "failedCount")]
   failed_count: usize,
   #[serde(rename = "reportItems")]
-  report_items: Vec<String>,
+  report_items: Vec<PhysicalOrgExecutionReportItem>,
+  warnings: Vec<String>,
 }
 
 #[tauri::command]
@@ -668,8 +711,8 @@ fn create_physical_org_dry_run(
     warnings.push(format!("在目标位置发现 {} 个同名冲突文件，如果后续运行将使用冲突命名规则解决。", conflict_count));
   }
 
-  Ok(PhysicalOrgDryRunResult {
-    plan_id,
+  let dry_run_result = PhysicalOrgDryRunResult {
+    plan_id: plan_id.clone(),
     output_display_label: "已选择输出位置".to_string(),
     total_items,
     keep_count,
@@ -680,17 +723,289 @@ fn create_physical_org_dry_run(
     can_proceed,
     warnings,
     items: plan_items,
-  })
+  };
+
+  if let Ok(mut guard) = get_dry_run_plans().lock() {
+    guard.insert(plan_id, PlanState {
+      result: dry_run_result.clone(),
+      output_folder_token: request.output_folder_token,
+      status: "planned".to_string(),
+    });
+  }
+
+  Ok(dry_run_result)
 }
 
 #[tauri::command]
-fn execute_physical_org_copy(_plan_id: String) -> Result<PhysicalOrgExecutionResult, String> {
-  Err("当前阶段为 MVP 第一阶段，仅支持生成和预览整理计划，不执行真实复制。".to_string())
+fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResult, String> {
+  // 1. Find the plan in DRY_RUN_PLANS by plan_id
+  let plan = {
+    let plans_map = get_dry_run_plans();
+    let guard = plans_map.lock().map_err(|_| "系统锁定错误")?;
+    let plan_state = guard.get(&plan_id).ok_or_else(|| "未找到对应的整理计划，请重新生成计划。".to_string())?;
+    
+    if plan_state.status != "planned" {
+      return Err(format!("该整理计划当前状态为 {}，无法执行复制。", plan_state.status));
+    }
+    plan_state.clone()
+  };
+
+  // Set status to executing
+  {
+    let plans_map = get_dry_run_plans();
+    if let Ok(mut guard) = plans_map.lock() {
+      if let Some(p) = guard.get_mut(&plan_id) {
+        p.status = "executing".to_string();
+      }
+    }
+  }
+
+  // 2. Retrieve output folder token and path
+  let output_path = {
+    let mapping = get_output_folder_mapping();
+    let guard = mapping.lock().map_err(|_| "系统锁定错误")?;
+    guard.get(&plan.output_folder_token).cloned()
+  };
+
+  let output_path = match output_path {
+    Some(path) => path,
+    None => {
+      let _ = set_plan_status(&plan_id, "failed");
+      return Err("输出位置已失效，请重新选择输出位置。".to_string());
+    }
+  };
+
+  // 3. Double-check active folder and overlap safety
+  let active_folder = {
+    let guard = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "系统锁定错误")?;
+    guard.clone()
+  };
+
+  let active_folder_path = match active_folder {
+    Some(path) => path,
+    None => {
+      let _ = set_plan_status(&plan_id, "failed");
+      return Err("源文件夹会话已改变，当前计划已失效。".to_string());
+    }
+  };
+
+  let src_canon = active_folder_path.canonicalize().unwrap_or(active_folder_path);
+  let dest_canon = output_path.canonicalize().unwrap_or(output_path);
+
+  if dest_canon == src_canon 
+     || dest_canon.starts_with(&src_canon) 
+     || src_canon.starts_with(&dest_canon) 
+  {
+    let _ = set_plan_status(&plan_id, "failed");
+    return Err("安全拒绝：输出文件夹不能与源文件夹相同，且不能是层级重叠的子/父文件夹。".to_string());
+  }
+
+  // 4. Create base export and unique session directories
+  let base_export_dir = dest_canon.join("AI Photo Cleaner Export");
+  if !base_export_dir.exists() {
+    fs::create_dir_all(&base_export_dir).map_err(|_| "无法创建 AI Photo Cleaner Export 基础目录。".to_string())?;
+  }
+
+  let session_token = generate_opaque_token("session");
+  let session_dir = base_export_dir.join(format!("export-session-{}", session_token));
+  fs::create_dir(&session_dir).map_err(|_| "无法创建本次整理的会话输出目录。".to_string())?;
+
+  let keep_dir = session_dir.join("Keep");
+  let cull_dir = session_dir.join("Cull-Candidates");
+  fs::create_dir(&keep_dir).map_err(|_| "无法创建 Keep 输出目录。".to_string())?;
+  fs::create_dir(&cull_dir).map_err(|_| "无法创建 Cull-Candidates 输出目录。".to_string())?;
+
+  // 5. Execute copy
+  let mut copied_count = 0;
+  let mut skipped_count = 0;
+  let mut failed_count = 0;
+  let mut report_items = Vec::new();
+  let warnings = Vec::new();
+
+  for item in plan.result.items {
+    if item.status == "skipped" {
+      skipped_count += 1;
+      report_items.push(PhysicalOrgExecutionReportItem {
+        photo_id: item.photo_id,
+        display_name: item.display_name,
+        target_bucket: item.target_bucket,
+        output_relative_path: "".to_string(),
+        status: "skipped".to_string(),
+        reason: item.reason,
+      });
+      continue;
+    }
+
+    // Find real source path
+    let file_path = {
+      let mapping = get_preview_mapping();
+      if let Ok(guard) = mapping.lock() {
+        guard.get(&item.photo_id).cloned()
+      } else {
+        None
+      }
+    };
+
+    let file_path = match file_path {
+      Some(path) => path,
+      None => {
+        failed_count += 1;
+        report_items.push(PhysicalOrgExecutionReportItem {
+          photo_id: item.photo_id,
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          output_relative_path: "".to_string(),
+          status: "failed".to_string(),
+          reason: Some("未找到源图片文件缓存".to_string()),
+        });
+        continue;
+      }
+    };
+
+    // Verify source path safety
+    if !verify_in_active_folder(&file_path) {
+      failed_count += 1;
+      report_items.push(PhysicalOrgExecutionReportItem {
+        photo_id: item.photo_id,
+        display_name: item.display_name,
+        target_bucket: item.target_bucket,
+        output_relative_path: "".to_string(),
+        status: "failed".to_string(),
+        reason: Some("安全拒绝：超出源文件夹授权范围".to_string()),
+      });
+      continue;
+    }
+
+    if !file_path.exists() {
+      failed_count += 1;
+      report_items.push(PhysicalOrgExecutionReportItem {
+        photo_id: item.photo_id,
+        display_name: item.display_name,
+        target_bucket: item.target_bucket,
+        output_relative_path: "".to_string(),
+        status: "failed".to_string(),
+        reason: Some("源文件已被移动或删除".to_string()),
+      });
+      continue;
+    }
+
+    let ext = file_path
+      .extension()
+      .and_then(|e| e.to_str())
+      .unwrap_or("")
+      .to_lowercase();
+
+    let sub_folder = match item.target_bucket.as_str() {
+      "keep" => "Keep",
+      "cull-candidate" => "Cull-Candidates",
+      _ => {
+        failed_count += 1;
+        report_items.push(PhysicalOrgExecutionReportItem {
+          photo_id: item.photo_id,
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          output_relative_path: "".to_string(),
+          status: "failed".to_string(),
+          reason: Some("无效的分组目标类型".to_string()),
+        });
+        continue;
+      }
+    };
+
+    // Construct target filename, avoiding collisions
+    let mut final_filename = if ext.is_empty() {
+      item.display_name.clone()
+    } else {
+      format!("{}.{}", item.display_name, ext)
+    };
+
+    let target_sub_dir = session_dir.join(&sub_folder);
+    let mut dest_path = target_sub_dir.join(&final_filename);
+    let mut collision_counter = 1;
+
+    while dest_path.exists() {
+      final_filename = if ext.is_empty() {
+        format!("{}-{}", item.display_name, collision_counter)
+      } else {
+        format!("{}-{}.{}", item.display_name, collision_counter, ext)
+      };
+      dest_path = target_sub_dir.join(&final_filename);
+      collision_counter += 1;
+    }
+
+    let output_relative_path = format!("{}/{}", sub_folder, final_filename);
+
+    // Copy file
+    match fs::copy(&file_path, &dest_path) {
+      Ok(_) => {
+        copied_count += 1;
+        report_items.push(PhysicalOrgExecutionReportItem {
+          photo_id: item.photo_id,
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          output_relative_path,
+          status: "copied".to_string(),
+          reason: None,
+        });
+      }
+      Err(_) => {
+        failed_count += 1;
+        report_items.push(PhysicalOrgExecutionReportItem {
+          photo_id: item.photo_id,
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          output_relative_path: "".to_string(),
+          status: "failed".to_string(),
+          reason: Some("写入目标文件夹失败，磁盘可能已满".to_string()),
+        });
+      }
+    }
+  }
+
+  // 6. Build execution result
+  let execution_result = PhysicalOrgExecutionResult {
+    plan_id: plan_id.clone(),
+    execution_id: format!("exec-{}", session_token),
+    output_display_label: "已选择输出位置".to_string(),
+    total_items: plan.result.total_items,
+    copied_count,
+    skipped_count,
+    failed_count,
+    report_items,
+    warnings: warnings.clone(),
+  };
+
+  // 7. Write report.json
+  if let Ok(report_content) = serde_json::to_string_pretty(&execution_result) {
+    let _ = fs::write(session_dir.join("report.json"), report_content);
+  }
+
+  // 8. Update plan status
+  let final_status = if failed_count == plan.result.total_items {
+    "failed"
+  } else {
+    "completed"
+  };
+  let _ = set_plan_status(&plan_id, final_status);
+
+  Ok(execution_result)
+}
+
+fn set_plan_status(plan_id: &str, status: &str) -> Result<(), String> {
+  let plans_map = get_dry_run_plans();
+  let mut guard = plans_map.lock().map_err(|_| "系统锁定错误")?;
+  if let Some(p) = guard.get_mut(plan_id) {
+    p.status = status.to_string();
+  }
+  Ok(())
 }
 
 #[tauri::command]
 fn clear_physical_org_session() -> Result<(), String> {
   if let Ok(mut guard) = get_output_folder_mapping().lock() {
+    guard.clear();
+  }
+  if let Ok(mut guard) = get_dry_run_plans().lock() {
     guard.clear();
   }
   Ok(())

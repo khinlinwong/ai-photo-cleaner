@@ -36,8 +36,8 @@ import { buildZipExportFilename, buildManifestExportFilename } from '@/lib/expor
 import { ResultsSummaryCards } from '@/components/results/ResultsSummaryCards';
 import { ExportPanel } from '@/components/results/ExportPanel';
 import { PhotoBucketSection } from '@/components/results/PhotoBucketSection';
-import { selectPhysicalOrgOutputFolder, createPhysicalOrgDryRun, clearPhysicalOrgSession } from '@/lib/desktop/physicalOrgBridge';
-import { PhysicalOrgDryRunResult } from '@/lib/desktop/physicalOrgTypes';
+import { selectPhysicalOrgOutputFolder, createPhysicalOrgDryRun, executePhysicalOrgCopy, clearPhysicalOrgSession } from '@/lib/desktop/physicalOrgBridge';
+import { PhysicalOrgDryRunResult, PhysicalOrgExecutionResult } from '@/lib/desktop/physicalOrgTypes';
 
 
 // 延时辅助函数
@@ -109,6 +109,8 @@ export default function ResultsPage() {
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [dryRunResult, setDryRunResult] = useState<PhysicalOrgDryRunResult | null>(null);
   const [orgError, setOrgError] = useState<string | null>(null);
+  const [isExecutingCopy, setIsExecutingCopy] = useState(false);
+  const [executionResult, setExecutionResult] = useState<PhysicalOrgExecutionResult | null>(null);
 
   const handleClosePhysicalOrgDialog = useCallback(async () => {
     setPhysicalOrgDialogOpen(false);
@@ -119,6 +121,8 @@ export default function ResultsPage() {
       setDryRunResult(null);
       setOrgError(null);
       setIsGeneratingPlan(false);
+      setIsExecutingCopy(false);
+      setExecutionResult(null);
       await clearPhysicalOrgSession();
     }, 300);
   }, []);
@@ -166,6 +170,26 @@ export default function ResultsPage() {
       setOrgError(errMsg || "生成整理计划发生错误。");
     } finally {
       setIsGeneratingPlan(false);
+    }
+  };
+
+  const handleExecuteCopy = async () => {
+    if (!dryRunResult?.planId) return;
+    setIsExecutingCopy(true);
+    setOrgError(null);
+    try {
+      const res = await executePhysicalOrgCopy(dryRunResult.planId);
+      if (res) {
+        setExecutionResult(res);
+        setPhysicalOrgStep(4);
+      } else {
+        setOrgError("执行物理复制失败，请检查输出文件夹权限或可用空间。");
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setOrgError(errMsg || "执行复制时发生错误。");
+    } finally {
+      setIsExecutingCopy(false);
     }
   };
 
@@ -2303,45 +2327,94 @@ export default function ResultsPage() {
                   </div>
                 </div>
 
+                <div className="text-[11px] text-[var(--dt-text-soft)] bg-white/5 p-2.5 rounded border border-white/5 space-y-1">
+                  <p>💡 说明：原图保持不变。</p>
+                  <p>只复制到新文件夹，不会移动或删除原图。</p>
+                </div>
+
                 <div className="flex justify-between items-center pt-2">
                   <button
                     onClick={() => setPhysicalOrgStep(2)}
-                    className="desktop-button-secondary py-2 px-4 border border-white/10"
+                    disabled={isExecutingCopy}
+                    className="desktop-button-secondary py-2 px-4 border border-white/10 disabled:opacity-50"
                   >
                     上一步
                   </button>
                   <button
-                    onClick={() => setPhysicalOrgStep(4)}
-                    className="desktop-button-primary py-2 px-4 font-bold"
+                    onClick={handleExecuteCopy}
+                    disabled={isExecutingCopy || !dryRunResult.canProceed}
+                    className="desktop-button-primary py-2 px-4 font-bold disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    下一步：安全声明
+                    {isExecutingCopy ? "正在复制..." : "开始复制到新文件夹"}
                   </button>
                 </div>
               </div>
             )}
 
-            {physicalOrgStep === 4 && (
-              <div className="space-y-4 text-left">
+            {physicalOrgStep === 4 && executionResult && (
+              <div className="space-y-4 text-left animate-fade-in">
                 <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-lg space-y-2">
-                  <h4 className="font-bold text-sm">🛡️ 安全整理声明</h4>
+                  <h4 className="font-bold text-sm">🎉 整理完成</h4>
                   <p className="text-[11px] leading-relaxed">
-                    当前处于 MVP 第一阶段，系统**仅生成整理计划并模拟输出**。
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    不会向您的本地输出文件夹写入任何文件，也不会复制、移动或物理删除您的原图照片。原图保持 100% 只读且完整安全。
+                    照片已成功组织并复制到新文件夹。原图保持不变，只复制到新文件夹，不会移动或删除原图。
                   </p>
                 </div>
-                
-                <div className="flex justify-between items-center pt-2">
-                  <button
-                    onClick={() => setPhysicalOrgStep(3)}
-                    className="desktop-button-secondary py-2 px-4 border border-white/10"
-                  >
-                    上一步
-                  </button>
+
+                <div className="grid grid-cols-3 gap-2 bg-black/15 border border-white/5 p-3 rounded text-[11px]">
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">复制成功：</span>
+                    <span className="font-bold text-emerald-400">{executionResult.copiedCount} 张</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">跳过数量：</span>
+                    <span className="font-bold text-yellow-400">{executionResult.skippedCount} 张</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">失败数量：</span>
+                    <span className="font-bold text-rose-400">{executionResult.failedCount} 张</span>
+                  </div>
+                </div>
+
+                {executionResult.warnings.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-2.5 rounded text-[11px] leading-relaxed">
+                    {executionResult.warnings.map((w, idx) => (
+                      <p key={idx}>⚠️ {w}</p>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-[var(--dt-text-primary)] text-[11px]">📋 复制执行报告 (仅显示前 6 条)：</h4>
+                  <div className="border border-white/5 rounded divide-y divide-white/5 max-h-[160px] overflow-y-auto scrollbar-thin bg-black/10">
+                    {executionResult.reportItems.slice(0, 6).map((item, idx) => (
+                      <div key={idx} className="p-2 flex items-center justify-between text-[10.5px]">
+                        <span className="font-mono text-[var(--dt-text-primary)]">{item.displayName}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          item.status === 'copied' 
+                            ? 'bg-emerald-500/10 text-emerald-400' 
+                            : item.status === 'skipped' 
+                            ? 'bg-yellow-500/10 text-yellow-400' 
+                            : 'bg-rose-500/10 text-rose-400'
+                        }`}>
+                          {item.status === 'copied' ? '已复制' : item.status === 'skipped' ? '跳过' : '失败'}
+                        </span>
+                        <span className="text-[var(--dt-text-soft)] truncate max-w-[200px] font-mono" title={item.outputRelativePath}>
+                          {item.outputRelativePath || "(无)"}
+                        </span>
+                      </div>
+                    ))}
+                    {executionResult.reportItems.length > 6 && (
+                      <div className="p-2 text-center text-[10px] text-[var(--dt-text-soft)]">
+                        ... 以及另外 {executionResult.reportItems.length - 6} 张照片的报告
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
                   <button
                     onClick={handleClosePhysicalOrgDialog}
-                    className="desktop-button-primary py-2 px-4 font-bold"
+                    className="desktop-button-primary py-2 px-6 font-bold"
                   >
                     完成
                   </button>
