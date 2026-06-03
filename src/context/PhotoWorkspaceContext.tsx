@@ -528,7 +528,7 @@ export const MOCK_TRAVEL_PHOTOS: PhotoItem[] = [
   }
 ];
 
-export const NATIVE_PROCESSING_MVP_LIMIT = 30;
+export const NATIVE_PROCESSING_MVP_LIMIT = 50;
 
 interface PhotoWorkspaceContextType {
   photos: PhotoItem[];

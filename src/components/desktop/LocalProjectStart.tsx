@@ -534,7 +534,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                   <div className="space-y-2 mt-2 pt-2 border-t border-emerald-500/10">
                     <div className="flex items-center justify-between text-[10.5px]">
                       <span className="font-bold text-[var(--dt-text-primary)]">本地预览</span>
-                      <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 30 张</span>
+                      <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 50 张</span>
                     </div>
                     <div className="grid grid-cols-4 gap-1.5">
                       {previews.map((item, idx) => (
@@ -583,7 +583,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                   {!isScanning && previews.length > 0 ? (
                     <>
                       <p>💡 已可进行本地预览与小批量分析。</p>
-                      <p>💡 当前最多分析 30 张。</p>
+                      <p>💡 当前最多分析 50 张。</p>
                       <p>💡 原图保持不变，不上传云端。</p>
                       <p>💡 整理结果页接入将在下一步完成。</p>
                     </>
