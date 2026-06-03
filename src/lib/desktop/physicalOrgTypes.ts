@@ -33,7 +33,6 @@ export interface PhysicalOrgDryRunResult {
 }
 
 export interface PhysicalOrgExecutionReportItem {
-  photoId: string;
   displayName: string;
   targetBucket: PhysicalOrgTargetBucket;
   outputRelativePath: string;

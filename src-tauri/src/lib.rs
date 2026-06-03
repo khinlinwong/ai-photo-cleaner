@@ -444,8 +444,6 @@ pub struct PhysicalOrgDryRunResult {
 
 #[derive(Serialize, Clone)]
 pub struct PhysicalOrgExecutionReportItem {
-  #[serde(rename = "photoId")]
-  photo_id: String,
   #[serde(rename = "displayName")]
   display_name: String,
   #[serde(rename = "targetBucket")]
@@ -510,7 +508,8 @@ async fn select_physical_org_output_folder(
   };
 
   if let Some(src_path) = active_folder {
-    let src_canon = src_path.canonicalize().unwrap_or(src_path);
+    let src_canon = src_path.canonicalize()
+      .map_err(|_| "安全拒绝：源文件夹路径解析失败。".to_string())?;
     if canonical_path == src_canon 
        || canonical_path.starts_with(&src_canon) 
        || src_canon.starts_with(&canonical_path) 
@@ -556,7 +555,8 @@ fn create_physical_org_dry_run(
   };
 
   if let Some(src_path) = active_folder {
-    let src_canon = src_path.canonicalize().unwrap_or(src_path);
+    let src_canon = src_path.canonicalize()
+      .map_err(|_| "安全拒绝：源文件夹路径解析失败。".to_string())?;
     if output_path == src_canon 
        || output_path.starts_with(&src_canon) 
        || src_canon.starts_with(&output_path) 
@@ -738,32 +738,31 @@ fn create_physical_org_dry_run(
 
 #[tauri::command]
 fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResult, String> {
-  // 1. Find the plan in DRY_RUN_PLANS by plan_id
+  // 1. Find the plan in DRY_RUN_PLANS by plan_id and atomically check & set status
   let plan = {
     let plans_map = get_dry_run_plans();
-    let guard = plans_map.lock().map_err(|_| "系统锁定错误")?;
-    let plan_state = guard.get(&plan_id).ok_or_else(|| "未找到对应的整理计划，请重新生成计划。".to_string())?;
+    let mut guard = plans_map.lock().map_err(|_| "系统锁定错误与冲突保护拦截。".to_string())?;
+    let plan_state = guard.get_mut(&plan_id).ok_or_else(|| "未找到对应的整理计划，请重新生成计划。".to_string())?;
     
     if plan_state.status != "planned" {
-      return Err(format!("该整理计划当前状态为 {}，无法执行复制。", plan_state.status));
+      return Err(format!("该整理计划当前状态为 {}，无法重复执行复制。", plan_state.status));
     }
+
+    if !plan_state.result.can_proceed {
+      return Err("安全拒绝：该整理计划已被标记为不可继续执行。".to_string());
+    }
+    
+    plan_state.status = "executing".to_string();
     plan_state.clone()
   };
-
-  // Set status to executing
-  {
-    let plans_map = get_dry_run_plans();
-    if let Ok(mut guard) = plans_map.lock() {
-      if let Some(p) = guard.get_mut(&plan_id) {
-        p.status = "executing".to_string();
-      }
-    }
-  }
 
   // 2. Retrieve output folder token and path
   let output_path = {
     let mapping = get_output_folder_mapping();
-    let guard = mapping.lock().map_err(|_| "系统锁定错误")?;
+    let guard = mapping.lock().map_err(|_| {
+      let _ = set_plan_status(&plan_id, "failed");
+      "系统锁定错误".to_string()
+    })?;
     guard.get(&plan.output_folder_token).cloned()
   };
 
@@ -775,9 +774,12 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
     }
   };
 
-  // 3. Double-check active folder and overlap safety
+  // 3. Double-check active folder and overlap safety with canonicalize error checking
   let active_folder = {
-    let guard = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "系统锁定错误")?;
+    let guard = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock().map_err(|_| {
+      let _ = set_plan_status(&plan_id, "failed");
+      "系统锁定错误".to_string()
+    })?;
     guard.clone()
   };
 
@@ -789,8 +791,14 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
     }
   };
 
-  let src_canon = active_folder_path.canonicalize().unwrap_or(active_folder_path);
-  let dest_canon = output_path.canonicalize().unwrap_or(output_path);
+  let src_canon = active_folder_path.canonicalize().map_err(|_| {
+    let _ = set_plan_status(&plan_id, "failed");
+    "安全拒绝：无法解析源相册的绝对路径。".to_string()
+  })?;
+  let dest_canon = output_path.canonicalize().map_err(|_| {
+    let _ = set_plan_status(&plan_id, "failed");
+    "安全拒绝：无法解析输出位置的绝对路径。".to_string()
+  })?;
 
   if dest_canon == src_canon 
      || dest_canon.starts_with(&src_canon) 
@@ -803,17 +811,29 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
   // 4. Create base export and unique session directories
   let base_export_dir = dest_canon.join("AI Photo Cleaner Export");
   if !base_export_dir.exists() {
-    fs::create_dir_all(&base_export_dir).map_err(|_| "无法创建 AI Photo Cleaner Export 基础目录。".to_string())?;
+    fs::create_dir_all(&base_export_dir).map_err(|_| {
+      let _ = set_plan_status(&plan_id, "failed");
+      "无法创建 AI Photo Cleaner Export 基础目录。".to_string()
+    })?;
   }
 
   let session_token = generate_opaque_token("session");
   let session_dir = base_export_dir.join(format!("export-session-{}", session_token));
-  fs::create_dir(&session_dir).map_err(|_| "无法创建本次整理的会话输出目录。".to_string())?;
+  fs::create_dir(&session_dir).map_err(|_| {
+    let _ = set_plan_status(&plan_id, "failed");
+    "无法创建本次整理的会话输出目录。".to_string()
+  })?;
 
   let keep_dir = session_dir.join("Keep");
   let cull_dir = session_dir.join("Cull-Candidates");
-  fs::create_dir(&keep_dir).map_err(|_| "无法创建 Keep 输出目录。".to_string())?;
-  fs::create_dir(&cull_dir).map_err(|_| "无法创建 Cull-Candidates 输出目录。".to_string())?;
+  fs::create_dir(&keep_dir).map_err(|_| {
+    let _ = set_plan_status(&plan_id, "failed");
+    "无法创建 Keep 输出目录。".to_string()
+  })?;
+  fs::create_dir(&cull_dir).map_err(|_| {
+    let _ = set_plan_status(&plan_id, "failed");
+    "无法创建 Cull-Candidates 输出目录。".to_string()
+  })?;
 
   // 5. Execute copy
   let mut copied_count = 0;
@@ -826,7 +846,6 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
     if item.status == "skipped" {
       skipped_count += 1;
       report_items.push(PhysicalOrgExecutionReportItem {
-        photo_id: item.photo_id,
         display_name: item.display_name,
         target_bucket: item.target_bucket,
         output_relative_path: "".to_string(),
@@ -851,7 +870,6 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
       None => {
         failed_count += 1;
         report_items.push(PhysicalOrgExecutionReportItem {
-          photo_id: item.photo_id,
           display_name: item.display_name,
           target_bucket: item.target_bucket,
           output_relative_path: "".to_string(),
@@ -862,11 +880,25 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
       }
     };
 
-    // Verify source path safety
-    if !verify_in_active_folder(&file_path) {
+    // Verify source path canonicalization and safety
+    let file_path_canon = match file_path.canonicalize() {
+      Ok(p) => p,
+      Err(_) => {
+        failed_count += 1;
+        report_items.push(PhysicalOrgExecutionReportItem {
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          output_relative_path: "".to_string(),
+          status: "failed".to_string(),
+          reason: Some("源文件路径解析失败。".to_string()),
+        });
+        continue;
+      }
+    };
+
+    if !verify_in_active_folder(&file_path_canon) {
       failed_count += 1;
       report_items.push(PhysicalOrgExecutionReportItem {
-        photo_id: item.photo_id,
         display_name: item.display_name,
         target_bucket: item.target_bucket,
         output_relative_path: "".to_string(),
@@ -876,10 +908,9 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
       continue;
     }
 
-    if !file_path.exists() {
+    if !file_path_canon.exists() {
       failed_count += 1;
       report_items.push(PhysicalOrgExecutionReportItem {
-        photo_id: item.photo_id,
         display_name: item.display_name,
         target_bucket: item.target_bucket,
         output_relative_path: "".to_string(),
@@ -889,7 +920,7 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
       continue;
     }
 
-    let ext = file_path
+    let ext = file_path_canon
       .extension()
       .and_then(|e| e.to_str())
       .unwrap_or("")
@@ -901,7 +932,6 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
       _ => {
         failed_count += 1;
         report_items.push(PhysicalOrgExecutionReportItem {
-          photo_id: item.photo_id,
           display_name: item.display_name,
           target_bucket: item.target_bucket,
           output_relative_path: "".to_string(),
@@ -912,7 +942,7 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
       }
     };
 
-    // Construct target filename, avoiding collisions
+    // Construct target filename, avoiding collisions with atomic create_new(true)
     let mut final_filename = if ext.is_empty() {
       item.display_name.clone()
     } else {
@@ -922,43 +952,76 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
     let target_sub_dir = session_dir.join(&sub_folder);
     let mut dest_path = target_sub_dir.join(&final_filename);
     let mut collision_counter = 1;
+    let mut dest_file = None;
 
-    while dest_path.exists() {
-      final_filename = if ext.is_empty() {
-        format!("{}-{}", item.display_name, collision_counter)
-      } else {
-        format!("{}-{}.{}", item.display_name, collision_counter, ext)
-      };
-      dest_path = target_sub_dir.join(&final_filename);
-      collision_counter += 1;
+    while dest_file.is_none() {
+      match fs::OpenOptions::new().write(true).create_new(true).open(&dest_path) {
+        Ok(file) => {
+          dest_file = Some(file);
+        }
+        Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+          final_filename = if ext.is_empty() {
+            format!("{}-{}", item.display_name, collision_counter)
+          } else {
+            format!("{}-{}.{}", item.display_name, collision_counter, ext)
+          };
+          dest_path = target_sub_dir.join(&final_filename);
+          collision_counter += 1;
+        }
+        Err(_) => {
+          break;
+        }
+      }
     }
 
     let output_relative_path = format!("{}/{}", sub_folder, final_filename);
 
-    // Copy file
-    match fs::copy(&file_path, &dest_path) {
-      Ok(_) => {
-        copied_count += 1;
-        report_items.push(PhysicalOrgExecutionReportItem {
-          photo_id: item.photo_id,
-          display_name: item.display_name,
-          target_bucket: item.target_bucket,
-          output_relative_path,
-          status: "copied".to_string(),
-          reason: None,
-        });
+    if let Some(mut dest) = dest_file {
+      match fs::File::open(&file_path_canon) {
+        Ok(mut src) => {
+          match std::io::copy(&mut src, &mut dest) {
+            Ok(_) => {
+              copied_count += 1;
+              report_items.push(PhysicalOrgExecutionReportItem {
+                display_name: item.display_name,
+                target_bucket: item.target_bucket,
+                output_relative_path,
+                status: "copied".to_string(),
+                reason: None,
+              });
+            }
+            Err(_) => {
+              failed_count += 1;
+              report_items.push(PhysicalOrgExecutionReportItem {
+                display_name: item.display_name,
+                target_bucket: item.target_bucket,
+                output_relative_path: "".to_string(),
+                status: "failed".to_string(),
+                reason: Some("写入目标文件内容失败，磁盘可能已满。".to_string()),
+              });
+            }
+          }
+        }
+        Err(_) => {
+          failed_count += 1;
+          report_items.push(PhysicalOrgExecutionReportItem {
+            display_name: item.display_name,
+            target_bucket: item.target_bucket,
+            output_relative_path: "".to_string(),
+            status: "failed".to_string(),
+            reason: Some("无法打开源文件进行读取。".to_string()),
+          });
+        }
       }
-      Err(_) => {
-        failed_count += 1;
-        report_items.push(PhysicalOrgExecutionReportItem {
-          photo_id: item.photo_id,
-          display_name: item.display_name,
-          target_bucket: item.target_bucket,
-          output_relative_path: "".to_string(),
-          status: "failed".to_string(),
-          reason: Some("写入目标文件夹失败，磁盘可能已满".to_string()),
-        });
-      }
+    } else {
+      failed_count += 1;
+      report_items.push(PhysicalOrgExecutionReportItem {
+        display_name: item.display_name,
+        target_bucket: item.target_bucket,
+        output_relative_path: "".to_string(),
+        status: "failed".to_string(),
+        reason: Some("无法创建目标文件。".to_string()),
+      });
     }
   }
 
