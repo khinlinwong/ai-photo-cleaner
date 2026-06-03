@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use serde::{Serialize, Deserialize};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tauri_plugin_dialog::DialogExt;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct FolderMetadataSummary {
@@ -345,6 +347,355 @@ fn read_native_preview_bytes(id: String) -> Result<Vec<u8>, String> {
   Ok(bytes)
 }
 
+static OUTPUT_FOLDER_MAPPING: OnceLock<Mutex<HashMap<String, PathBuf>>> = OnceLock::new();
+
+fn get_output_folder_mapping() -> &'static Mutex<HashMap<String, PathBuf>> {
+  OUTPUT_FOLDER_MAPPING.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn generate_opaque_token(prefix: &str) -> String {
+  let start = SystemTime::now();
+  let since_the_epoch = start
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_default();
+  
+  static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+  let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+  
+  format!("{}-{}-{}", prefix, since_the_epoch.as_nanos(), count)
+}
+
+#[derive(Deserialize)]
+pub struct DryRunRequestItem {
+  #[serde(rename = "photoId")]
+  photo_id: String,
+  #[serde(rename = "displayName")]
+  display_name: String,
+  #[serde(rename = "targetBucket")]
+  target_bucket: String,
+}
+
+#[derive(Deserialize)]
+pub struct PhysicalOrgDryRunRequest {
+  #[serde(rename = "outputFolderToken")]
+  output_folder_token: String,
+  items: Vec<DryRunRequestItem>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct PhysicalOrgPlanItem {
+  #[serde(rename = "photoId")]
+  photo_id: String,
+  #[serde(rename = "displayName")]
+  display_name: String,
+  #[serde(rename = "targetBucket")]
+  target_bucket: String,
+  #[serde(rename = "targetRelativePath")]
+  target_relative_path: String,
+  status: String,
+  reason: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct PhysicalOrgDryRunResult {
+  #[serde(rename = "planId")]
+  plan_id: String,
+  #[serde(rename = "outputDisplayLabel")]
+  output_display_label: String,
+  #[serde(rename = "totalItems")]
+  total_items: usize,
+  #[serde(rename = "keepCount")]
+  keep_count: usize,
+  #[serde(rename = "cullCandidateCount")]
+  cull_candidate_count: usize,
+  #[serde(rename = "skippedCount")]
+  skipped_count: usize,
+  #[serde(rename = "conflictCount")]
+  conflict_count: usize,
+  #[serde(rename = "estimatedBytes")]
+  estimated_bytes: u64,
+  #[serde(rename = "canProceed")]
+  can_proceed: bool,
+  warnings: Vec<String>,
+  items: Vec<PhysicalOrgPlanItem>,
+}
+
+#[derive(Serialize)]
+pub struct PhysicalOrgExecutionResult {
+  #[serde(rename = "planId")]
+  plan_id: String,
+  #[serde(rename = "copiedCount")]
+  copied_count: usize,
+  #[serde(rename = "skippedCount")]
+  skipped_count: usize,
+  #[serde(rename = "failedCount")]
+  failed_count: usize,
+  #[serde(rename = "reportItems")]
+  report_items: Vec<String>,
+}
+
+#[tauri::command]
+async fn select_physical_org_output_folder(
+  app: tauri::AppHandle,
+) -> Result<(String, String), String> {
+  let (tx, rx) = std::sync::mpsc::channel();
+  
+  app.dialog().file().pick_folder(move |file_path| {
+    let _ = tx.send(file_path);
+  });
+  
+  let file_path_opt = rx.recv().map_err(|_| "选择目录对话框被取消。".to_string())?;
+  let file_path = match file_path_opt {
+    Some(fp) => fp,
+    None => return Err("用户取消了选择。".to_string()),
+  };
+  
+  let raw_path = match file_path {
+    tauri_plugin_dialog::FilePath::Path(p) => p,
+    tauri_plugin_dialog::FilePath::Url(u) => {
+      u.to_file_path().map_err(|_| "无法将 URL 转换为本地路径。".to_string())?
+    }
+  };
+
+  let canonical_path = raw_path.canonicalize()
+    .map_err(|_| "无法解析所选目录的绝对路径，可能不存在或无权限。".to_string())?;
+
+  // Check if there is an active source folder, and check overlap
+  let active_folder = {
+    let guard = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "系统锁定错误")?;
+    guard.clone()
+  };
+
+  if let Some(src_path) = active_folder {
+    let src_canon = src_path.canonicalize().unwrap_or(src_path);
+    if canonical_path == src_canon 
+       || canonical_path.starts_with(&src_canon) 
+       || src_canon.starts_with(&canonical_path) 
+    {
+      return Err("安全拒绝：输出文件夹不能是源文件夹、源文件夹的子文件夹，或源文件夹的父文件夹。".to_string());
+    }
+  }
+
+  // Generate desensitized token
+  let token = generate_opaque_token("org-token");
+  
+  // Save in the static map
+  if let Ok(mut guard) = get_output_folder_mapping().lock() {
+    guard.insert(token.clone(), canonical_path);
+  } else {
+    return Err("系统锁定错误".to_string());
+  }
+
+  // Return (token, "已选择输出位置")
+  Ok((token, "已选择输出位置".to_string()))
+}
+
+#[tauri::command]
+fn create_physical_org_dry_run(
+  request: PhysicalOrgDryRunRequest,
+) -> Result<PhysicalOrgDryRunResult, String> {
+  // 1. Check if outputFolderToken exists in map
+  let output_path = {
+    let mapping = get_output_folder_mapping();
+    let guard = mapping.lock().map_err(|_| "系统锁定错误")?;
+    guard.get(&request.output_folder_token).cloned()
+  };
+
+  let output_path = match output_path {
+    Some(path) => path,
+    None => return Err("无效或已过期的输出文件夹标识，请重新选择输出位置。".to_string()),
+  };
+
+  // Double check active folder and overlap safety in dry-run as well (defense in depth)
+  let active_folder = {
+    let guard = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "系统锁定错误")?;
+    guard.clone()
+  };
+
+  if let Some(src_path) = active_folder {
+    let src_canon = src_path.canonicalize().unwrap_or(src_path);
+    if output_path == src_canon 
+       || output_path.starts_with(&src_canon) 
+       || src_canon.starts_with(&output_path) 
+    {
+      return Err("安全拒绝：输出文件夹不能与源文件夹相同，且不能是层级重叠的子/父文件夹。".to_string());
+    }
+  }
+
+  let plan_id = generate_opaque_token("plan");
+
+  let mut total_items = 0;
+  let mut keep_count = 0;
+  let mut cull_candidate_count = 0;
+  let mut skipped_count = 0;
+  let mut conflict_count = 0;
+  let mut estimated_bytes = 0;
+  let mut warnings = Vec::new();
+  let mut plan_items = Vec::new();
+
+  for item in request.items {
+    total_items += 1;
+    
+    // Find the file in PREVIEW_MAPPING by photo_id
+    let file_path = {
+      let mapping = get_preview_mapping();
+      if let Ok(guard) = mapping.lock() {
+        guard.get(&item.photo_id).cloned()
+      } else {
+        None
+      }
+    };
+
+    let file_path = match file_path {
+      Some(path) => path,
+      None => {
+        skipped_count += 1;
+        plan_items.push(PhysicalOrgPlanItem {
+          photo_id: item.photo_id,
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          target_relative_path: "".to_string(),
+          status: "skipped".to_string(),
+          reason: Some("未找到源图片文件缓存".to_string()),
+        });
+        continue;
+      }
+    };
+
+    // Verify file is in active folder
+    if !verify_in_active_folder(&file_path) {
+      skipped_count += 1;
+      plan_items.push(PhysicalOrgPlanItem {
+        photo_id: item.photo_id,
+        display_name: item.display_name,
+        target_bucket: item.target_bucket,
+        target_relative_path: "".to_string(),
+        status: "skipped".to_string(),
+        reason: Some("安全拒绝：超出源文件夹授权范围".to_string()),
+      });
+      continue;
+    }
+
+    // Check if the source file exists
+    if !file_path.exists() {
+      skipped_count += 1;
+      plan_items.push(PhysicalOrgPlanItem {
+        photo_id: item.photo_id,
+        display_name: item.display_name,
+        target_bucket: item.target_bucket,
+        target_relative_path: "".to_string(),
+        status: "skipped".to_string(),
+        reason: Some("源文件不存在，可能在外部已被删除".to_string()),
+      });
+      continue;
+    }
+
+    // Get size and extension
+    let size_bytes = match fs::metadata(&file_path) {
+      Ok(meta) => meta.len(),
+      Err(_) => {
+        skipped_count += 1;
+        plan_items.push(PhysicalOrgPlanItem {
+          photo_id: item.photo_id,
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          target_relative_path: "".to_string(),
+          status: "skipped".to_string(),
+          reason: Some("无法读取文件元数据".to_string()),
+        });
+        continue;
+      }
+    };
+
+    let ext = file_path
+      .extension()
+      .and_then(|e| e.to_str())
+      .unwrap_or("")
+      .to_lowercase();
+
+    let sub_folder = match item.target_bucket.as_str() {
+      "keep" => "Keep",
+      "cull-candidate" => "Cull-Candidates",
+      _ => {
+        skipped_count += 1;
+        plan_items.push(PhysicalOrgPlanItem {
+          photo_id: item.photo_id,
+          display_name: item.display_name,
+          target_bucket: item.target_bucket,
+          target_relative_path: "".to_string(),
+          status: "skipped".to_string(),
+          reason: Some("无效的分组目标类型".to_string()),
+        });
+        continue;
+      }
+    };
+
+    let target_relative_path = if ext.is_empty() {
+      format!("{}/{}", sub_folder, item.display_name)
+    } else {
+      format!("{}/{}.{}", sub_folder, item.display_name, ext)
+    };
+
+    // Check potential conflict in output path
+    let dest_path = output_path.join(&target_relative_path);
+    let is_conflict = dest_path.exists();
+    if is_conflict {
+      conflict_count += 1;
+    }
+
+    // Increment counts for planned items
+    estimated_bytes += size_bytes;
+    if item.target_bucket == "keep" {
+      keep_count += 1;
+    } else {
+      cull_candidate_count += 1;
+    }
+
+    plan_items.push(PhysicalOrgPlanItem {
+      photo_id: item.photo_id,
+      display_name: item.display_name,
+      target_bucket: item.target_bucket,
+      target_relative_path,
+      status: "planned".to_string(),
+      reason: None,
+    });
+  }
+
+  // Determine if we can proceed
+  let can_proceed = total_items > 0 && skipped_count < total_items;
+
+  if conflict_count > 0 {
+    warnings.push(format!("在目标位置发现 {} 个同名冲突文件，如果后续运行将使用冲突命名规则解决。", conflict_count));
+  }
+
+  Ok(PhysicalOrgDryRunResult {
+    plan_id,
+    output_display_label: "已选择输出位置".to_string(),
+    total_items,
+    keep_count,
+    cull_candidate_count,
+    skipped_count,
+    conflict_count,
+    estimated_bytes,
+    can_proceed,
+    warnings,
+    items: plan_items,
+  })
+}
+
+#[tauri::command]
+fn execute_physical_org_copy(_plan_id: String) -> Result<PhysicalOrgExecutionResult, String> {
+  Err("当前阶段为 MVP 第一阶段，仅支持生成和预览整理计划，不执行真实复制。".to_string())
+}
+
+#[tauri::command]
+fn clear_physical_org_session() -> Result<(), String> {
+  if let Ok(mut guard) = get_output_folder_mapping().lock() {
+    guard.clear();
+  }
+  Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -399,7 +750,11 @@ pub fn run() {
       scan_folder_metadata,
       scan_folder_image_entries,
       scan_folder_image_previews,
-      read_native_preview_bytes
+      read_native_preview_bytes,
+      select_physical_org_output_folder,
+      create_physical_org_dry_run,
+      execute_physical_org_copy,
+      clear_physical_org_session
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

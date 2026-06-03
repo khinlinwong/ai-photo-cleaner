@@ -36,6 +36,8 @@ import { buildZipExportFilename, buildManifestExportFilename } from '@/lib/expor
 import { ResultsSummaryCards } from '@/components/results/ResultsSummaryCards';
 import { ExportPanel } from '@/components/results/ExportPanel';
 import { PhotoBucketSection } from '@/components/results/PhotoBucketSection';
+import { selectPhysicalOrgOutputFolder, createPhysicalOrgDryRun, clearPhysicalOrgSession } from '@/lib/desktop/physicalOrgBridge';
+import { PhysicalOrgDryRunResult } from '@/lib/desktop/physicalOrgTypes';
 
 
 // 延时辅助函数
@@ -98,6 +100,74 @@ export default function ResultsPage() {
 
   // 导出面板锚定元素 rect
   const [exportAnchorRect, setExportAnchorRect] = useState<DOMRect | null>(null);
+
+  // 本地物理整理组织状态
+  const [physicalOrgDialogOpen, setPhysicalOrgDialogOpen] = useState(false);
+  const [physicalOrgStep, setPhysicalOrgStep] = useState<1 | 2 | 3 | 4>(1);
+  const [physicalOrgToken, setPhysicalOrgToken] = useState<string | null>(null);
+  const [physicalOrgLabel, setPhysicalOrgLabel] = useState<string | null>(null);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<PhysicalOrgDryRunResult | null>(null);
+  const [orgError, setOrgError] = useState<string | null>(null);
+
+  const handleClosePhysicalOrgDialog = useCallback(async () => {
+    setPhysicalOrgDialogOpen(false);
+    setTimeout(async () => {
+      setPhysicalOrgStep(1);
+      setPhysicalOrgToken(null);
+      setPhysicalOrgLabel(null);
+      setDryRunResult(null);
+      setOrgError(null);
+      setIsGeneratingPlan(false);
+      await clearPhysicalOrgSession();
+    }, 300);
+  }, []);
+
+  const handleSelectOutputFolder = async () => {
+    setOrgError(null);
+    try {
+      const res = await selectPhysicalOrgOutputFolder();
+      if (res) {
+        setPhysicalOrgToken(res[0]);
+        setPhysicalOrgLabel(res[1]);
+      } else {
+        setOrgError("选择输出文件夹失败或用户取消了操作。");
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setOrgError(errMsg || "选择输出文件夹失败。");
+    }
+  };
+
+  const handleGeneratePlan = async () => {
+    if (!physicalOrgToken) return;
+    setIsGeneratingPlan(true);
+    setOrgError(null);
+    try {
+      const requestItems = photos.map(photo => ({
+        photoId: photo.id,
+        displayName: getPhotoDisplayName(photo),
+        targetBucket: (getUserVisibleBucket(photo) === 'keep' ? 'keep' : 'cull-candidate') as 'keep' | 'cull-candidate'
+      }));
+
+      const res = await createPhysicalOrgDryRun({
+        outputFolderToken: physicalOrgToken,
+        items: requestItems
+      });
+
+      if (res) {
+        setDryRunResult(res);
+        setPhysicalOrgStep(3);
+      } else {
+        setOrgError("生成整理计划失败，请重试。");
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setOrgError(errMsg || "生成整理计划发生错误。");
+    } finally {
+      setIsGeneratingPlan(false);
+    }
+  };
 
   // 包装对局决策函数以加入 300ms 缓冲确认/退出/淡入过渡动画
   const applyBattleDecision = useCallback(async (decision: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => {
@@ -1089,12 +1159,22 @@ export default function ResultsPage() {
                         这只调整整理结果，不会修改原图，原图在您的电脑上保持不变。
                       </p>
                     </div>
-                    <button
-                      onClick={handleRestart}
-                      className="desktop-button-secondary text-[10px] py-1.5 h-8 flex items-center gap-1.5 font-bold shrink-0 border border-[var(--dt-border)]"
-                    >
-                      重新选择文件夹
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {hasNativeSource && (
+                        <button
+                          onClick={() => setPhysicalOrgDialogOpen(true)}
+                          className="desktop-button-primary text-[10px] py-1.5 h-8 flex items-center gap-1.5 font-bold"
+                        >
+                          本地整理输出
+                        </button>
+                      )}
+                      <button
+                        onClick={handleRestart}
+                        className="desktop-button-secondary text-[10px] py-1.5 h-8 flex items-center gap-1.5 font-bold shrink-0 border border-[var(--dt-border)]"
+                      >
+                        重新选择文件夹
+                      </button>
+                    </div>
                   </div>
 
                   {/* 统计摘要区 */}
@@ -2056,6 +2136,233 @@ export default function ResultsPage() {
           </div>
         );
       })()}
+      {/* 本地整理输出 Wizard Dialog */}
+      <Dialog open={physicalOrgDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleClosePhysicalOrgDialog();
+        }
+      }}>
+        <DialogContent 
+          style={{
+            background: 'linear-gradient(135deg, rgba(30, 35, 42, 0.96), rgba(40, 46, 54, 0.98))',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)'
+          }}
+          className="sm:max-w-xl w-[90vw] max-h-[85vh] flex flex-col text-[var(--dt-text-primary)] p-5 rounded-xl border-white/5"
+        >
+          <DialogHeader className="shrink-0 border-b border-white/5 pb-2">
+            <DialogTitle className="text-sm font-bold text-[var(--dt-text-primary)] flex items-center justify-between">
+              <span>本地整理输出 (MVP Plan)</span>
+              <span className="text-[10px] text-[var(--dt-text-soft)] font-normal">步骤 {physicalOrgStep} / 4</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="overflow-y-auto pr-1 my-4 flex-grow max-h-[55vh] scrollbar-thin text-xs space-y-3">
+            {orgError && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-2.5 rounded text-[11px] leading-relaxed">
+                ⚠️ 出错啦：{orgError}
+              </div>
+            )}
+
+            {physicalOrgStep === 1 && (
+              <div className="space-y-4 text-left">
+                <p className="text-[var(--dt-text-secondary)] leading-relaxed">
+                  第一步：请选择用于存放整理后照片的本地输出位置。原图文件夹绝对不会被修改、移动或删除。
+                </p>
+                <div className="bg-black/10 border border-white/5 p-3 rounded space-y-1.5 text-[11px] text-[var(--dt-text-soft)]">
+                  <p>• 安全沙箱：输出文件夹不能与导入的源文件夹重叠。</p>
+                  <p>• 原图只读：源相册原图保持只读状态，确保安全。</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSelectOutputFolder}
+                    className="desktop-button-primary py-2 px-4 font-bold"
+                  >
+                    选择输出位置
+                  </button>
+                  {physicalOrgToken ? (
+                    <span className="text-emerald-400 font-semibold">{physicalOrgLabel}</span>
+                  ) : (
+                    <span className="text-[var(--dt-text-soft)]">尚未选择输出位置</span>
+                  )}
+                </div>
+                {physicalOrgToken && (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={() => setPhysicalOrgStep(2)}
+                      className="desktop-button-primary py-2 px-4 font-bold"
+                    >
+                      下一步：生成整理计划
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {physicalOrgStep === 2 && (
+              <div className="space-y-4 text-left">
+                <p className="text-[var(--dt-text-secondary)] leading-relaxed">
+                  第二步：基于当前整理状态生成脱敏计划。我们将模拟分析每个文件在输出目录下的结构。
+                </p>
+                <div className="bg-black/10 border border-white/5 p-3 rounded space-y-1.5 text-[11px] text-[var(--dt-text-soft)]">
+                  <p>• 保留照片 &rarr; 存入 Keep/ 子文件夹</p>
+                  <p>• 淘汰候选照片 &rarr; 存入 Cull-Candidates/ 子文件夹</p>
+                  <p>• 清单说明 &rarr; 生成 manifest.json 记录</p>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    onClick={() => setPhysicalOrgStep(1)}
+                    className="desktop-button-secondary py-2 px-4 border border-white/10"
+                  >
+                    上一步
+                  </button>
+                  <button
+                    onClick={handleGeneratePlan}
+                    disabled={isGeneratingPlan}
+                    className="desktop-button-primary py-2 px-4 font-bold disabled:opacity-50"
+                  >
+                    {isGeneratingPlan ? "正在生成计划..." : "生成整理计划"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {physicalOrgStep === 3 && dryRunResult && (
+              <div className="space-y-4 text-left">
+                <p className="text-[var(--dt-text-secondary)] leading-relaxed">
+                  第三步：预览整理计划。以下是模拟分析生成的报告指标。
+                </p>
+                
+                <div className="grid grid-cols-2 gap-2 bg-black/15 border border-white/5 p-3 rounded text-[11px]">
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">计划处理数量：</span>
+                    <span className="font-bold text-[var(--dt-text-primary)]">{dryRunResult.totalItems} 张</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">是否可以继续：</span>
+                    <span className={`font-bold ${dryRunResult.canProceed ? "text-emerald-400" : "text-red-400"}`}>
+                      {dryRunResult.canProceed ? "是" : "否"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">保留照片数量：</span>
+                    <span className="font-bold text-emerald-400">{dryRunResult.keepCount} 张</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">淘汰候选照片：</span>
+                    <span className="font-bold text-rose-400">{dryRunResult.cullCandidateCount} 张</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">跳过照片数量：</span>
+                    <span className="font-bold text-yellow-400">{dryRunResult.skippedCount} 张</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--dt-text-soft)]">重名冲突数量：</span>
+                    <span className={`font-bold ${dryRunResult.conflictCount > 0 ? "text-amber-400" : "text-[var(--dt-text-primary)]"}`}>
+                      {dryRunResult.conflictCount} 个
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[var(--dt-text-soft)]">安全估算大小：</span>
+                    <span className="font-bold text-[var(--dt-text-primary)]">
+                      {((dryRunResult.estimatedBytes ?? 0) / (1024 * 1024)).toFixed(2)} MB
+                    </span>
+                  </div>
+                </div>
+
+                {dryRunResult.warnings.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-2.5 rounded text-[11px] leading-relaxed">
+                    {dryRunResult.warnings.map((w, idx) => (
+                      <p key={idx}>⚠️ {w}</p>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-[var(--dt-text-primary)] text-[11px]">📋 整理计划条目预览 (仅显示前 6 条)：</h4>
+                  <div className="border border-white/5 rounded divide-y divide-white/5 max-h-[160px] overflow-y-auto scrollbar-thin bg-black/10">
+                    {dryRunResult.items.slice(0, 6).map((item) => (
+                      <div key={item.photoId} className="p-2 flex items-center justify-between text-[10.5px]">
+                        <span className="font-mono text-[var(--dt-text-primary)]">{item.displayName}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          item.targetBucket === 'keep' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                        }`}>
+                          {item.targetBucket === 'keep' ? '保留照片' : '淘汰候选'}
+                        </span>
+                        <span className="text-[var(--dt-text-soft)] truncate max-w-[200px] font-mono" title={item.targetRelativePath}>
+                          {item.targetRelativePath || "(跳过)"}
+                        </span>
+                      </div>
+                    ))}
+                    {dryRunResult.items.length > 6 && (
+                      <div className="p-2 text-center text-[10px] text-[var(--dt-text-soft)]">
+                        ... 以及另外 {dryRunResult.items.length - 6} 张照片的整理计划
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    onClick={() => setPhysicalOrgStep(2)}
+                    className="desktop-button-secondary py-2 px-4 border border-white/10"
+                  >
+                    上一步
+                  </button>
+                  <button
+                    onClick={() => setPhysicalOrgStep(4)}
+                    className="desktop-button-primary py-2 px-4 font-bold"
+                  >
+                    下一步：安全声明
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {physicalOrgStep === 4 && (
+              <div className="space-y-4 text-left">
+                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-lg space-y-2">
+                  <h4 className="font-bold text-sm">🛡️ 安全整理声明</h4>
+                  <p className="text-[11px] leading-relaxed">
+                    当前处于 MVP 第一阶段，系统**仅生成整理计划并模拟输出**。
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    不会向您的本地输出文件夹写入任何文件，也不会复制、移动或物理删除您的原图照片。原图保持 100% 只读且完整安全。
+                  </p>
+                </div>
+                
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    onClick={() => setPhysicalOrgStep(3)}
+                    className="desktop-button-secondary py-2 px-4 border border-white/10"
+                  >
+                    上一步
+                  </button>
+                  <button
+                    onClick={handleClosePhysicalOrgDialog}
+                    className="desktop-button-primary py-2 px-4 font-bold"
+                  >
+                    完成
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t border-white/5 pt-2 shrink-0 flex items-center justify-between">
+            <span className="text-[9.5px] text-[var(--dt-text-soft)] text-left leading-normal">
+              🛡️ AI Photo Cleaner 安全整理沙箱运行中
+            </span>
+            <button 
+              onClick={handleClosePhysicalOrgDialog}
+              className="desktop-button-secondary text-[11px] h-7 px-3 rounded border border-white/10"
+            >
+              关闭
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
