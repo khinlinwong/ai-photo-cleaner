@@ -742,10 +742,10 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
   let plan = {
     let plans_map = get_dry_run_plans();
     let mut guard = plans_map.lock().map_err(|_| "系统锁定错误与冲突保护拦截。".to_string())?;
-    let plan_state = guard.get_mut(&plan_id).ok_or_else(|| "未找到对应的整理计划，请重新生成计划。".to_string())?;
+    let plan_state = guard.get_mut(&plan_id).ok_or_else(|| "该整理计划已执行或已失效，请重新生成整理计划。".to_string())?;
     
     if plan_state.status != "planned" {
-      return Err(format!("该整理计划当前状态为 {}，无法重复执行复制。", plan_state.status));
+      return Err("该整理计划已执行或已失效，请重新生成整理计划。".to_string());
     }
 
     if !plan_state.result.can_proceed {
@@ -1044,10 +1044,10 @@ fn execute_physical_org_copy(plan_id: String) -> Result<PhysicalOrgExecutionResu
   }
 
   // 8. Update plan status
-  let final_status = if failed_count == plan.result.total_items {
-    "failed"
-  } else {
+  let final_status = if copied_count > 0 {
     "completed"
+  } else {
+    "failed"
   };
   let _ = set_plan_status(&plan_id, final_status);
 

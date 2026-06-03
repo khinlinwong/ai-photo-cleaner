@@ -43,6 +43,14 @@ import { PhysicalOrgDryRunResult, PhysicalOrgExecutionResult } from '@/lib/deskt
 // 延时辅助函数
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// 路径脱敏辅助函数
+const sanitizePathString = (str: string): string => {
+  if (!str) return '';
+  return str
+    .replace(/[a-zA-Z]:\\[^:?*"<>|\r\n\t]+/g, '<路径>')
+    .replace(/\/[^\s"']+\/[^\s"']+/g, '<路径>');
+};
+
 export default function ResultsPage() {
   const {
     photos,
@@ -111,6 +119,7 @@ export default function ResultsPage() {
   const [orgError, setOrgError] = useState<string | null>(null);
   const [isExecutingCopy, setIsExecutingCopy] = useState(false);
   const [executionResult, setExecutionResult] = useState<PhysicalOrgExecutionResult | null>(null);
+  const [hasExecutedCopy, setHasExecutedCopy] = useState(false);
 
   const handleClosePhysicalOrgDialog = useCallback(async () => {
     setPhysicalOrgDialogOpen(false);
@@ -123,6 +132,7 @@ export default function ResultsPage() {
       setIsGeneratingPlan(false);
       setIsExecutingCopy(false);
       setExecutionResult(null);
+      setHasExecutedCopy(false);
       await clearPhysicalOrgSession();
     }, 300);
   }, []);
@@ -147,6 +157,8 @@ export default function ResultsPage() {
     if (!physicalOrgToken) return;
     setIsGeneratingPlan(true);
     setOrgError(null);
+    setHasExecutedCopy(false);
+    setExecutionResult(null);
     try {
       const requestItems = photos.map(photo => ({
         photoId: photo.id,
@@ -167,7 +179,7 @@ export default function ResultsPage() {
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      setOrgError(errMsg || "生成整理计划发生错误。");
+      setOrgError(sanitizePathString(errMsg || "生成整理计划发生错误。"));
     } finally {
       setIsGeneratingPlan(false);
     }
@@ -179,6 +191,7 @@ export default function ResultsPage() {
     setOrgError(null);
     try {
       const res = await executePhysicalOrgCopy(dryRunResult.planId);
+      setHasExecutedCopy(true);
       if (res) {
         setExecutionResult(res);
         setPhysicalOrgStep(4);
@@ -186,8 +199,9 @@ export default function ResultsPage() {
         setOrgError("执行物理复制失败，请检查输出文件夹权限或可用空间。");
       }
     } catch (err) {
+      setHasExecutedCopy(true);
       const errMsg = err instanceof Error ? err.message : String(err);
-      setOrgError(errMsg || "执行复制时发生错误。");
+      setOrgError(sanitizePathString(errMsg || "执行复制时发生错误。"));
     } finally {
       setIsExecutingCopy(false);
     }
@@ -2329,8 +2343,14 @@ export default function ResultsPage() {
 
                 <div className="text-[11px] text-[var(--dt-text-soft)] bg-white/5 p-2.5 rounded border border-white/5 space-y-1">
                   <p>💡 说明：原图保持不变。</p>
-                  <p>只复制到新文件夹，不会移动或删除原图。</p>
+                  <p>只复制 to 新文件夹，不会移动或删除原图。</p>
                 </div>
+
+                {hasExecutedCopy && (
+                  <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 p-2.5 rounded text-[11px] leading-relaxed">
+                    此整理计划已完成。如需再次输出，请重新生成整理计划。
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center pt-2">
                   <button
@@ -2342,10 +2362,10 @@ export default function ResultsPage() {
                   </button>
                   <button
                     onClick={handleExecuteCopy}
-                    disabled={isExecutingCopy || !dryRunResult.canProceed}
+                    disabled={isExecutingCopy || hasExecutedCopy || !dryRunResult.canProceed}
                     className="desktop-button-primary py-2 px-4 font-bold disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    {isExecutingCopy ? "正在复制..." : "开始复制到新文件夹"}
+                    {isExecutingCopy ? "正在复制..." : (hasExecutedCopy ? "已完成复制" : "开始复制到新文件夹")}
                   </button>
                 </div>
               </div>
@@ -2357,6 +2377,9 @@ export default function ResultsPage() {
                   <h4 className="font-bold text-sm">🎉 整理完成</h4>
                   <p className="text-[11px] leading-relaxed">
                     照片已成功组织并复制到新文件夹。原图保持不变，只复制到新文件夹，不会移动或删除原图。
+                  </p>
+                  <p className="text-[11px] font-bold text-emerald-300">
+                    此整理计划已完成。如需再次输出，请重新生成整理计划。
                   </p>
                 </div>
 
