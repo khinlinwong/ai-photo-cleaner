@@ -528,6 +528,8 @@ export const MOCK_TRAVEL_PHOTOS: PhotoItem[] = [
   }
 ];
 
+export const NATIVE_PROCESSING_MVP_LIMIT = 30;
+
 interface PhotoWorkspaceContextType {
   photos: PhotoItem[];
   isAnalyzing: boolean;
@@ -1131,8 +1133,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setSkippedCount(0);
     setFailedCount(0);
 
-    // 最多取 previews.slice(0, 10)
-    const activePreviews = previews.slice(0, 10);
+    // 最多取 previews.slice(0, NATIVE_PROCESSING_MVP_LIMIT)
+    const activePreviews = previews.slice(0, NATIVE_PROCESSING_MVP_LIMIT);
 
     if (activePreviews.length > 0) {
       const nativeItems: PhotoItem[] = activePreviews.map((item, index) => {

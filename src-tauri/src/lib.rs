@@ -235,7 +235,7 @@ fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewS
 
   let mut preview_items = Vec::new();
   let mut idx = 0;
-  const PREVIEW_LIMIT: usize = 12;
+  const PREVIEW_LIMIT: usize = 30;
 
   // Clear previous mappings
   if let Ok(mut guard) = get_preview_mapping().lock() {
