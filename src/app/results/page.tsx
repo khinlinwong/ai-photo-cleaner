@@ -46,9 +46,17 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // 路径脱敏辅助函数
 const sanitizePathString = (str: string): string => {
   if (!str) return '';
-  return str
+  const cleaned = str
     .replace(/[a-zA-Z]:\\[^:?*"<>|\r\n\t]+/g, '<路径>')
     .replace(/\/[^\s"']+\/[^\s"']+/g, '<路径>');
+
+  if (cleaned.includes("该整理计划已执行或已失效") || cleaned.includes("整理计划已执行")) {
+    return "整理计划已执行，请重新生成整理计划。";
+  }
+  if (cleaned.includes("输出位置已失效") || cleaned.includes("无效或已过期的输出文件夹标识") || cleaned.includes("输出位置不可用")) {
+    return "输出位置不可用，请重新选择输出位置。";
+  }
+  return cleaned;
 };
 
 export default function ResultsPage() {
@@ -145,11 +153,10 @@ export default function ResultsPage() {
         setPhysicalOrgToken(res[0]);
         setPhysicalOrgLabel(res[1]);
       } else {
-        setOrgError("选择输出文件夹失败或用户取消了操作。");
+        setOrgError("输出位置不可用，请重新选择输出位置。");
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      setOrgError(errMsg || "选择输出文件夹失败。");
+    } catch {
+      setOrgError("输出位置不可用，请重新选择输出位置。");
     }
   };
 
@@ -2343,7 +2350,7 @@ export default function ResultsPage() {
 
                 <div className="text-[11px] text-[var(--dt-text-soft)] bg-white/5 p-2.5 rounded border border-white/5 space-y-1">
                   <p>💡 说明：原图保持不变。</p>
-                  <p>只复制 to 新文件夹，不会移动或删除原图。</p>
+                  <p>只复制到新文件夹，不会移动或删除原图。</p>
                 </div>
 
                 {hasExecutedCopy && (
@@ -2365,7 +2372,7 @@ export default function ResultsPage() {
                     disabled={isExecutingCopy || hasExecutedCopy || !dryRunResult.canProceed}
                     className="desktop-button-primary py-2 px-4 font-bold disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    {isExecutingCopy ? "正在复制..." : (hasExecutedCopy ? "已完成复制" : "开始复制到新文件夹")}
+                    {isExecutingCopy ? "正在复制到新文件夹…" : (hasExecutedCopy ? "复制完成" : "开始复制到新文件夹")}
                   </button>
                 </div>
               </div>
@@ -2373,15 +2380,27 @@ export default function ResultsPage() {
 
             {physicalOrgStep === 4 && executionResult && (
               <div className="space-y-4 text-left animate-fade-in">
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-lg space-y-2">
-                  <h4 className="font-bold text-sm">🎉 整理完成</h4>
-                  <p className="text-[11px] leading-relaxed">
-                    照片已成功组织并复制到新文件夹。原图保持不变，只复制到新文件夹，不会移动或删除原图。
-                  </p>
-                  <p className="text-[11px] font-bold text-emerald-300">
-                    此整理计划已完成。如需再次输出，请重新生成整理计划。
-                  </p>
-                </div>
+                {executionResult.failedCount > 0 ? (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-lg space-y-2">
+                    <h4 className="font-bold text-sm">⚠️ 部分照片未复制，请查看整理报告。</h4>
+                    <p className="text-[11px] leading-relaxed">
+                      原图保持不变，只复制到新文件夹，不会移动或删除原图。
+                    </p>
+                    <p className="text-[11px] font-bold text-amber-300">
+                      此整理计划已完成。如需再次输出，请重新生成整理计划。
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-lg space-y-2">
+                    <h4 className="font-bold text-sm">🎉 复制完成</h4>
+                    <p className="text-[11px] leading-relaxed">
+                      照片已成功组织并复制到新文件夹。原图保持不变，只复制到新文件夹，不会移动或删除原图。
+                    </p>
+                    <p className="text-[11px] font-bold text-emerald-300">
+                      此整理计划已完成。如需再次输出，请重新生成整理计划。
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-3 gap-2 bg-black/15 border border-white/5 p-3 rounded text-[11px]">
                   <div>
