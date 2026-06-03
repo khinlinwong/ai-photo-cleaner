@@ -76,22 +76,19 @@ export function ResultsSummaryCards({
       </button>
 
       <button
-        disabled={hasNativeSource}
         onClick={() => onTabChange('battle-status')}
         className={cn(
-          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none",
-          hasNativeSource
-            ? "bg-[var(--dt-card-bg)] border-[var(--dt-border)] opacity-50 cursor-not-allowed"
-            : activeTab === 'battle-status'
-            ? "bg-[var(--dt-nav-active-bg)] border-yellow-500/70 cursor-pointer"
-            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)] cursor-pointer"
+          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none cursor-pointer",
+          activeTab === 'battle-status'
+            ? "bg-[var(--dt-nav-active-bg)] border-yellow-500/70"
+            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)]"
         )}
       >
         <span className="text-[10px] text-[var(--dt-text-soft)] font-semibold">
-          ⚔️ {hasNativeSource ? "A/B 对局 (下一步接入)" : "A/B 对局"}
+          ⚔️ {hasNativeSource ? "A/B 对局 (本地)" : "A/B 对局"}
         </span>
         <span className="text-xs font-bold text-yellow-400 mt-1 font-mono">
-          {hasNativeSource ? "-" : `${completedBattleCount} / ${totalBattleCount} 已完成`}
+          {completedBattleCount} / {totalBattleCount} 已完成
         </span>
       </button>
     </div>

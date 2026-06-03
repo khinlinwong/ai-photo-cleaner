@@ -68,6 +68,13 @@ export default function ResultsPage() {
 
   const router = useRouter();
   const hasNativeSource = photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
+  const getPhotoDisplayName = useCallback((photo: PhotoItem) => {
+    if (hasNativeSource) {
+      const idx = photos.findIndex(p => p.id === photo.id);
+      return `Photo-${String(idx + 1).padStart(3, '0')}`;
+    }
+    return photo.name;
+  }, [hasNativeSource, photos]);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [filteredGroupId, setFilteredGroupId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -340,7 +347,7 @@ export default function ResultsPage() {
           // 直接在同一个窗口内流转到下一组，先播放淡出动画
           setBattleMotionState('group-exiting');
           setTimeout(() => {
-            startBattleForGroup(nextPendingGroup.id);
+            startBattleForGroup(nextPendingGroup.id, hasNativeSource ? { allowNative: true } : undefined);
             isTransitioningRef.current = false;
           }, 250);
         } else {
@@ -359,7 +366,7 @@ export default function ResultsPage() {
         }
       }
     }
-  }, [activeBattle, similarGroups, dismissedGroups, startBattleForGroup, handleCloseBattleWithAnimation]);
+  }, [activeBattle, similarGroups, dismissedGroups, startBattleForGroup, handleCloseBattleWithAnimation, hasNativeSource]);
 
   // 自动弹出相似照片组 PK 流程（寻找首个 battleCompleted===false 且非忽略组）
   useEffect(() => {
@@ -1279,7 +1286,7 @@ export default function ResultsPage() {
                                 const remainingCount = groupPhotos.length - 5;
 
                                 return (
-                                  <button 
+                                  <div 
                                     key={group.id} 
                                     onClick={() => {
                                       if (hasNativeSource) {
@@ -1289,7 +1296,7 @@ export default function ResultsPage() {
                                       }
                                     }}
                                     className={cn(
-                                      "w-full text-left p-3 rounded border flex flex-col justify-between gap-3 transition-all duration-200 select-none outline-none",
+                                      "w-full text-left p-3 rounded border flex flex-col justify-between gap-3 transition-all duration-200 select-none outline-none cursor-pointer",
                                       group.battleCompleted
                                         ? "bg-[#222832]/50 border-[var(--dt-border)] hover:bg-[#2C3440]/60 hover:border-[var(--dt-border-strong)]"
                                         : "bg-amber-500/5 border-amber-500/20 hover:bg-[#2C3440]/60 hover:border-[var(--dt-border-strong)]",
@@ -1305,17 +1312,40 @@ export default function ResultsPage() {
                                       </div>
                                       <div className="shrink-0 flex items-center gap-1.5">
                                         {hasNativeSource ? (
-                                          <span className="text-[10px] text-[var(--dt-text-soft)] border border-[var(--dt-border)] bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
-                                            查看组内照片
-                                          </span>
+                                          <>
+                                            <span className="text-[10px] text-[var(--dt-text-soft)] border border-[var(--dt-border)] bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
+                                              查看组内照片
+                                            </span>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                startBattleForGroup(group.id, { allowNative: true });
+                                              }}
+                                              className="text-[10px] text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded hover:bg-amber-500/20 transition-all font-bold"
+                                            >
+                                              重新对比
+                                            </button>
+                                          </>
                                         ) : group.battleCompleted ? (
-                                          <span className="text-[10px] text-[var(--dt-text-soft)] border border-[var(--dt-border)] bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              startBattleForGroup(group.id);
+                                            }}
+                                            className="text-[10px] text-[var(--dt-text-soft)] border border-[var(--dt-border)] bg-white/5 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-white/10"
+                                          >
                                             重新对决
-                                          </span>
+                                          </button>
                                         ) : (
-                                          <span className="text-[10px] text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              startBattleForGroup(group.id);
+                                            }}
+                                            className="text-[10px] text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-amber-500/20"
+                                          >
                                             <GitCompare className="h-2.5 w-2.5" /> 开始对决
-                                          </span>
+                                          </button>
                                         )}
                                       </div>
                                     </div>
@@ -1342,7 +1372,7 @@ export default function ResultsPage() {
                                         </div>
                                       )}
                                     </div>
-                                  </button>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -1358,45 +1388,101 @@ export default function ResultsPage() {
                         <h3 className="text-xs font-bold text-[var(--dt-text-primary)]">⚔️ A/B 对局进度与指示</h3>
                       </div>
                       
-                      <div className={cn(
-                        "p-3.5 rounded border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs",
-                        pendingGroupsCount > 0 
-                          ? "bg-amber-950/10 border-amber-500/20 text-amber-400/90"
-                          : "bg-emerald-950/10 border-emerald-500/20 text-emerald-400/90"
-                      )}>
-                        <div className="space-y-1">
-                          <p className="font-bold flex items-center gap-2">
-                            {pendingGroupsCount > 0 ? (
-                              <>
-                                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
-                                <span>有 {pendingGroupsCount} 组相似照片尚未完成对决</span>
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
-                                <span>所有相似照片对局均已完成</span>
-                              </>
-                            )}
-                          </p>
-                          <p className="text-[10px] text-[var(--dt-text-soft)]">
-                            {pendingGroupsCount > 0 
-                              ? "建议您先完成相似照片的 A/B 筛选对比，系统将自动推荐保留清晰度高、曝光好的照片，这有利于获取最佳的整理效果。"
-                              : "您已完成全部对决。保留照片和淘汰候选照片目前处于最优状态，可直接查看结果或导出。"}
-                          </p>
+                      {hasNativeSource ? (
+                        similarGroups.length === 0 ? (
+                          <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
+                            请先在相似组中识别本地相似照片
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {/* Start A/B Button */}
+                            <div className="flex items-center justify-between bg-black/10 border border-[var(--dt-border)] p-3 rounded">
+                              <span className="text-[11px] text-[var(--dt-text-soft)]">
+                                对局将连续在相似照片组间流转，系统会引导您挑选最想保留的照片。
+                              </span>
+                              {pendingGroupsCount > 0 && (
+                                <button
+                                  onClick={() => {
+                                    const firstPending = similarGroups.find(g => !g.battleCompleted);
+                                    if (firstPending) {
+                                      startBattleForGroup(firstPending.id, { allowNative: true });
+                                    }
+                                  }}
+                                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1.5 rounded text-[10px] flex items-center gap-1.5 transition-all shrink-0"
+                                >
+                                  <GitCompare className="h-3 w-3" />
+                                  开始本地 A/B 对局
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Similar Groups list with buttons */}
+                            <div className="space-y-2">
+                              {similarGroups.map((group, idx) => {
+                                return (
+                                  <div 
+                                    key={group.id}
+                                    className="p-3 rounded border border-[var(--dt-border)] bg-[var(--dt-card-bg)] flex items-center justify-between text-xs"
+                                  >
+                                    <div className="space-y-0.5">
+                                      <p className="font-bold text-[var(--dt-text-primary)]">相似组 #{idx + 1}</p>
+                                      <p className="text-[10px] text-[var(--dt-text-soft)]">
+                                        包含 {group.photoIds.length} 张照片 • {group.battleCompleted ? "已完成对比" : "待对决"}
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => startBattleForGroup(group.id, { allowNative: true })}
+                                      className="desktop-button-secondary text-[10px] py-1 px-3 font-bold border border-[var(--dt-border)]"
+                                    >
+                                      {group.battleCompleted ? "重新对比" : "开始对决"}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <div className={cn(
+                          "p-3.5 rounded border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs",
+                          pendingGroupsCount > 0 
+                            ? "bg-amber-950/10 border-amber-500/20 text-amber-400/90"
+                            : "bg-emerald-950/10 border-emerald-500/20 text-emerald-400/90"
+                        )}>
+                          <div className="space-y-1">
+                            <p className="font-bold flex items-center gap-2">
+                              {pendingGroupsCount > 0 ? (
+                                <>
+                                  <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                                  <span>有 {pendingGroupsCount} 组相似照片尚未完成对决</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+                                  <span>所有相似照片对局均已完成</span>
+                                </>
+                              )}
+                            </p>
+                            <p className="text-[10px] text-[var(--dt-text-soft)]">
+                              {pendingGroupsCount > 0 
+                                ? "建议您先完成相似照片的 A/B 筛选对比，系统将自动推荐保留清晰度高、曝光好的照片，这有利于获取最佳的整理效果。"
+                                : "您已完成全部对决。保留照片和淘汰候选照片目前处于最优状态，可直接查看结果或导出。"}
+                            </p>
+                          </div>
+                          {pendingGroupsCount > 0 && (
+                            <button
+                              onClick={() => {
+                                const group = similarGroups.find(g => !g.battleCompleted);
+                                if (group) startBattleForGroup(group.id);
+                              }}
+                              className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1.5 rounded text-[10px] flex items-center gap-1.5 transition-all self-start sm:self-center shrink-0"
+                            >
+                              <GitCompare className="h-3 w-3" />
+                              开始/继续 A/B 对局
+                            </button>
+                          )}
                         </div>
-                        {pendingGroupsCount > 0 && (
-                          <button
-                            onClick={() => {
-                              const group = similarGroups.find(g => !g.battleCompleted);
-                              if (group) startBattleForGroup(group.id);
-                            }}
-                            className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold px-3 py-1.5 rounded text-[10px] flex items-center gap-1.5 transition-all self-start sm:self-center shrink-0"
-                          >
-                            <GitCompare className="h-3 w-3" />
-                            开始/继续 A/B 对局
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -1660,10 +1746,12 @@ export default function ResultsPage() {
                 <div className="flex flex-col text-left">
                   <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
                     <GitCompare className="h-4 w-4 text-yellow-400" />
-                    选择更想保留的一张
+                    {hasNativeSource ? `相似组 #${similarGroups.findIndex(g => g.id === battleObj.groupId) + 1} - 本地处理` : "选择更想保留的一张"}
                   </h3>
                   <span className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">
-                    这组照片较相似，请直接选择你想保留的结果。未选照片会标记为淘汰候选，原图保持不变。
+                    {hasNativeSource 
+                      ? "本地 A/B 对局中，不上传云端，原图保持不变。请挑选您更想保留的照片。"
+                      : "这组照片较相似，请直接选择你想保留的结果。未选照片会标记为淘汰候选，原图保持不变。"}
                   </span>
                 </div>
                 <div className="bg-black/25 border border-white/5 rounded px-2.5 py-1 text-[10px] text-[var(--dt-text-primary)] font-mono font-bold">
@@ -1714,7 +1802,7 @@ export default function ResultsPage() {
                       >
                         <img 
                           src={leftPhoto.url} 
-                          alt={leftPhoto.name} 
+                          alt={getPhotoDisplayName(leftPhoto)} 
                           style={{ 
                             transform: `translate(${leftX}px, ${leftY}px) scale(${leftScale})`,
                             transition: isLeftDragging ? 'none' : 'transform 0.1s ease-out'
@@ -1730,7 +1818,12 @@ export default function ResultsPage() {
                       <div className="p-2.5 border-t border-white/5 shrink-0 flex flex-col gap-1 bg-black/10">
                         <div className="flex items-center justify-between gap-2">
                           <div className="max-w-[70%]">
-                            <p className="text-xs font-bold text-[var(--dt-text-primary)] truncate" title={leftPhoto.name}>{leftPhoto.name}</p>
+                            <p 
+                              className="text-xs font-bold text-[var(--dt-text-primary)] truncate" 
+                              title={hasNativeSource ? undefined : leftPhoto.name}
+                            >
+                              {getPhotoDisplayName(leftPhoto)}
+                            </p>
                             <p className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">{leftPhoto.size} • {leftPhoto.resolution}</p>
                           </div>
                           <span className="text-[10px] text-emerald-400 font-semibold">
@@ -1784,7 +1877,7 @@ export default function ResultsPage() {
                       >
                         <img 
                           src={rightPhoto.url} 
-                          alt={rightPhoto.name} 
+                          alt={getPhotoDisplayName(rightPhoto)} 
                           style={{ 
                             transform: `translate(${rightX}px, ${rightY}px) scale(${rightScale})`,
                             transition: isRightDragging ? 'none' : 'transform 0.1s ease-out'
@@ -1800,7 +1893,12 @@ export default function ResultsPage() {
                       <div className="p-2.5 border-t border-white/5 shrink-0 flex flex-col gap-1 bg-black/10">
                         <div className="flex items-center justify-between gap-2">
                           <div className="max-w-[70%]">
-                            <p className="text-xs font-bold text-[var(--dt-text-primary)] truncate" title={rightPhoto.name}>{rightPhoto.name}</p>
+                            <p 
+                              className="text-xs font-bold text-[var(--dt-text-primary)] truncate" 
+                              title={hasNativeSource ? undefined : rightPhoto.name}
+                            >
+                              {getPhotoDisplayName(rightPhoto)}
+                            </p>
                             <p className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">{rightPhoto.size} • {rightPhoto.resolution}</p>
                           </div>
                           <span className="text-[10px] text-yellow-400 font-semibold">
@@ -1857,7 +1955,7 @@ export default function ResultsPage() {
                         >
                           <img
                             src={photo.url}
-                            alt={photo.name}
+                            alt={getPhotoDisplayName(photo)}
                             className="w-full h-full object-cover"
                           />
                           {/* Status Dot */}

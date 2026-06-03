@@ -555,7 +555,7 @@ interface PhotoWorkspaceContextType {
   // Checkpoint 6 Battle methods and state:
   similarGroups: SimilarGroup[];
   activeBattle: ActiveBattleState | null;
-  startBattleForGroup: (groupId: string) => void;
+  startBattleForGroup: (groupId: string, options?: { allowNative?: boolean }) => void;
   applyBattleDecision: (decision: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => void;
   resetBattleForGroup: (groupId: string) => void;
   closeBattle: () => void;
@@ -829,10 +829,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     }
   };
 
-  const startBattleForGroup = (groupId: string) => {
+  const startBattleForGroup = (groupId: string, options?: { allowNative?: boolean }) => {
     const hasNative = photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
-    if (hasNative) {
-      console.warn('Battle is disabled for local native sources.');
+    if (hasNative && !options?.allowNative) {
+      console.warn('Battle is disabled for local native sources unless explicitly allowed.');
       return;
     }
 
