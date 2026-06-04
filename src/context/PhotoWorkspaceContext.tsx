@@ -711,7 +711,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   // 双路运行 QA 比较辅助
   const runDuplicateQA = (processedPhotos: PhotoItem[], oldSimilarGroupsOverride?: SimilarGroup[]) => {
     try {
-      const signalInputs = processedPhotos.map(photo => ({
+      if (!Array.isArray(processedPhotos)) return;
+      const safePhotos = processedPhotos.filter(Boolean);
+      const signalInputs = safePhotos.map(photo => ({
         id: photo.id,
         perceptualHash: photo.perceptualHash,
         sharpnessScore: photo.sharpnessScore,
@@ -724,8 +726,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
 
       // 1. 同步还原旧版的分组数据，用于只读对比，无需依赖或重写 initializeSimilarGroups
       const groupsMap: { [groupId: string]: string[] } = {};
-      processedPhotos.forEach((photo) => {
-        if (photo.duplicateGroupId) {
+      safePhotos.forEach((photo) => {
+        if (photo && photo.duplicateGroupId) {
           if (!groupsMap[photo.duplicateGroupId]) {
             groupsMap[photo.duplicateGroupId] = [];
           }
@@ -733,7 +735,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         }
       });
       const oldSimilarGroupsMock: SimilarGroup[] = Object.entries(groupsMap).map(([groupId, photoIds]) => {
-        const groupPhotos = processedPhotos.filter(p => photoIds.includes(p.id));
+        const groupPhotos = safePhotos.filter(p => p && photoIds.includes(p.id));
         const recommendedLeader = groupPhotos.find(p => p.duplicateRecommendation === 'keep') || groupPhotos[0];
         const leaderId = recommendedLeader ? recommendedLeader.id : photoIds[0];
         return {
@@ -806,9 +808,11 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
 
   // 初始化相似照片分组列表的辅助方法
   const initializeSimilarGroups = (photosList: PhotoItem[]) => {
+    if (!Array.isArray(photosList)) return;
+    const safePhotosList = photosList.filter(Boolean);
     if (canUseSignalGroupsForBattle) {
       // 灰度分支：使用客观相似检测信号生成的 newSimilarGroupsForQA 覆盖 similarGroups 状态，驱动 PK
-      const signalInputs = photosList.map(photo => ({
+      const signalInputs = safePhotosList.map(photo => ({
         id: photo.id,
         perceptualHash: photo.perceptualHash,
         sharpnessScore: photo.sharpnessScore,
@@ -821,7 +825,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     } else {
       // 稳定分支：继续使用 legacy 相似组逻辑来初始化和驱动
       const groupsMap: { [groupId: string]: string[] } = {};
-      photosList.forEach((photo) => {
+      safePhotosList.forEach((photo) => {
         if (photo.duplicateGroupId) {
           if (!groupsMap[photo.duplicateGroupId]) {
             groupsMap[photo.duplicateGroupId] = [];
@@ -831,7 +835,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       });
 
       const newGroups: SimilarGroup[] = Object.entries(groupsMap).map(([groupId, photoIds]) => {
-        const groupPhotos = photosList.filter(p => photoIds.includes(p.id));
+        const groupPhotos = safePhotosList.filter(p => p && photoIds.includes(p.id));
         const recommendedLeader = groupPhotos.find(p => p.duplicateRecommendation === 'keep') || groupPhotos[0];
         const leaderId = recommendedLeader ? recommendedLeader.id : photoIds[0];
 

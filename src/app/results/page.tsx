@@ -59,6 +59,169 @@ const sanitizePathString = (str: string): string => {
   return cleaned;
 };
 
+interface ResultsPhotoCardProps {
+  photo: PhotoItem;
+  index: number;
+  isSelected: boolean;
+  getPhotoDisplayName: (photo: PhotoItem) => string;
+  renderIssueBadge: (photo: PhotoItem) => React.ReactNode;
+  toggleSelectPhoto: (id: string) => void;
+  updatePhotoStatus: (id: string, status: 'keep' | 'review' | 'delete') => void;
+  openDetail: (photo: PhotoItem) => void;
+  setPreviewPhoto: (photo: PhotoItem) => void;
+  setPreviewScale: (scale: number) => void;
+  setPreviewX: (x: number) => void;
+  setPreviewY: (y: number) => void;
+}
+
+const ResultsPhotoCard: React.FC<ResultsPhotoCardProps> = ({
+  photo,
+  index,
+  isSelected,
+  getPhotoDisplayName,
+  renderIssueBadge,
+  toggleSelectPhoto,
+  updatePhotoStatus,
+  openDetail,
+  setPreviewPhoto,
+  setPreviewScale,
+  setPreviewX,
+  setPreviewY,
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const reasonTag = getReasonTags(photo);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [photo.id, photo.url]);
+
+  return (
+    <Card 
+      style={{
+        animationDelay: `${Math.min((index % 20) * 20, 120)}ms`
+      }}
+      className={cn(
+        "w-full h-full overflow-visible rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md flex flex-col justify-between animate-card-pop",
+        isSelected
+          ? "border-emerald-500/80 bg-emerald-500/5 ring-1 ring-emerald-500/35"
+          : getUserVisibleBucket(photo) === 'cull'
+          ? "border-[#B96F68]/30 bg-[#B96F68]/5 hover:border-[#B96F68]/60 hover:bg-[#B96F68]/15" 
+          : "border-white/5 bg-[var(--dt-card-bg)] hover:border-[#6F8FA8]/40 hover:bg-[#6F8FA8]/5"
+      )}
+    >
+      {/* Image Section */}
+      <div 
+        className="relative h-[100px] w-full overflow-hidden bg-neutral-800/20 rounded-t-lg cursor-pointer select-none"
+        onClick={() => {
+          setPreviewPhoto(photo);
+          setPreviewScale(1);
+          setPreviewX(0);
+          setPreviewY(0);
+        }}
+      >
+        {imageError ? (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-900 border border-white/5 text-[var(--dt-text-soft)] gap-1">
+            <AlertTriangle className="h-5 w-5 text-amber-500/80" />
+            <span className="text-[10px] font-medium">预览不可用</span>
+          </div>
+        ) : (
+          <img
+            src={photo.url}
+            alt={getPhotoDisplayName(photo)}
+            className="w-full h-full object-contain bg-neutral-800/50"
+            onError={() => setImageError(true)}
+          />
+        )}
+        <div className="absolute top-1.5 left-1.5 z-10 scale-[0.8] origin-top-left">
+          {renderIssueBadge(photo)}
+        </div>
+        {/* Checkbox Overlay */}
+        <button
+          type="button"
+          className={cn(
+            "absolute top-1.5 right-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full border transition-all shadow-md focus:outline-none",
+            isSelected
+              ? "bg-emerald-500 border-emerald-400 text-white"
+              : "bg-black/40 border-white/40 text-transparent hover:border-white hover:bg-black/60"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSelectPhoto(photo.id);
+          }}
+        >
+          {isSelected && <span className="text-[8px] font-bold">✓</span>}
+        </button>
+      </div>
+
+      {/* Info details */}
+      <CardContent className="p-2 flex-1 flex flex-col justify-between text-left relative">
+        <div className="space-y-0.5">
+          <div className="flex items-center justify-between gap-1 leading-tight">
+            <p className="text-[10px] font-bold text-[var(--dt-text-primary)] truncate flex-grow" title={getPhotoDisplayName(photo)}>
+              {getPhotoDisplayName(photo)}
+            </p>
+            <span className="text-[8px] text-[var(--dt-text-soft)] shrink-0 font-mono">{photo.size}</span>
+          </div>
+
+          {/* 简单原因标签 (隐藏用户选择) */}
+          {reasonTag !== '用户选择' && (
+            <div className="flex items-center mt-0.5">
+              <span className="text-[8px] text-[var(--dt-text-secondary)] font-medium bg-white/5 px-1 py-0.5 rounded leading-none font-sans">
+                {reasonTag}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Action Row */}
+        <div className="flex items-center justify-between gap-1.5 mt-1.5 border-t border-white/5 pt-1.5 shrink-0">
+          <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-0 select-none shrink-0 relative">
+            <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-0.5 font-semibold">
+              <span className="text-[7px]">▶</span> 详情
+            </summary>
+            <div className="absolute bottom-[24px] left-0 bg-[#12161A]/95 border border-white/10 p-2.5 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20 font-mono space-y-0.5 backdrop-blur-md w-[150px] text-[8px] leading-tight">
+              <p>综合质量: {photo.score} / 100</p>
+              <p>清晰对焦: {photo.sharpnessScore} / 100</p>
+              <p>曝光亮度: {photo.exposureScore} / 100</p>
+              <div className="pt-1.5 flex items-center justify-end border-t border-white/5 mt-1.5">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDetail(photo);
+                  }}
+                  className="text-[8px] text-yellow-400 hover:underline flex items-center gap-0.5"
+                >
+                  <Maximize2 className="h-2.5 w-2.5" /> 像素诊断仪
+                </button>
+              </div>
+            </div>
+          </details>
+
+          {getUserVisibleBucket(photo) === 'keep' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-5 px-1 text-[8.5px] flex items-center justify-center rounded transition-all font-semibold border-0 bg-white/5 hover:bg-[#B96F68]/20 hover:text-[#B96F68] text-[var(--dt-text-muted)] flex-1"
+              onClick={() => updatePhotoStatus(photo.id, 'delete')}
+            >
+              标记为淘汰候选
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-5 px-1 text-[8.5px] flex items-center justify-center rounded transition-all font-semibold border-0 bg-white/5 hover:bg-[#6FA887]/20 hover:text-[#6FA887] text-[var(--dt-text-muted)] flex-1"
+              onClick={() => updatePhotoStatus(photo.id, 'keep')}
+            >
+              标记为保留
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function ResultsPage() {
   const {
     photos,
@@ -74,7 +237,9 @@ export default function ResultsPage() {
     projectName,
     isAnalyzing,
     analysisProgress,
-    isNativeProcessingCancelled
+    isNativeProcessingCancelled,
+    skippedCount,
+    failedCount
   } = usePhotoWorkspace();
 
   interface UndoAction {
@@ -89,11 +254,14 @@ export default function ResultsPage() {
   const router = useRouter();
   const hasNativeSource = photos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
   const getPhotoDisplayName = useCallback((photo: PhotoItem) => {
+    if (!photo) return '';
     if (hasNativeSource) {
       const idx = photos.findIndex(p => p.id === photo.id);
-      return `Photo-${String(idx + 1).padStart(3, '0')}`;
+      if (idx !== -1) {
+        return `Photo-${String(idx + 1).padStart(3, '0')}`;
+      }
     }
-    return photo.name;
+    return photo.name || '';
   }, [hasNativeSource, photos]);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [filteredGroupId, setFilteredGroupId] = useState<string | null>(null);
@@ -107,6 +275,50 @@ export default function ResultsPage() {
   const [previewY, setPreviewY] = useState(0);
   const [isPreviewDragging, setIsPreviewDragging] = useState(false);
   const [previewDragStart, setPreviewDragStart] = useState({ x: 0, y: 0 });
+  const [isAnimateIn, setIsAnimateIn] = useState(false);
+
+  const closePreviewModal = useCallback(() => {
+    setIsAnimateIn(false);
+    setTimeout(() => {
+      setPreviewPhoto(null);
+    }, 700);
+  }, []);
+
+  const handlePreviewWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+
+    const scaleFactor = 0.15;
+    const delta = e.deltaY < 0 ? scaleFactor : -scaleFactor;
+
+    setPreviewScale(prev => {
+      const next = Math.min(Math.max(prev + delta, 1), 5);
+      if (next === 1) {
+        setPreviewX(0);
+        setPreviewY(0);
+      } else {
+        const ratio = next / prev;
+        setPreviewX(prevX => (mx - cx) - (mx - cx - prevX) * ratio);
+        setPreviewY(prevY => (my - cy) - (my - cy - prevY) * ratio);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (previewPhoto) {
+      const timer = setTimeout(() => {
+        setIsAnimateIn(true);
+      }, 50);
+      return () => clearTimeout(timer);
+    } else {
+      setIsAnimateIn(false);
+    }
+  }, [previewPhoto]);
 
   // 当 Tab 切换时，自动清除相似组过滤状态
   useEffect(() => {
@@ -446,7 +658,7 @@ export default function ResultsPage() {
       if (e.key === 'Escape') {
         if (previewPhoto) {
           e.preventDefault();
-          setPreviewPhoto(null);
+          closePreviewModal();
         } else if (exportOpen && !isExportClosing) {
           e.preventDefault();
           handleCloseExport();
@@ -455,7 +667,7 @@ export default function ResultsPage() {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [exportOpen, isExportClosing, handleCloseExport, previewPhoto]);
+  }, [exportOpen, isExportClosing, handleCloseExport, previewPhoto, closePreviewModal]);
 
   // 当检测到当前组对比 PK 结束时，自动关闭当前对比，并流转到下一组或展示 Toast
   useEffect(() => {
@@ -497,19 +709,35 @@ export default function ResultsPage() {
   // A/B 自动进入策略：仅在 Native 正常分析完成并跳转到 Results 时，若 similarGroups.length > 0，自动打开第一组的 A/B 对局
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (
-      hasNativeSource &&
-      similarGroups.length > 0 &&
-      analysisProgress === 100 &&
-      !isAnalyzing &&
-      !isNativeProcessingCancelled &&
-      !sessionStorage.getItem('ab_auto_opened')
-    ) {
-      const firstPending = similarGroups.find(g => !g.battleCompleted) || similarGroups[0];
-      if (firstPending) {
-        sessionStorage.setItem('ab_auto_opened', 'true');
-        startBattleForGroup(firstPending.id, { allowNative: true });
+    try {
+      let isAlreadyOpened = false;
+      try {
+        isAlreadyOpened = !!window.sessionStorage.getItem('ab_auto_opened');
+      } catch (err) {
+        console.warn('Failed to read sessionStorage:', err);
       }
+
+      if (
+        hasNativeSource &&
+        Array.isArray(similarGroups) &&
+        similarGroups.length > 0 &&
+        analysisProgress === 100 &&
+        !isAnalyzing &&
+        !isNativeProcessingCancelled &&
+        !isAlreadyOpened
+      ) {
+        const firstPending = similarGroups.find(g => g && !g.battleCompleted) || similarGroups[0];
+        if (firstPending && firstPending.id) {
+          try {
+            window.sessionStorage.setItem('ab_auto_opened', 'true');
+          } catch (err) {
+            console.warn('Failed to write sessionStorage:', err);
+          }
+          startBattleForGroup(firstPending.id, { allowNative: true });
+        }
+      }
+    } catch (e) {
+      console.warn('Auto A/B error guarded:', e);
     }
   }, [
     hasNativeSource,
@@ -888,10 +1116,10 @@ export default function ResultsPage() {
   }, 0).toFixed(1);
 
   // 打开详情诊断弹窗 (非主决策，隐藏入 details折叠 后辅助查看)
-  const openDetail = (photo: PhotoItem) => {
+  const openDetail = useCallback((photo: PhotoItem) => {
     setSelectedPhoto(photo);
     setDialogOpen(true);
-  };
+  }, []);
 
   // 重新导入跳转到 /desktop
   const handleRestart = () => {
@@ -900,7 +1128,7 @@ export default function ResultsPage() {
   };
 
   // 获取问题标签（对应真实的 issue 类型）
-  const renderIssueBadge = (photo: PhotoItem) => {
+  const renderIssueBadge = useCallback((photo: PhotoItem) => {
     switch (photo.issue) {
       case 'good':
         return (
@@ -944,7 +1172,7 @@ export default function ResultsPage() {
           </Badge>
         );
     }
-  };
+  }, []);
 
   // 获取质量得分颜色
   const getScoreColor = (score: number) => {
@@ -964,128 +1192,35 @@ export default function ResultsPage() {
   }
 
   // 渲染单张照片卡片（高度固定为 190px，详情折叠使用悬浮框以免改变卡片高度）
-  const renderPhotoCard = (photo: PhotoItem, index: number) => {
-    const isSelected = selectedPhotoIds.includes(photo.id);
-    const reasonTag = getReasonTags(photo);
-
+  const renderPhotoCard = useCallback((photo: PhotoItem, index: number) => {
     return (
-      <Card 
-        style={{
-          animationDelay: `${Math.min((index % 20) * 20, 120)}ms`
-        }}
-        className={cn(
-          "w-full h-full overflow-visible rounded-lg border transition-all duration-200 relative shadow-sm hover:shadow-md flex flex-col justify-between animate-card-pop",
-          isSelected
-            ? "border-emerald-500/80 bg-emerald-500/5 ring-1 ring-emerald-500/35"
-            : getUserVisibleBucket(photo) === 'cull'
-            ? "border-[#B96F68]/30 bg-[#B96F68]/5 hover:border-[#B96F68]/60 hover:bg-[#B96F68]/15" 
-            : "border-white/5 bg-[var(--dt-card-bg)] hover:border-[#6F8FA8]/40 hover:bg-[#6F8FA8]/5"
-        )}
-      >
-        {/* Image Section */}
-        <div 
-          className="relative h-[100px] w-full overflow-hidden bg-neutral-800/20 rounded-t-lg cursor-pointer select-none"
-          onClick={() => {
-            setPreviewPhoto(photo);
-            setPreviewScale(1);
-            setPreviewX(0);
-            setPreviewY(0);
-          }}
-        >
-          <img
-            src={photo.url}
-            alt={getPhotoDisplayName(photo)}
-            className="w-full h-full object-contain bg-neutral-800/50"
-          />
-          <div className="absolute top-1.5 left-1.5 z-10 scale-[0.8] origin-top-left">
-            {renderIssueBadge(photo)}
-          </div>
-          {/* Checkbox Overlay */}
-          <button
-            type="button"
-            className={cn(
-              "absolute top-1.5 right-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full border transition-all shadow-md focus:outline-none",
-              isSelected
-                ? "bg-emerald-500 border-emerald-400 text-white"
-                : "bg-black/40 border-white/40 text-transparent hover:border-white hover:bg-black/60"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleSelectPhoto(photo.id);
-            }}
-          >
-            {isSelected && <span className="text-[8px] font-bold">✓</span>}
-          </button>
-        </div>
-
-        {/* Info details */}
-        <CardContent className="p-2 flex-1 flex flex-col justify-between text-left relative">
-          <div className="space-y-0.5">
-            <div className="flex items-center justify-between gap-1 leading-tight">
-              <p className="text-[10px] font-bold text-[var(--dt-text-primary)] truncate flex-grow" title={getPhotoDisplayName(photo)}>
-                {getPhotoDisplayName(photo)}
-              </p>
-              <span className="text-[8px] text-[var(--dt-text-soft)] shrink-0 font-mono">{photo.size}</span>
-            </div>
-
-            {/* 简单原因标签 (隐藏用户选择) */}
-            {reasonTag !== '用户选择' && (
-              <div className="flex items-center mt-0.5">
-                <span className="text-[8px] text-[var(--dt-text-secondary)] font-medium bg-white/5 px-1 py-0.5 rounded leading-none font-sans">
-                  {reasonTag}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Action Row */}
-          <div className="flex items-center justify-between gap-1.5 mt-1.5 border-t border-white/5 pt-1.5 shrink-0">
-            <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-0 select-none shrink-0 relative">
-              <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-0.5 font-semibold">
-                <span className="text-[7px]">▶</span> 详情
-              </summary>
-              <div className="absolute bottom-[24px] left-0 bg-[#12161A]/95 border border-white/10 p-2.5 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20 font-mono space-y-0.5 backdrop-blur-md w-[150px] text-[8px] leading-tight">
-                <p>综合质量: {photo.score} / 100</p>
-                <p>清晰对焦: {photo.sharpnessScore} / 100</p>
-                <p>曝光亮度: {photo.exposureScore} / 100</p>
-                <div className="pt-1.5 flex items-center justify-end border-t border-white/5 mt-1.5">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDetail(photo);
-                    }}
-                    className="text-[8px] text-yellow-400 hover:underline flex items-center gap-0.5"
-                  >
-                    <Maximize2 className="h-2.5 w-2.5" /> 像素诊断仪
-                  </button>
-                </div>
-              </div>
-            </details>
-
-            {getUserVisibleBucket(photo) === 'keep' ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-5 px-1 text-[8.5px] flex items-center justify-center rounded transition-all font-semibold border-0 bg-white/5 hover:bg-[#B96F68]/20 hover:text-[#B96F68] text-[var(--dt-text-muted)] flex-1"
-                onClick={() => updatePhotoStatus(photo.id, 'delete')}
-              >
-                标记为淘汰候选
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-5 px-1 text-[8.5px] flex items-center justify-center rounded transition-all font-semibold border-0 bg-white/5 hover:bg-[#6FA887]/20 hover:text-[#6FA887] text-[var(--dt-text-muted)] flex-1"
-                onClick={() => updatePhotoStatus(photo.id, 'keep')}
-              >
-                标记为保留
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <ResultsPhotoCard
+        photo={photo}
+        index={index}
+        isSelected={selectedPhotoIds.includes(photo.id)}
+        getPhotoDisplayName={getPhotoDisplayName}
+        renderIssueBadge={renderIssueBadge}
+        toggleSelectPhoto={toggleSelectPhoto}
+        updatePhotoStatus={updatePhotoStatus}
+        openDetail={openDetail}
+        setPreviewPhoto={setPreviewPhoto}
+        setPreviewScale={setPreviewScale}
+        setPreviewX={setPreviewX}
+        setPreviewY={setPreviewY}
+      />
     );
-  };
+  }, [
+    selectedPhotoIds,
+    getPhotoDisplayName,
+    renderIssueBadge,
+    toggleSelectPhoto,
+    updatePhotoStatus,
+    openDetail,
+    setPreviewPhoto,
+    setPreviewScale,
+    setPreviewX,
+    setPreviewY,
+  ]);
 
   // 渲染分区照片列表 (使用自研 VirtualPhotoGrid 以大幅优化渲染 DOM 节点数)
   const renderPartitionGrid = (items: PhotoItem[], partitionType: 'keep' | 'cull') => {
@@ -1291,6 +1426,11 @@ export default function ResultsPage() {
                         <p className="text-[var(--dt-text-secondary)] leading-relaxed">
                           未发现足够相似的照片组，因此不会自动进入 A/B。你可以直接查看整理结果，或稍后手动调整筛选。
                         </p>
+                        {(skippedCount > 0 || failedCount > 0) && (
+                          <p className="text-[10px] text-blue-300 mt-1 font-medium">
+                            诊断信息: 本次扫描共跳过 {skippedCount} 张不支持或重复的图片文件，有 {failedCount} 张图片分析失败。
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1723,8 +1863,8 @@ export default function ResultsPage() {
             <>
               <DialogHeader className="shrink-0">
                 <DialogTitle className="text-sm font-bold text-[var(--dt-text-primary)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2">
-                  <span className="truncate max-w-full sm:max-w-[70%] block text-left" title={selectedPhoto.name}>
-                    像素分析诊断: {selectedPhoto.name}
+                  <span className="truncate max-w-full sm:max-w-[70%] block text-left" title={getPhotoDisplayName(selectedPhoto)}>
+                    像素分析诊断: {getPhotoDisplayName(selectedPhoto)}
                   </span>
                   <span className="shrink-0 text-left">
                     {renderIssueBadge(selectedPhoto)}
@@ -1737,7 +1877,7 @@ export default function ResultsPage() {
                   <div className="relative aspect-square rounded-lg overflow-hidden border border-white/5 bg-black/25 flex items-center justify-center">
                     <img
                       src={selectedPhoto.url}
-                      alt={selectedPhoto.name}
+                      alt={getPhotoDisplayName(selectedPhoto)}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -2520,85 +2660,81 @@ export default function ResultsPage() {
       </Dialog>
 
       {/* Fullscreen Zoom Preview Modal */}
-      {previewPhoto && (
+      {(previewPhoto || isAnimateIn) && (
         <div 
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center select-none"
-          onClick={() => setPreviewPhoto(null)}
+          className={cn(
+            "fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-700 ease-out select-none",
+            isAnimateIn ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+          onClick={closePreviewModal}
         >
-          {/* Title bar (desensitized name) */}
+          {/* Centered Modal Card Box */}
           <div 
-            className="absolute top-0 inset-x-0 h-12 bg-black/40 border-b border-white/5 flex items-center justify-between px-6 z-10"
+            className={cn(
+              "w-[85vw] h-[82vh] max-w-7xl max-h-[85vh] bg-[#12161A]/95 border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden relative transition-all duration-700 ease-out",
+              isAnimateIn ? "scale-100" : "scale-95"
+            )}
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="text-xs font-bold text-[var(--dt-text-primary)]">
-              {getPhotoDisplayName(previewPhoto)}
-            </span>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">
-                滚轮缩放 ({previewScale.toFixed(1)}x) • 拖动平移 • 双击重置
+            {/* Title bar (desensitized name) */}
+            <div 
+              className="h-12 bg-black/40 border-b border-white/5 flex items-center justify-between px-6 shrink-0 z-10"
+            >
+              <span className="text-xs font-bold text-[var(--dt-text-primary)]">
+                {previewPhoto ? getPhotoDisplayName(previewPhoto) : ""}
               </span>
-              <button 
-                onClick={() => setPreviewPhoto(null)}
-                className="text-[var(--dt-text-soft)] hover:text-white bg-transparent border-0 cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">
+                  滚轮缩放 ({previewScale.toFixed(1)}x) • 拖动平移 • 双击重置
+                </span>
+                <button 
+                  onClick={closePreviewModal}
+                  className="text-[var(--dt-text-soft)] hover:text-white bg-transparent border-0 cursor-pointer p-1 rounded-full hover:bg-white/5 transition-all"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Interactive Zoom/Pan area */}
-          <div 
-            className="w-full h-full flex items-center justify-center overflow-hidden relative cursor-zoom-in"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setPreviewPhoto(null);
-              }
-            }}
-            onWheel={(e) => {
-              e.preventDefault();
-              const scaleFactor = 0.15;
-              const delta = e.deltaY < 0 ? scaleFactor : -scaleFactor;
-              setPreviewScale(prev => {
-                const next = Math.min(Math.max(prev + delta, 1), 5); // 1x to 5x
-                if (next === 1) {
-                  setPreviewX(0);
-                  setPreviewY(0);
-                }
-                return next;
-              });
-            }}
-            onMouseDown={(e) => {
-              if (e.button !== 0 || previewScale <= 1) return;
-              e.preventDefault();
-              setIsPreviewDragging(true);
-              setPreviewDragStart({ x: e.clientX - previewX, y: e.clientY - previewY });
-            }}
-            onMouseMove={(e) => {
-              if (!isPreviewDragging) return;
-              setPreviewX(e.clientX - previewDragStart.x);
-              setPreviewY(e.clientY - previewDragStart.y);
-            }}
-            onMouseUp={() => setIsPreviewDragging(false)}
-            onMouseLeave={() => setIsPreviewDragging(false)}
-            onDoubleClick={() => {
-              setPreviewScale(1);
-              setPreviewX(0);
-              setPreviewY(0);
-              setIsPreviewDragging(false);
-            }}
-          >
-            <img 
-              src={previewPhoto.url}
-              alt={getPhotoDisplayName(previewPhoto)}
-              style={{
-                transform: `translate(${previewX}px, ${previewY}px) scale(${previewScale})`,
-                transition: isPreviewDragging ? 'none' : 'transform 0.1s ease-out',
-                maxHeight: '90vh',
-                maxWidth: '90vw',
+            {/* Interactive Zoom/Pan area */}
+            <div 
+              className={cn(
+                "flex-grow flex items-center justify-center overflow-hidden relative bg-black/20",
+                previewScale > 1 ? (isPreviewDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
+              )}
+              onWheel={handlePreviewWheel}
+              onMouseDown={(e) => {
+                if (e.button !== 0 || previewScale <= 1) return;
+                e.preventDefault();
+                setIsPreviewDragging(true);
+                setPreviewDragStart({ x: e.clientX - previewX, y: e.clientY - previewY });
               }}
-              className="object-contain select-none pointer-events-none"
-              onClick={(e) => e.stopPropagation()}
-            />
+              onMouseMove={(e) => {
+                if (!isPreviewDragging) return;
+                setPreviewX(e.clientX - previewDragStart.x);
+                setPreviewY(e.clientY - previewDragStart.y);
+              }}
+              onMouseUp={() => setIsPreviewDragging(false)}
+              onMouseLeave={() => setIsPreviewDragging(false)}
+              onDoubleClick={() => {
+                setPreviewScale(1);
+                setPreviewX(0);
+                setPreviewY(0);
+                setIsPreviewDragging(false);
+              }}
+            >
+              <img 
+                src={previewPhoto?.url}
+                alt={previewPhoto ? getPhotoDisplayName(previewPhoto) : ""}
+                style={{
+                  transform: `translate(${previewX}px, ${previewY}px) scale(${previewScale})`,
+                  transition: isPreviewDragging ? 'none' : 'transform 0.1s ease-out',
+                  maxHeight: '100%',
+                  maxWidth: '100%',
+                }}
+                className="object-contain select-none pointer-events-none"
+              />
+            </div>
           </div>
         </div>
       )}

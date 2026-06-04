@@ -114,8 +114,9 @@ export function calculateHammingDistance(hash1: string, hash2: string): number {
  * 并自动分配推荐保留/删除状态
  */
 export function detectDuplicates<T extends DuplicatePhotoInput>(photos: T[]): T[] {
-  // 只对存在有效 perceptualHash 的相片建立相似关系
-  const validPhotos = photos.filter(p => p.perceptualHash && p.perceptualHash.length > 0);
+  if (!Array.isArray(photos)) return [];
+  // 只对存在有效 perceptualHash 的相片建立相似关系，并过滤 null/undefined
+  const validPhotos = photos.filter(p => p && p.perceptualHash && typeof p.perceptualHash === 'string' && p.perceptualHash.length > 0);
   
   // 建立图的邻接表
   const adj: { [id: string]: string[] } = {};
@@ -136,7 +137,7 @@ export function detectDuplicates<T extends DuplicatePhotoInput>(photos: T[]): T[
           const r2 = parseAspectRatio(p2.resolution);
           if (r1 !== null && r2 !== null) {
             const diff = Math.abs(r1 - r2);
-            if (diff > 0.05 * r1) {
+            if (diff > 0.08 * r1) {
               aspectMatch = false;
             }
           }
@@ -345,7 +346,8 @@ export type DuplicateAnalysisResult = {
 export function buildDuplicateSignals(
   photos: DuplicateSignalInput[]
 ): DuplicateAnalysisResult {
-  const validPhotos = photos.filter(p => p.perceptualHash && p.perceptualHash.length > 0);
+  if (!Array.isArray(photos)) return { groups: [], photoToGroup: {} };
+  const validPhotos = photos.filter(p => p && p.perceptualHash && typeof p.perceptualHash === 'string' && p.perceptualHash.length > 0);
   
   // 建立图的邻接表
   const adj: { [id: string]: string[] } = {};
@@ -366,7 +368,7 @@ export function buildDuplicateSignals(
           const r2 = parseAspectRatio(p2.resolution);
           if (r1 !== null && r2 !== null) {
             const diff = Math.abs(r1 - r2);
-            if (diff > 0.05 * r1) {
+            if (diff > 0.08 * r1) {
               aspectMatch = false;
             }
           }
