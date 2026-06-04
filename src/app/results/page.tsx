@@ -281,7 +281,7 @@ export default function ResultsPage() {
     setIsAnimateIn(false);
     setTimeout(() => {
       setPreviewPhoto(null);
-    }, 700);
+    }, 400);
   }, []);
 
   const handlePreviewWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
@@ -2663,7 +2663,7 @@ export default function ResultsPage() {
       {(previewPhoto || isAnimateIn) && (
         <div 
           className={cn(
-            "fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-700 ease-out select-none",
+            "fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-400 ease-out select-none",
             isAnimateIn ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
           onClick={closePreviewModal}
@@ -2671,7 +2671,7 @@ export default function ResultsPage() {
           {/* Centered Modal Card Box */}
           <div 
             className={cn(
-              "w-[85vw] h-[82vh] max-w-7xl max-h-[85vh] bg-[#12161A]/95 border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden relative transition-all duration-700 ease-out",
+              "w-[85vw] h-[82vh] max-w-7xl max-h-[85vh] bg-[#12161A]/95 border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden relative transition-all duration-400 ease-out",
               isAnimateIn ? "scale-100" : "scale-95"
             )}
             onClick={(e) => e.stopPropagation()}
