@@ -220,7 +220,10 @@ fn verify_in_active_folder(path: &Path) -> bool {
 }
 
 #[tauri::command]
-fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewScanResult, String> {
+fn scan_folder_image_previews(
+  folder_path: String,
+  limit: Option<usize>,
+) -> Result<NativeImagePreviewScanResult, String> {
   let path = Path::new(&folder_path);
   let canonical_active = path.canonicalize()
     .map_err(|_| "无法读取所选文件夹，请重新选择。".to_string())?;
@@ -238,7 +241,11 @@ fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewS
 
   let mut preview_items = Vec::new();
   let mut idx = 0;
-  const PREVIEW_LIMIT: usize = 100;
+  
+  let target_limit = match limit {
+    Some(l) if l > 0 => std::cmp::min(l, 200),
+    _ => 100,
+  };
 
   // Clear previous mappings
   if let Ok(mut guard) = get_preview_mapping().lock() {
@@ -246,7 +253,7 @@ fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewS
   }
 
   for entry in entries {
-    if preview_items.len() >= PREVIEW_LIMIT {
+    if preview_items.len() >= target_limit {
       break;
     }
     if let Ok(entry) = entry {
@@ -309,7 +316,7 @@ fn scan_folder_image_previews(folder_path: String) -> Result<NativeImagePreviewS
 
   Ok(NativeImagePreviewScanResult {
     total_preview_items: preview_items.len(),
-    preview_limit: PREVIEW_LIMIT,
+    preview_limit: target_limit,
     items: preview_items,
   })
 }

@@ -7,6 +7,7 @@ import { AnalysisMode, SimilarGroup, BattleDecision } from '@/lib/analysis/visio
 import { detectDuplicates, buildDuplicateSignals, DuplicateAnalysisResult, buildSimilarGroupsFromSignals, QASimilarGroupSignalForBattle, adaptSignalGroupsToLegacySimilarGroups } from '@/lib/analysis/local/duplicate';
 import { USE_SIGNAL_GROUPS_FOR_BATTLE } from '@/lib/config/featureFlags';
 import { NativeImagePreviewItem } from '@/lib/desktop/nativeImagePreviewScanner';
+import { getEffectiveNativeBatchLimit } from '@/lib/desktop/nativeBatchLimit';
 
 declare global {
   interface Window {
@@ -528,7 +529,7 @@ export const MOCK_TRAVEL_PHOTOS: PhotoItem[] = [
   }
 ];
 
-export const NATIVE_PROCESSING_MVP_LIMIT = 100;
+export const NATIVE_PROCESSING_MVP_LIMIT = getEffectiveNativeBatchLimit();
 
 interface PhotoWorkspaceContextType {
   photos: PhotoItem[];

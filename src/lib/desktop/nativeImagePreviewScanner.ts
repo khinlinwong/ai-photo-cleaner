@@ -1,4 +1,5 @@
 import { isTauriRuntime } from './tauriEnvironment';
+import { getEffectiveNativeBatchLimit } from './nativeBatchLimit';
 
 export type NativeImagePreviewItem = {
   id: string;
@@ -28,7 +29,7 @@ interface RustNativeImagePreviewScanResult {
 
 /**
  * Invokes the Tauri custom Rust command 'scan_folder_image_previews' to scan the
- * first 12 image files in the folder and return secure asset preview URLs.
+ * first level image files in the folder and return secure asset preview URLs.
  * Safe to call on Web (returns null) and uses dynamic imports to protect Web build.
  */
 export async function scanNativeFolderImagePreviews(
@@ -44,6 +45,7 @@ export async function scanNativeFolderImagePreviews(
 
     const result = await invoke<RustNativeImagePreviewScanResult>('scan_folder_image_previews', {
       folderPath,
+      limit: getEffectiveNativeBatchLimit(),
     });
 
     if (result && result.items) {
