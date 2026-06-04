@@ -715,7 +715,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         id: photo.id,
         perceptualHash: photo.perceptualHash,
         sharpnessScore: photo.sharpnessScore,
-        qualityScore: photo.score
+        qualityScore: photo.score,
+        resolution: photo.resolution
       }));
 
       const newResult = buildDuplicateSignals(signalInputs);
@@ -811,7 +812,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         id: photo.id,
         perceptualHash: photo.perceptualHash,
         sharpnessScore: photo.sharpnessScore,
-        qualityScore: photo.score
+        qualityScore: photo.score,
+        resolution: photo.resolution
       }));
       const newResult = buildDuplicateSignals(signalInputs);
       const signalGroups = buildSimilarGroupsFromSignals(newResult);
@@ -1440,22 +1442,17 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       ...prev,
       isCancelledRef.current ? '🛑 本地扫描分析已停止！' : '✅ 本地扫描分析已完成！'
     ]);
-    const hasNativeSource = updatedPhotos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
-    
-    if (hasNativeSource) {
-      setPhotos(updatedPhotos);
-    } else {
-      const finalPhotos = detectDuplicates(updatedPhotos);
-      setPhotos(finalPhotos);
-      runDuplicateQA(finalPhotos);
-      initializeSimilarGroups(finalPhotos);
-    }
+    const finalPhotos = detectDuplicates(updatedPhotos);
+    setPhotos(finalPhotos);
+    runDuplicateQA(finalPhotos);
+    initializeSimilarGroups(finalPhotos);
 
     // 延时跳转，提供更好的交互感知
     setTimeout(() => {
       setIsAnalyzing(false);
       isAnalyzingRef.current = false;
-      if (!hasNativeSource && !isCancelledRef.current) {
+      const isSuccess = updatedPhotos.some(p => p.category !== '已跳过' && p.category !== '待分类');
+      if (isSuccess && !isCancelledRef.current) {
         router.push('/results');
       }
     }, 1200);

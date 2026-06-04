@@ -71,8 +71,7 @@ export default function ResultsPage() {
     startBattleForGroup,
     applyBattleDecision: contextApplyBattleDecision,
     closeBattle,
-    projectName,
-    identifyNativeSimilarGroups
+    projectName
   } = usePhotoWorkspace();
 
   interface UndoAction {
@@ -483,19 +482,10 @@ export default function ResultsPage() {
     }
   }, [activeBattle, similarGroups, dismissedGroups, startBattleForGroup, handleCloseBattleWithAnimation, hasNativeSource]);
 
-  // 自动弹出相似照片组 PK 流程（寻找首个 battleCompleted===false 且非忽略组）
+  // 自动弹出相似照片组 PK 流程（根据设计，第一阶段不进行自动弹窗，统一改由 Results CTA 手动触发）
   useEffect(() => {
-    if (hasNativeSource) return; // Native source 不自动启动 A/B PK 流程
-    if (activeBattle) return;
-
-    const nextPendingGroup = similarGroups.find(g => !g.battleCompleted);
-    if (nextPendingGroup) {
-      if (dismissedGroups.includes(nextPendingGroup.id)) {
-        return;
-      }
-      startBattleForGroup(nextPendingGroup.id);
-    }
-  }, [similarGroups, activeBattle, dismissedGroups, startBattleForGroup, hasNativeSource]);
+    return;
+  }, []);
 
   // 键盘快捷键监听
   useEffect(() => {
@@ -1236,6 +1226,43 @@ export default function ResultsPage() {
                     hasNativeSource={hasNativeSource}
                   />
 
+                  {/* A/B 对局主视觉引导 / 无相似组提示区域 */}
+                  {similarGroups.length > 0 ? (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                      <div className="flex items-center gap-2 flex-wrap text-left">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                        <span className="text-[var(--dt-text-primary)] font-medium">
+                          检测到本地存在 {similarGroups.length} 组相似照片 ({similarGroups.filter(g => !g.battleCompleted).length} 组待对比)。系统建议进行 A/B 挑选，以选择保留最佳照片。
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          onClick={() => {
+                            const firstPending = similarGroups.find(g => !g.battleCompleted) || similarGroups[0];
+                            if (firstPending) {
+                              startBattleForGroup(firstPending.id, { allowNative: true });
+                            }
+                          }}
+                          className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-8 px-4 text-xs transition-all shadow-none border-0"
+                        >
+                          ⚔️ 开始 A/B 对比
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-[var(--dt-card-bg)] border border-[var(--dt-border)] rounded-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                      <div className="flex items-center gap-2 flex-wrap text-left">
+                        <span className="inline-flex h-2 w-2 rounded-full bg-[var(--dt-text-soft)]" />
+                        <span className="text-[var(--dt-text-secondary)]">
+                          未发现足够相似的照片组，因此不会自动进入 A/B。你仍可查看整理结果。
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 批量操作栏 */}
                   {selectedPhotoIds.length > 0 && (
                     <div className="p-3 bg-[var(--dt-card-bg)] border border-emerald-500/30 rounded-md flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
@@ -1336,29 +1363,7 @@ export default function ResultsPage() {
 
                   {activeTab === 'similar' && (
                     <div className="space-y-3 text-left animate-fade-in-up select-none">
-                      {hasNativeSource && similarGroups.length === 0 ? (
-                        <div className="max-w-md mx-auto py-12 text-center select-none bg-[var(--dt-panel-bg)] border border-[var(--dt-border)] p-6 rounded-lg space-y-4">
-                          <div className="space-y-1">
-                            <h3 className="text-sm font-bold text-[var(--dt-text-primary)]">识别本地相似照片</h3>
-                            <p className="text-[10.5px] text-[var(--dt-text-soft)] leading-relaxed">
-                              系统将通过客观图像哈希检测本地相似组。
-                            </p>
-                          </div>
-                          
-                          <div className="bg-[var(--dt-panel-bg-solid)] p-3 rounded text-[10px] text-[var(--dt-text-soft)] space-y-1 text-left">
-                            <p>• 本地处理，不上传云端</p>
-                            <p>• 原图保持不变，不会物理修改</p>
-                            <p>• 最多分析当前已导入的本地图片</p>
-                          </div>
-
-                          <button
-                            onClick={identifyNativeSimilarGroups}
-                            className="desktop-button-primary text-xs w-full py-2 font-bold"
-                          >
-                            识别本地相似照片
-                          </button>
-                        </div>
-                      ) : filteredGroupId ? (() => {
+                      {filteredGroupId ? (() => {
                         const group = similarGroups.find(g => g.id === filteredGroupId);
                         const groupPhotos = group
                           ? group.photoIds
@@ -1516,7 +1521,7 @@ export default function ResultsPage() {
                       {hasNativeSource ? (
                         similarGroups.length === 0 ? (
                           <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
-                            请先在相似组中识别本地相似照片
+                            未发现足够相似的照片组，因此不会自动进入 A/B。你仍可查看整理结果。
                           </div>
                         ) : (
                           <div className="space-y-4">

@@ -18,6 +18,23 @@ export interface DuplicatePhotoInput {
   displayLabel?: '技术风险低' | '建议复核' | '淘汰候选';
   reasonLabel?: string;
   userDecision?: 'keep' | 'review' | 'delete';
+  resolution?: string;
+}
+
+/**
+ * 辅助方法：解析 "width × height" 格式的分辨率并计算宽高比
+ */
+function parseAspectRatio(resolution?: string): number | null {
+  if (!resolution) return null;
+  const match = resolution.match(/(\d+)\s*[xX×]\s*(\d+)/);
+  if (match) {
+    const width = parseInt(match[1], 10);
+    const height = parseInt(match[2], 10);
+    if (width > 0 && height > 0) {
+      return width / height;
+    }
+  }
+  return null;
 }
 
 /**
@@ -112,10 +129,21 @@ export function detectDuplicates<T extends DuplicatePhotoInput>(photos: T[]): T[
       const p2 = validPhotos[j];
       if (p1.perceptualHash && p2.perceptualHash) {
         const dist = calculateHammingDistance(p1.perceptualHash, p2.perceptualHash);
-        // Hamming 距离 <= 10 判定为相似
-        if (dist <= 10) {
-          adj[p1.id].push(p2.id);
-          adj[p2.id].push(p1.id);
+        // Hamming 距离 <= 12 判定为相似，且宽高比相对偏差不超过 5%
+        if (dist <= 12) {
+          let aspectMatch = true;
+          const r1 = parseAspectRatio(p1.resolution);
+          const r2 = parseAspectRatio(p2.resolution);
+          if (r1 !== null && r2 !== null) {
+            const diff = Math.abs(r1 - r2);
+            if (diff > 0.05 * r1) {
+              aspectMatch = false;
+            }
+          }
+          if (aspectMatch) {
+            adj[p1.id].push(p2.id);
+            adj[p2.id].push(p1.id);
+          }
         }
       }
     }
@@ -296,6 +324,7 @@ export type DuplicateSignalInput = {
   perceptualHash?: string;
   sharpnessScore?: number;
   qualityScore?: number;
+  resolution?: string;
 };
 
 export type SimilarityGroupSignal = {
@@ -330,10 +359,21 @@ export function buildDuplicateSignals(
       const p2 = validPhotos[j];
       if (p1.perceptualHash && p2.perceptualHash) {
         const dist = calculateHammingDistance(p1.perceptualHash, p2.perceptualHash);
-        // Hamming 距离 <= 10 判定为相似
-        if (dist <= 10) {
-          adj[p1.id].push(p2.id);
-          adj[p2.id].push(p1.id);
+        // Hamming 距离 <= 12 判定为相似，且宽高比相对偏差不超过 5%
+        if (dist <= 12) {
+          let aspectMatch = true;
+          const r1 = parseAspectRatio(p1.resolution);
+          const r2 = parseAspectRatio(p2.resolution);
+          if (r1 !== null && r2 !== null) {
+            const diff = Math.abs(r1 - r2);
+            if (diff > 0.05 * r1) {
+              aspectMatch = false;
+            }
+          }
+          if (aspectMatch) {
+            adj[p1.id].push(p2.id);
+            adj[p2.id].push(p1.id);
+          }
         }
       }
     }

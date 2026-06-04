@@ -36,15 +36,17 @@ export default function ProcessingPage() {
     }
   }, [photos, isAnalyzing, analysisProgress, startAnalysis]);
 
-  // 2. 自动跳转逻辑：当进度到达 100 且分析状态结束，1.5 秒后自动路由至结果页 (如果是 Native Processing，则先不自动跳转 /results)
+  const analyzedCount = photos.filter(p => p.category !== '待分类' && p.category !== '已跳过').length;
+
+  // 2. 自动跳转逻辑：当进度到达 100 且分析状态结束，1.5 秒后自动路由至结果页
   useEffect(() => {
-    if (analysisProgress === 100 && !isAnalyzing && !hasNativeSource) {
+    if (analysisProgress === 100 && !isAnalyzing && !isNativeProcessingCancelled && analyzedCount > 0) {
       const timer = setTimeout(() => {
         router.push('/results');
       }, 1550);
       return () => clearTimeout(timer);
     }
-  }, [analysisProgress, isAnalyzing, router, hasNativeSource]);
+  }, [analysisProgress, isAnalyzing, router, isNativeProcessingCancelled, analyzedCount]);
 
   // 取消扫描
   const handleCancelScan = () => {
@@ -57,8 +59,6 @@ export default function ProcessingPage() {
   let scanStatus = '进行中';
   let projectStatus = '已创建';
   let nextStep = '整理工作区';
-
-  const analyzedCount = photos.filter(p => p.category !== '待分类' && p.category !== '已跳过').length;
 
   if (photos.length === 0) {
     statusText = '等待照片导入';
