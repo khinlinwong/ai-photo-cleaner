@@ -19,5 +19,5 @@ export const USE_SIGNAL_GROUPS_FOR_BATTLE = false;
  * Keep NATIVE_BATCH_LIMIT_EXPERIMENTAL_200 as false. Only set to true in
  * experimental checkpoints / branches for QA.
  */
-export const NATIVE_BATCH_LIMIT_EXPERIMENTAL_200 = false;
+export const NATIVE_BATCH_LIMIT_EXPERIMENTAL_200 = true;
 
