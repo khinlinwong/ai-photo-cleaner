@@ -129,8 +129,8 @@ export function detectDuplicates<T extends DuplicatePhotoInput>(photos: T[]): T[
       const p2 = validPhotos[j];
       if (p1.perceptualHash && p2.perceptualHash) {
         const dist = calculateHammingDistance(p1.perceptualHash, p2.perceptualHash);
-        // Hamming 距离 <= 12 判定为相似，且宽高比相对偏差不超过 5%
-        if (dist <= 12) {
+        // Hamming 距离 <= 15 判定为相似，且宽高比相对偏差不超过 5%
+        if (dist <= 15) {
           let aspectMatch = true;
           const r1 = parseAspectRatio(p1.resolution);
           const r2 = parseAspectRatio(p2.resolution);
@@ -359,8 +359,8 @@ export function buildDuplicateSignals(
       const p2 = validPhotos[j];
       if (p1.perceptualHash && p2.perceptualHash) {
         const dist = calculateHammingDistance(p1.perceptualHash, p2.perceptualHash);
-        // Hamming 距离 <= 12 判定为相似，且宽高比相对偏差不超过 5%
-        if (dist <= 12) {
+        // Hamming 距离 <= 15 判定为相似，且宽高比相对偏差不超过 5%
+        if (dist <= 15) {
           let aspectMatch = true;
           const r1 = parseAspectRatio(p1.resolution);
           const r2 = parseAspectRatio(p2.resolution);

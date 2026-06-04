@@ -1135,6 +1135,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
 
   // 新增 Native Processing 独立入口
   const startNativeFolderAnalysis = (previews: NativeImagePreviewItem[], name?: string) => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem('ab_auto_opened');
+    }
     // 释放旧的预览 URL 防止泄露
     photos.forEach(p => revokeBlobUrl(p.url));
 
@@ -1508,6 +1511,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
 
   // 重置工作台
   const resetWorkspace = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem('ab_auto_opened');
+    }
     photos.forEach(p => revokeBlobUrl(p.url));
     setPhotos([]);
     setSimilarGroups([]);
@@ -1525,6 +1531,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
 
   // 载入演示图片数据包
   const loadDemoPhotos = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem('ab_auto_opened');
+    }
     photos.forEach(p => revokeBlobUrl(p.url));
 
     // 重置所有分析和 Battle 相关状态

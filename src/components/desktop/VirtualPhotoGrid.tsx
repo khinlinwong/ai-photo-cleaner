@@ -94,8 +94,8 @@ export default function VirtualPhotoGrid<T>({
       for (const entry of entries) {
         const width = entry.contentRect.width;
         if (width > 0) {
-          // 自适应计算列数，并限制在 2 - 4 列之间以对齐原设计
-          const cols = Math.min(4, Math.max(2, Math.floor((width + gap) / (minCardWidth + gap))));
+          // 自适应计算列数，支持宽屏多列展示以配合紧凑网格
+          const cols = Math.min(8, Math.max(2, Math.floor((width + gap) / (minCardWidth + gap))));
           setColumns(cols);
         }
       }

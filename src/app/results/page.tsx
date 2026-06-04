@@ -71,7 +71,10 @@ export default function ResultsPage() {
     startBattleForGroup,
     applyBattleDecision: contextApplyBattleDecision,
     closeBattle,
-    projectName
+    projectName,
+    isAnalyzing,
+    analysisProgress,
+    isNativeProcessingCancelled
   } = usePhotoWorkspace();
 
   interface UndoAction {
@@ -98,6 +101,12 @@ export default function ResultsPage() {
   const [isZipping, setIsZipping] = useState(false);
   const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'keep' | 'cull' | 'similar' | 'battle-status'>('keep');
+  const [previewPhoto, setPreviewPhoto] = useState<PhotoItem | null>(null);
+  const [previewScale, setPreviewScale] = useState(1);
+  const [previewX, setPreviewX] = useState(0);
+  const [previewY, setPreviewY] = useState(0);
+  const [isPreviewDragging, setIsPreviewDragging] = useState(false);
+  const [previewDragStart, setPreviewDragStart] = useState({ x: 0, y: 0 });
 
   // 当 Tab 切换时，自动清除相似组过滤状态
   useEffect(() => {
@@ -431,11 +440,14 @@ export default function ResultsPage() {
     }, 220);
   }, []);
 
-  // 全局 Escape 键监听，用于关闭导出弹出框
+  // 全局 Escape 键监听，用于关闭导出弹出框和预览图模态框
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (exportOpen && !isExportClosing) {
+        if (previewPhoto) {
+          e.preventDefault();
+          setPreviewPhoto(null);
+        } else if (exportOpen && !isExportClosing) {
           e.preventDefault();
           handleCloseExport();
         }
@@ -443,7 +455,7 @@ export default function ResultsPage() {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [exportOpen, isExportClosing, handleCloseExport]);
+  }, [exportOpen, isExportClosing, handleCloseExport, previewPhoto]);
 
   // 当检测到当前组对比 PK 结束时，自动关闭当前对比，并流转到下一组或展示 Toast
   useEffect(() => {
@@ -482,10 +494,31 @@ export default function ResultsPage() {
     }
   }, [activeBattle, similarGroups, dismissedGroups, startBattleForGroup, handleCloseBattleWithAnimation, hasNativeSource]);
 
-  // 自动弹出相似照片组 PK 流程（根据设计，第一阶段不进行自动弹窗，统一改由 Results CTA 手动触发）
+  // A/B 自动进入策略：仅在 Native 正常分析完成并跳转到 Results 时，若 similarGroups.length > 0，自动打开第一组的 A/B 对局
   useEffect(() => {
-    return;
-  }, []);
+    if (typeof window === 'undefined') return;
+    if (
+      hasNativeSource &&
+      similarGroups.length > 0 &&
+      analysisProgress === 100 &&
+      !isAnalyzing &&
+      !isNativeProcessingCancelled &&
+      !sessionStorage.getItem('ab_auto_opened')
+    ) {
+      const firstPending = similarGroups.find(g => !g.battleCompleted) || similarGroups[0];
+      if (firstPending) {
+        sessionStorage.setItem('ab_auto_opened', 'true');
+        startBattleForGroup(firstPending.id, { allowNative: true });
+      }
+    }
+  }, [
+    hasNativeSource,
+    similarGroups,
+    analysisProgress,
+    isAnalyzing,
+    isNativeProcessingCancelled,
+    startBattleForGroup
+  ]);
 
   // 键盘快捷键监听
   useEffect(() => {
@@ -930,9 +963,10 @@ export default function ResultsPage() {
     statusText = `照片已分入保留区与淘汰候选区，安全导出就绪`;
   }
 
-  // 渲染单张照片卡片（高度固定为 280px，详情折叠使用悬浮框以免改变卡片高度）
+  // 渲染单张照片卡片（高度固定为 190px，详情折叠使用悬浮框以免改变卡片高度）
   const renderPhotoCard = (photo: PhotoItem, index: number) => {
     const isSelected = selectedPhotoIds.includes(photo.id);
+    const reasonTag = getReasonTags(photo);
 
     return (
       <Card 
@@ -950,22 +984,27 @@ export default function ResultsPage() {
       >
         {/* Image Section */}
         <div 
-          className="relative h-[140px] w-full overflow-hidden bg-black/20 rounded-t-lg cursor-pointer select-none"
-          onClick={() => toggleSelectPhoto(photo.id)}
+          className="relative h-[100px] w-full overflow-hidden bg-neutral-800/20 rounded-t-lg cursor-pointer select-none"
+          onClick={() => {
+            setPreviewPhoto(photo);
+            setPreviewScale(1);
+            setPreviewX(0);
+            setPreviewY(0);
+          }}
         >
           <img
             src={photo.url}
-            alt={photo.name}
-            className="w-full h-full object-cover"
+            alt={getPhotoDisplayName(photo)}
+            className="w-full h-full object-contain bg-neutral-800/50"
           />
-          <div className="absolute top-1.5 left-1.5 z-10 scale-90 origin-top-left">
+          <div className="absolute top-1.5 left-1.5 z-10 scale-[0.8] origin-top-left">
             {renderIssueBadge(photo)}
           </div>
           {/* Checkbox Overlay */}
           <button
             type="button"
             className={cn(
-              "absolute top-2 right-2 z-20 flex h-5 w-5 items-center justify-center rounded-full border transition-all shadow-md focus:outline-none",
+              "absolute top-1.5 right-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full border transition-all shadow-md focus:outline-none",
               isSelected
                 ? "bg-emerald-500 border-emerald-400 text-white"
                 : "bg-black/40 border-white/40 text-transparent hover:border-white hover:bg-black/60"
@@ -975,36 +1014,40 @@ export default function ResultsPage() {
               toggleSelectPhoto(photo.id);
             }}
           >
-            {isSelected && <span className="text-[10px] font-bold">✓</span>}
+            {isSelected && <span className="text-[8px] font-bold">✓</span>}
           </button>
         </div>
 
         {/* Info details */}
-        <CardContent className="p-2.5 flex-1 flex flex-col justify-between text-left relative">
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-1">
-              <p className="text-[11px] font-bold text-[var(--dt-text-primary)] truncate flex-1" title={photo.name}>{photo.name}</p>
+        <CardContent className="p-2 flex-1 flex flex-col justify-between text-left relative">
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between gap-1 leading-tight">
+              <p className="text-[10px] font-bold text-[var(--dt-text-primary)] truncate flex-grow" title={getPhotoDisplayName(photo)}>
+                {getPhotoDisplayName(photo)}
+              </p>
               <span className="text-[8px] text-[var(--dt-text-soft)] shrink-0 font-mono">{photo.size}</span>
             </div>
 
-            {/* 简单原因标签 */}
-            <div className="flex items-center mt-0.5">
-              <span className="text-[8.5px] text-[var(--dt-text-secondary)] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/5 font-sans leading-none">
-                {getReasonTags(photo)}
-              </span>
-            </div>
+            {/* 简单原因标签 (隐藏用户选择) */}
+            {reasonTag !== '用户选择' && (
+              <div className="flex items-center mt-0.5">
+                <span className="text-[8px] text-[var(--dt-text-secondary)] font-medium bg-white/5 px-1 py-0.5 rounded leading-none font-sans">
+                  {reasonTag}
+                </span>
+              </div>
+            )}
           </div>
 
-          <div className="mt-1 relative">
-            {/* 隐藏并折叠分值详情 */}
-            <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-0.5 relative">
-              <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
-                <span className="text-[8px]">▶</span> 查看技术详情
+          {/* Action Row */}
+          <div className="flex items-center justify-between gap-1.5 mt-1.5 border-t border-white/5 pt-1.5 shrink-0">
+            <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-0 select-none shrink-0 relative">
+              <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-0.5 font-semibold">
+                <span className="text-[7px]">▶</span> 详情
               </summary>
-              <div className="absolute bottom-[30px] left-0 right-0 bg-[#12161A]/95 border border-white/10 p-2.5 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20 font-mono space-y-0.5 backdrop-blur-md">
+              <div className="absolute bottom-[24px] left-0 bg-[#12161A]/95 border border-white/10 p-2.5 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20 font-mono space-y-0.5 backdrop-blur-md w-[150px] text-[8px] leading-tight">
                 <p>综合质量: {photo.score} / 100</p>
-                <p>对焦清晰: {photo.sharpnessScore} / 100</p>
-                <p>曝光得分: {photo.exposureScore} / 100</p>
+                <p>清晰对焦: {photo.sharpnessScore} / 100</p>
+                <p>曝光亮度: {photo.exposureScore} / 100</p>
                 <div className="pt-1.5 flex items-center justify-end border-t border-white/5 mt-1.5">
                   <button 
                     onClick={(e) => {
@@ -1013,43 +1056,31 @@ export default function ResultsPage() {
                     }}
                     className="text-[8px] text-yellow-400 hover:underline flex items-center gap-0.5"
                   >
-                    <Maximize2 className="h-2 w-2" /> 开启像素诊断仪
+                    <Maximize2 className="h-2.5 w-2.5" /> 像素诊断仪
                   </button>
                 </div>
               </div>
             </details>
-          </div>
 
-          {/* Row 4: Status Correction Buttons (Direct interaction) */}
-          <div className="grid grid-cols-2 gap-1 mt-1.5 border-t border-white/5 pt-1.5 shrink-0">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={getUserVisibleBucket(photo) === 'keep'}
-              className={cn(
-                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold border-0",
-                getUserVisibleBucket(photo) === 'keep'
-                  ? "bg-[#6FA887]/20 text-[#6FA887]/60 cursor-not-allowed opacity-50" 
-                  : "bg-white/5 hover:bg-[#6FA887]/20 hover:text-[#6FA887] text-[var(--dt-text-muted)]"
-              )}
-              onClick={() => updatePhotoStatus(photo.id, 'keep')}
-            >
-              标记为保留
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={getUserVisibleBucket(photo) === 'cull'}
-              className={cn(
-                "h-5.5 px-0 text-[9px] flex items-center justify-center rounded transition-all font-semibold border-0",
-                getUserVisibleBucket(photo) === 'cull'
-                  ? "bg-[#B96F68]/20 text-[#B96F68]/60 cursor-not-allowed opacity-50" 
-                  : "bg-white/5 hover:bg-[#B96F68]/20 hover:text-[#B96F68] text-[var(--dt-text-muted)]"
-              )}
-              onClick={() => updatePhotoStatus(photo.id, 'delete')}
-            >
-              标记为淘汰候选
-            </Button>
+            {getUserVisibleBucket(photo) === 'keep' ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-5 px-1 text-[8.5px] flex items-center justify-center rounded transition-all font-semibold border-0 bg-white/5 hover:bg-[#B96F68]/20 hover:text-[#B96F68] text-[var(--dt-text-muted)] flex-1"
+                onClick={() => updatePhotoStatus(photo.id, 'delete')}
+              >
+                标记为淘汰候选
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-5 px-1 text-[8.5px] flex items-center justify-center rounded transition-all font-semibold border-0 bg-white/5 hover:bg-[#6FA887]/20 hover:text-[#6FA887] text-[var(--dt-text-muted)] flex-1"
+                onClick={() => updatePhotoStatus(photo.id, 'keep')}
+              >
+                标记为保留
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1083,8 +1114,8 @@ export default function ResultsPage() {
         items={items}
         getItemKey={(photo) => photo.id}
         renderItem={renderPhotoCard}
-        minCardWidth={190}
-        rowHeight={280}
+        minCardWidth={150}
+        rowHeight={190}
         gap={12}
         overscanRows={3}
         emptyState={emptyState}
@@ -1153,10 +1184,10 @@ export default function ResultsPage() {
 
           {/* Right Workstation Content */}
           <div className="flex-1 flex flex-col overflow-hidden relative">
-            <main className="flex-1 overflow-y-auto p-5 bg-[var(--dt-workspace-bg)] pb-24">
+            <main className="flex-1 flex flex-col overflow-hidden p-5 bg-[var(--dt-workspace-bg)]">
               
               {totalPhotos === 0 ? (
-                <div className="max-w-xl mx-auto py-16 text-center select-none desktop-panel p-8">
+                <div className="max-w-xl mx-auto py-16 text-center select-none desktop-panel p-8 mt-10">
                   <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 mb-3">
                     <AlertTriangle className="h-4 w-4" />
                   </div>
@@ -1184,10 +1215,10 @@ export default function ResultsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-5">
-                  
-                  {/* 页面标题区 */}
-                  <div className="flex items-center justify-between gap-4 border-b border-[var(--dt-border)] pb-3 select-none text-left">
+                <>
+                  <div className="space-y-4 shrink-0 pb-3 border-b border-[var(--dt-border)]">
+                    {/* 页面标题区 */}
+                    <div className="flex items-center justify-between gap-4 pb-1 select-none text-left">
                     <div className="space-y-0.5">
                       <h2 className="text-sm font-bold text-[var(--dt-text-primary)]">整理结果</h2>
                       <p className="text-[10.5px] text-[var(--dt-text-soft)] leading-relaxed">
@@ -1253,12 +1284,13 @@ export default function ResultsPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 bg-[var(--dt-card-bg)] border border-[var(--dt-border)] rounded-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
-                      <div className="flex items-center gap-2 flex-wrap text-left">
-                        <span className="inline-flex h-2 w-2 rounded-full bg-[var(--dt-text-soft)]" />
-                        <span className="text-[var(--dt-text-secondary)]">
-                          未发现足够相似的照片组，因此不会自动进入 A/B。你仍可查看整理结果。
-                        </span>
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-lg flex items-start gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                      <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-blue-400 mt-0.5" />
+                      <div className="space-y-1 text-left">
+                        <p className="font-bold text-[var(--dt-text-primary)]">相似检测完成</p>
+                        <p className="text-[var(--dt-text-secondary)] leading-relaxed">
+                          未发现足够相似的照片组，因此不会自动进入 A/B。你可以直接查看整理结果，或稍后手动调整筛选。
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1328,8 +1360,10 @@ export default function ResultsPage() {
                       </div>
                     </div>
                   )}
+                  </div>
 
-                  {/* Active Tab Area Rendering with 0.18s transition */}
+                  <div className="flex-grow overflow-y-auto pr-1 pt-2 pb-20 scrollbar-thin">
+                    {/* Active Tab Area Rendering with 0.18s transition */}
                   {activeTab === 'keep' && (
                     <div className="animate-fade-in-up">
                       <PhotoBucketSection
@@ -1616,7 +1650,8 @@ export default function ResultsPage() {
                     </div>
                   )}
 
-                </div>
+                  </div>
+                </>
               )}
             </main>
           </div>
@@ -2483,6 +2518,90 @@ export default function ResultsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Fullscreen Zoom Preview Modal */}
+      {previewPhoto && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center select-none"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          {/* Title bar (desensitized name) */}
+          <div 
+            className="absolute top-0 inset-x-0 h-12 bg-black/40 border-b border-white/5 flex items-center justify-between px-6 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-xs font-bold text-[var(--dt-text-primary)]">
+              {getPhotoDisplayName(previewPhoto)}
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">
+                滚轮缩放 ({previewScale.toFixed(1)}x) • 拖动平移 • 双击重置
+              </span>
+              <button 
+                onClick={() => setPreviewPhoto(null)}
+                className="text-[var(--dt-text-soft)] hover:text-white bg-transparent border-0 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Zoom/Pan area */}
+          <div 
+            className="w-full h-full flex items-center justify-center overflow-hidden relative cursor-zoom-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setPreviewPhoto(null);
+              }
+            }}
+            onWheel={(e) => {
+              e.preventDefault();
+              const scaleFactor = 0.15;
+              const delta = e.deltaY < 0 ? scaleFactor : -scaleFactor;
+              setPreviewScale(prev => {
+                const next = Math.min(Math.max(prev + delta, 1), 5); // 1x to 5x
+                if (next === 1) {
+                  setPreviewX(0);
+                  setPreviewY(0);
+                }
+                return next;
+              });
+            }}
+            onMouseDown={(e) => {
+              if (e.button !== 0 || previewScale <= 1) return;
+              e.preventDefault();
+              setIsPreviewDragging(true);
+              setPreviewDragStart({ x: e.clientX - previewX, y: e.clientY - previewY });
+            }}
+            onMouseMove={(e) => {
+              if (!isPreviewDragging) return;
+              setPreviewX(e.clientX - previewDragStart.x);
+              setPreviewY(e.clientY - previewDragStart.y);
+            }}
+            onMouseUp={() => setIsPreviewDragging(false)}
+            onMouseLeave={() => setIsPreviewDragging(false)}
+            onDoubleClick={() => {
+              setPreviewScale(1);
+              setPreviewX(0);
+              setPreviewY(0);
+              setIsPreviewDragging(false);
+            }}
+          >
+            <img 
+              src={previewPhoto.url}
+              alt={getPhotoDisplayName(previewPhoto)}
+              style={{
+                transform: `translate(${previewX}px, ${previewY}px) scale(${previewScale})`,
+                transition: isPreviewDragging ? 'none' : 'transform 0.1s ease-out',
+                maxHeight: '90vh',
+                maxWidth: '90vw',
+              }}
+              className="object-contain select-none pointer-events-none"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
