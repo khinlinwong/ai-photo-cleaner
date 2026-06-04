@@ -554,6 +554,9 @@ interface PhotoWorkspaceContextType {
   identifyNativeSimilarGroups: () => void;
   skippedCount: number;
   failedCount: number;
+  isNativeProcessingCancelled: boolean;
+  cancelNativeProcessing: () => void;
+  resetNativeProcessingCancelState: () => void;
   // Checkpoint 6 Battle methods and state:
   similarGroups: SimilarGroup[];
   activeBattle: ActiveBattleState | null;
@@ -661,6 +664,20 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [skippedCount, setSkippedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const router = useRouter();
+
+  const [isNativeProcessingCancelled, setIsNativeProcessingCancelled] = useState(false);
+  const isCancelledRef = useRef(false);
+
+  const cancelNativeProcessing = () => {
+    setIsNativeProcessingCancelled(true);
+    isCancelledRef.current = true;
+    setAnalysisLogs((prev) => [...prev, '🛑 收到停止指令，正在停止分析队列...']);
+  };
+
+  const resetNativeProcessingCancelState = () => {
+    setIsNativeProcessingCancelled(false);
+    isCancelledRef.current = false;
+  };
 
   // Development-only guard.
   // Signal-derived groups must not drive production or user-facing flows.
@@ -1122,6 +1139,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setProjectName(name || '');
 
     // 重置所有分析和 Battle 相关状态
+    resetNativeProcessingCancelState();
     setAnalysisProgress(0);
     setAnalysisLogs([]);
     setCurrentAnalysisIndex(-1);
@@ -1170,6 +1188,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     if (isAnalyzingRef.current) {
       return;
     }
+    resetNativeProcessingCancelState();
     isAnalyzingRef.current = true;
 
     let currentPhotos = [...photos];
@@ -1193,6 +1212,19 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setAnalysisLogs((prev) => [...prev, '⚡ 正在初始化本地扫描计算模块...']);
 
     for (let i = 0; i < total; i++) {
+      if (isCancelledRef.current) {
+        setAnalysisLogs((prev) => [...prev, '🛑 停止分析：后续图片分析已被用户中止。']);
+        for (let j = i; j < total; j++) {
+          updatedPhotos[j] = {
+            ...updatedPhotos[j],
+            status: 'keep',
+            resolution: '未分析',
+            category: '已跳过',
+            reasonLabel: '分析已被中止，未进行质量检测'
+          };
+        }
+        break;
+      }
       const photo = updatedPhotos[i];
       const percentEnd = Math.round(((i + 1) / total) * 100);
       
@@ -1403,7 +1435,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       setAnalysisProgress(percentEnd);
     }
 
-    setAnalysisLogs((prev) => [...prev, '✅ 本地扫描分析已完成！']);
+    setAnalysisLogs((prev) => [
+      ...prev,
+      isCancelledRef.current ? '🛑 本地扫描分析已停止！' : '✅ 本地扫描分析已完成！'
+    ]);
     const hasNativeSource = updatedPhotos.some(p => p.sourceType === 'native-folder-preview' || p.sourceType === 'native-folder-file');
     
     if (hasNativeSource) {
@@ -1419,7 +1454,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setTimeout(() => {
       setIsAnalyzing(false);
       isAnalyzingRef.current = false;
-      if (!hasNativeSource) {
+      if (!hasNativeSource && !isCancelledRef.current) {
         router.push('/results');
       }
     }, 1200);
@@ -1567,6 +1602,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         identifyNativeSimilarGroups,
         skippedCount,
         failedCount,
+        isNativeProcessingCancelled,
+        cancelNativeProcessing,
+        resetNativeProcessingCancelState,
         similarGroups,
         activeBattle,
         startBattleForGroup,

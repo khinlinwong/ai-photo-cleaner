@@ -36,6 +36,8 @@ interface LocalScanProgressProps {
   onViewResults?: () => void;
 }
 
+import { usePhotoWorkspace } from '@/context/PhotoWorkspaceContext';
+
 export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
   photos,
   isAnalyzing,
@@ -49,8 +51,16 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
   hasNativeSource = false,
   onViewResults
 }) => {
+  const { isNativeProcessingCancelled, cancelNativeProcessing } = usePhotoWorkspace();
+
+  // Count successfully analyzed photos (where category is not default '待分类' and not '已跳过')
+  const analyzedCount = photos.filter(p => p.category !== '待分类' && p.category !== '已跳过').length;
   // 动态判断子任务状态
   const getSubtaskStatus = (taskIndex: number) => {
+    if (isNativeProcessingCancelled && !isAnalyzing) {
+      if (taskIndex <= 1) return 'completed';
+      return 'pending';
+    }
     if (analysisProgress === 0) return 'pending';
 
     switch (taskIndex) {
@@ -118,7 +128,9 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
         <div className="space-y-1">
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-xl font-bold text-[var(--dt-text-primary)]">
-              {analysisProgress === 100 && !isAnalyzing ? '本地分析已完成' : '正在本地分析照片'}
+              {isNativeProcessingCancelled 
+                ? '本地扫描已停止'
+                : (analysisProgress === 100 && !isAnalyzing ? '本地分析已完成' : '正在本地分析照片')}
             </h1>
             {projectName && (
               <span className="text-[10px] text-[var(--dt-text-secondary)] font-mono bg-white/5 px-2 py-0.5 rounded border border-[var(--dt-border)] truncate max-w-[200px]" title={projectName}>
@@ -127,36 +139,66 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
             )}
           </div>
           <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed max-w-md">
-            {hasNativeSource
-              ? '本地处理 / 原图保持不变 / 不上传云端。整理结果可在后续手动调整。'
-              : '照片只在本机浏览器中处理，不会上传云端。原图保持不变，整理结果可在下一步手动调整。'}
+            {isNativeProcessingCancelled
+              ? (analyzedCount > 0 
+                  ? '已停止分析。已完成的结果已保留，原图保持不变。'
+                  : '暂无可查看结果，请返回重新选择照片。')
+              : (hasNativeSource
+                  ? '本地处理 / 原图保持不变 / 不上传云端。整理结果可在后续手动调整。'
+                  : '照片只在本机浏览器中处理，不会上传云端。原图保持不变，整理结果可在下一步手动调整。')}
           </p>
         </div>
 
-        {analysisProgress < 100 && (
-          <button
-            onClick={onCancel}
-            className="flex items-center space-x-1.5 text-xs text-[#B96F68] hover:text-white bg-[#B96F68]/15 hover:bg-[#B96F68] border border-[#B96F68]/20 px-3 py-1.5 rounded-lg transition-all"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-            <span>取消扫描</span>
-          </button>
+        {/* Buttons during active analysis */}
+        {analysisProgress < 100 && isAnalyzing && !isNativeProcessingCancelled && (
+          <div className="flex items-center space-x-2.5">
+            {hasNativeSource && (
+              <button
+                onClick={cancelNativeProcessing}
+                className="flex items-center space-x-1.5 text-xs text-yellow-500 hover:text-white bg-yellow-500/15 hover:bg-yellow-500 border border-yellow-500/20 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <span>停止分析</span>
+              </button>
+            )}
+            <button
+              onClick={onCancel}
+              className="flex items-center space-x-1.5 text-xs text-[#B96F68] hover:text-white bg-[#B96F68]/15 hover:bg-[#B96F68] border border-[#B96F68]/20 px-3 py-1.5 rounded-lg transition-all"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>取消扫描</span>
+            </button>
+          </div>
         )}
 
-        {analysisProgress === 100 && !isAnalyzing && hasNativeSource && (
+        {/* Buttons during Stopping transition (isNativeProcessingCancelled is true, but isAnalyzing is still true) */}
+        {analysisProgress < 100 && isAnalyzing && isNativeProcessingCancelled && (
+          <div className="flex items-center space-x-2.5">
+            <button
+              disabled
+              className="flex items-center space-x-1.5 text-xs text-yellow-500/60 bg-yellow-500/5 border border-yellow-500/10 px-3 py-1.5 rounded-lg cursor-not-allowed"
+            >
+              <span>正在停止…</span>
+            </button>
+          </div>
+        )}
+
+        {/* Buttons after stopped/completed */}
+        {((analysisProgress === 100 && !isAnalyzing) || (isNativeProcessingCancelled && !isAnalyzing)) && hasNativeSource && (
           <div className="flex items-center space-x-2.5">
             <button
               onClick={onCancel}
               className="flex items-center space-x-1.5 text-xs text-[var(--dt-text-secondary)] hover:text-white bg-white/5 hover:bg-white/10 border border-[var(--dt-border)] px-3.5 py-1.5 rounded-lg transition-all"
             >
-              重新选择文件夹
+              {analyzedCount > 0 ? '重新选择文件夹' : '返回开始页'}
             </button>
-            <button
-              onClick={() => onViewResults?.()}
-              className="flex items-center space-x-1.5 text-xs font-semibold text-white bg-[var(--dt-button-primary)] hover:bg-[var(--dt-button-primary-hover)] px-4 py-1.5 rounded-lg transition-all shadow-md"
-            >
-              查看整理结果
-            </button>
+            {analyzedCount > 0 && (
+              <button
+                onClick={() => onViewResults?.()}
+                className="flex items-center space-x-1.5 text-xs font-semibold text-white bg-[var(--dt-button-primary)] hover:bg-[var(--dt-button-primary-hover)] px-4 py-1.5 rounded-lg transition-all shadow-md"
+              >
+                查看整理结果
+              </button>
+            )}
           </div>
         )}
       </div>

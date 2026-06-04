@@ -20,7 +20,8 @@ export default function ProcessingPage() {
     resetWorkspace,
     projectName,
     skippedCount,
-    failedCount
+    failedCount,
+    isNativeProcessingCancelled
   } = usePhotoWorkspace();
   
   const router = useRouter();
@@ -57,11 +58,17 @@ export default function ProcessingPage() {
   let projectStatus = '已创建';
   let nextStep = '整理工作区';
 
+  const analyzedCount = photos.filter(p => p.category !== '待分类' && p.category !== '已跳过').length;
+
   if (photos.length === 0) {
     statusText = '等待照片导入';
     scanStatus = '未开始';
     projectStatus = '未创建';
     nextStep = '无';
+  } else if (isNativeProcessingCancelled && !isAnalyzing) {
+    statusText = '本地扫描分析已停止';
+    scanStatus = '已停止';
+    nextStep = analyzedCount > 0 ? '查看整理结果' : '重新选择文件夹';
   } else if (analysisProgress === 100 && !isAnalyzing) {
     statusText = '本地扫描分析已完成';
     scanStatus = '已完成';
