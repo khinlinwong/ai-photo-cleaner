@@ -983,8 +983,56 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         decisions: [...activeBattle.decisions, decision]
       };
 
-      setActiveBattle(finalState);
       completeBattleForGroupInternal(activeBattle.groupId, finalState);
+
+      const updatedSimilarGroups = similarGroups.map(g => {
+        if (g.id === activeBattle.groupId) {
+          return {
+            ...g,
+            recommendedPhotoIds: newRecommended,
+            backupPhotoIds: newBackup,
+            cullCandidateIds: newCull,
+            undecidedPhotoIds: finalState.undecidedIds,
+            battleCompleted: true,
+            battleUpdatedAt: Date.now()
+          };
+        }
+        return g;
+      });
+
+      const nextPendingGroup = updatedSimilarGroups.find(g => !g.battleCompleted);
+
+      if (nextPendingGroup) {
+        const groupPhotos = photos.filter(p => nextPendingGroup.photoIds.includes(p.id));
+        if (groupPhotos.length > 1) {
+          const sortedPhotos = [...groupPhotos].sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            if (b.sharpnessScore !== a.sharpnessScore) return b.sharpnessScore - a.sharpnessScore;
+            return a.id.localeCompare(b.id);
+          });
+
+          const initialCandidateId = sortedPhotos[0].id;
+          const contenderIds = sortedPhotos.slice(1).map(p => p.id);
+
+          setActiveBattle({
+            groupId: nextPendingGroup.id,
+            photoIds: nextPendingGroup.photoIds,
+            contenderIds,
+            currentCandidateId: initialCandidateId,
+            nextIndex: 0,
+            roundIndex: 1,
+            totalRounds: contenderIds.length,
+            decisions: [],
+            recommendedKeepIds: [],
+            similarBackupIds: [],
+            cullCandidateIds: [],
+            undecidedIds: [...nextPendingGroup.photoIds]
+          });
+          return;
+        }
+      }
+
+      setActiveBattle(finalState);
     } else {
       setActiveBattle({
         ...activeBattle,
@@ -1458,7 +1506,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setTimeout(() => {
       setIsAnalyzing(false);
       isAnalyzingRef.current = false;
-      const isSuccess = updatedPhotos.some(p => p.category !== '已跳过' && p.category !== '待分类');
+      const isSuccess = updatedPhotos.some(p => p.resolution !== '待分析' && p.resolution !== '格式不支持' && p.resolution !== '读取失败');
       if (isSuccess && !isCancelledRef.current) {
         router.push('/results');
       }

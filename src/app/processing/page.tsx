@@ -36,14 +36,14 @@ export default function ProcessingPage() {
     }
   }, [photos, isAnalyzing, analysisProgress, startAnalysis]);
 
-  const analyzedCount = photos.filter(p => p.category !== '待分类' && p.category !== '已跳过').length;
+  const analyzedCount = photos.filter(p => p.resolution !== '待分析' && p.resolution !== '格式不支持' && p.resolution !== '读取失败').length;
 
-  // 2. 自动跳转逻辑：当进度到达 100 且分析状态结束，1.5 秒后自动路由至结果页
+  // 2. 自动跳转逻辑：当进度到达 100 且分析状态结束，1.0 秒后自动路由至结果页
   useEffect(() => {
     if (analysisProgress === 100 && !isAnalyzing && !isNativeProcessingCancelled && analyzedCount > 0) {
       const timer = setTimeout(() => {
         router.push('/results');
-      }, 1550);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [analysisProgress, isAnalyzing, router, isNativeProcessingCancelled, analyzedCount]);

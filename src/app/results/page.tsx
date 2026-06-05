@@ -589,8 +589,6 @@ export default function ResultsPage() {
     });
   }, [photos]);
 
-  // 本地相似组弹窗控制机制，防止退出时陷入弹出循环
-  const [dismissedGroups, setDismissedGroups] = useState<string[]>([]);
 
   // 全局轻量提示
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -631,17 +629,13 @@ export default function ResultsPage() {
 
   // A/B 对局弹窗的安全退出控制 (带有退出收缩动画)
   const handleCloseBattleWithAnimation = useCallback(() => {
-    const battleToClose = activeBattle || localActiveBattle;
-    if (battleToClose) {
-      setDismissedGroups((prev) => [...prev, battleToClose.groupId]);
-    }
     setIsBattleClosing(true);
     setTimeout(() => {
       closeBattle();
       setLocalActiveBattle(null);
       setIsBattleClosing(false);
     }, 280);
-  }, [activeBattle, localActiveBattle, closeBattle]);
+  }, [closeBattle]);
 
   // 导出面板关闭动画控制器
   const handleCloseExport = useCallback(() => {
@@ -675,36 +669,16 @@ export default function ResultsPage() {
       const isBattleCompleted = activeBattle.nextIndex >= activeBattle.contenderIds.length;
       if (isBattleCompleted) {
         isTransitioningRef.current = true;
-        
-        // 寻找是否有下一个未完成的组
-        const nextPendingGroup = similarGroups.find(
-          g => g.id !== activeBattle.groupId && !g.battleCompleted && !dismissedGroups.includes(g.id)
-        );
-
-        if (nextPendingGroup) {
-          // 直接在同一个窗口内流转到下一组，先播放淡出动画
-          setBattleMotionState('group-exiting');
-          setTimeout(() => {
-            startBattleForGroup(nextPendingGroup.id, hasNativeSource ? { allowNative: true } : undefined);
-            isTransitioningRef.current = false;
-          }, 250);
-        } else {
-          // 没有更多对局了，关闭 overlay
-          const remainingPendingCount = similarGroups.filter(
-            g => g.id !== activeBattle.groupId && !g.battleCompleted
-          ).length;
-          if (remainingPendingCount === 0) {
-            setToastMessage("A/B 对比已完成，结果已更新。");
-            setTimeout(() => {
-              setToastMessage(null);
-            }, 3000);
-          }
-          handleCloseBattleWithAnimation();
-          isTransitioningRef.current = false;
-        }
+        setToastMessage("A/B 对比已完成，结果已更新。");
+        const timer = setTimeout(() => {
+          setToastMessage(null);
+        }, 3000);
+        handleCloseBattleWithAnimation();
+        isTransitioningRef.current = false;
+        return () => clearTimeout(timer);
       }
     }
-  }, [activeBattle, similarGroups, dismissedGroups, startBattleForGroup, handleCloseBattleWithAnimation, hasNativeSource]);
+  }, [activeBattle, handleCloseBattleWithAnimation]);
 
   // A/B 自动进入策略：仅在 Native 正常分析完成并跳转到 Results 时，若 similarGroups.length > 0，自动打开第一组的 A/B 对局
   useEffect(() => {
@@ -717,30 +691,33 @@ export default function ResultsPage() {
         console.warn('Failed to read sessionStorage:', err);
       }
 
+      const analyzedCount = photos.filter(p => p.category !== '待分类' && p.category !== '已跳过').length;
+      const validGroup = similarGroups.find(g => g && !g.battleCompleted && g.photoIds.length >= 2);
+
       if (
         hasNativeSource &&
+        analyzedCount > 0 &&
         Array.isArray(similarGroups) &&
         similarGroups.length > 0 &&
+        validGroup &&
         analysisProgress === 100 &&
         !isAnalyzing &&
         !isNativeProcessingCancelled &&
         !isAlreadyOpened
       ) {
-        const firstPending = similarGroups.find(g => g && !g.battleCompleted) || similarGroups[0];
-        if (firstPending && firstPending.id) {
-          try {
-            window.sessionStorage.setItem('ab_auto_opened', 'true');
-          } catch (err) {
-            console.warn('Failed to write sessionStorage:', err);
-          }
-          startBattleForGroup(firstPending.id, { allowNative: true });
+        try {
+          window.sessionStorage.setItem('ab_auto_opened', 'true');
+        } catch (err) {
+          console.warn('Failed to write sessionStorage:', err);
         }
+        startBattleForGroup(validGroup.id, { allowNative: true });
       }
     } catch (e) {
       console.warn('Auto A/B error guarded:', e);
     }
   }, [
     hasNativeSource,
+    photos,
     similarGroups,
     analysisProgress,
     isAnalyzing,
@@ -1429,7 +1406,7 @@ export default function ResultsPage() {
                       <div className="space-y-1 text-left">
                         <p className="font-bold text-[var(--dt-text-primary)]">相似检测完成</p>
                         <p className="text-[var(--dt-text-secondary)] leading-relaxed">
-                          未发现足够相似的照片组，因此不会自动进入 A/B。你可以直接查看整理结果，或稍后手动调整筛选。
+                          未发现足够相似的照片组，因此不会自动进入 A/B。你仍可查看整理结果。
                         </p>
                         {(skippedCount > 0 || failedCount > 0) && (
                           <p className="text-[10px] text-blue-300 mt-1 font-medium">
