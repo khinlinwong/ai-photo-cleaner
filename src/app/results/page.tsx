@@ -1388,7 +1388,12 @@ export default function ResultsPage() {
                     completedBattleCount={similarGroups.filter(g => g.battleCompleted).length}
                     totalBattleCount={similarGroups.length}
                     activeTab={activeTab}
-                    onTabChange={setActiveTab}
+                    onTabChange={(tab) => {
+                      if (tab === 'similar') {
+                        setFilteredGroupId(null);
+                      }
+                      setActiveTab(tab);
+                    }}
                     hasNativeSource={hasNativeSource}
                   />
 
@@ -1549,29 +1554,23 @@ export default function ResultsPage() {
                         return (
                           <div className="space-y-4">
                             <div className="flex items-center justify-between border-b border-[var(--dt-border)] pb-2 select-none">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-bold text-[var(--dt-text-primary)]">
-                                  当前查看：相似组 #{groupIdx + 1}
+                                  当前查看：相似组 #{groupIdx + 1} ({groupPhotos.length}张)
                                 </span>
-                                <span className="text-[10px] text-[var(--dt-text-soft)] mr-2">
-                                  (包含 {groupPhotos.length} 张照片)
+                                <span className="text-[10px] text-[var(--dt-text-soft)] bg-white/5 px-1.5 py-0.5 rounded">
+                                  💡 点击上方“相似组”卡片返回全部组
                                 </span>
                                 {group && (
                                   <button
                                     onClick={() => startBattleForGroup(group.id, { allowNative: true })}
-                                    className="desktop-button-primary text-[10px] py-1 h-7 px-3 font-bold flex items-center gap-1.5"
+                                    className="desktop-button-primary text-[10px] py-1 h-7 px-3 font-bold flex items-center gap-1.5 ml-2"
                                   >
                                     <GitCompare className="h-3.5 w-3.5" />
                                     {group.battleCompleted ? "重新对比" : "开始 A/B 对比"}
                                   </button>
                                 )}
                               </div>
-                              <button
-                                onClick={() => setFilteredGroupId(null)}
-                                className="desktop-button-secondary text-[10px] py-1 h-7 px-3 font-bold border border-[var(--dt-border)]"
-                              >
-                                清除相似组过滤
-                              </button>
                             </div>
                             
                             <div>
