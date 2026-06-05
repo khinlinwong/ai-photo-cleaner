@@ -62,8 +62,8 @@ export async function scanNativeSelectedImageFiles(
     }
 
     return null;
-  } catch (err) {
-    console.error('[NativeBridge] Error scanning selected image files:', err);
+  } catch {
+    console.warn('[native-file-picker] selected file scan failed');
     return null;
   }
 }
