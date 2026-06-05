@@ -1407,9 +1407,9 @@ export default function ResultsPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
                           onClick={() => {
-                            const firstPending = similarGroups.find(g => !g.battleCompleted) || similarGroups[0];
-                            if (firstPending) {
-                              startBattleForGroup(firstPending.id, { allowNative: true });
+                            const targetGroupId = filteredGroupId || (similarGroups.find(g => !g.battleCompleted) || similarGroups[0])?.id;
+                            if (targetGroupId) {
+                              startBattleForGroup(targetGroupId, { allowNative: true });
                             }
                           }}
                           className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-8 px-4 text-xs transition-all shadow-none border-0"
@@ -1553,9 +1553,18 @@ export default function ResultsPage() {
                                 <span className="text-xs font-bold text-[var(--dt-text-primary)]">
                                   当前查看：相似组 #{groupIdx + 1}
                                 </span>
-                                <span className="text-[10px] text-[var(--dt-text-soft)]">
+                                <span className="text-[10px] text-[var(--dt-text-soft)] mr-2">
                                   (包含 {groupPhotos.length} 张照片)
                                 </span>
+                                {group && (
+                                  <button
+                                    onClick={() => startBattleForGroup(group.id, { allowNative: true })}
+                                    className="desktop-button-primary text-[10px] py-1 h-7 px-3 font-bold flex items-center gap-1.5"
+                                  >
+                                    <GitCompare className="h-3.5 w-3.5" />
+                                    {group.battleCompleted ? "重新对比" : "开始 A/B 对比"}
+                                  </button>
+                                )}
                               </div>
                               <button
                                 onClick={() => setFilteredGroupId(null)}
@@ -1835,7 +1844,7 @@ export default function ResultsPage() {
               onExportManifestJson={handleExportManifestJson}
               onContinueBattle={() => {
                 const group = similarGroups.find(g => !g.battleCompleted);
-                if (group) startBattleForGroup(group.id);
+                if (group) startBattleForGroup(group.id, hasNativeSource ? { allowNative: true } : undefined);
                 handleCloseExport();
               }}
               onRestart={() => {
@@ -2070,7 +2079,7 @@ export default function ResultsPage() {
               </div>
 
               <div className="flex-1 p-4 flex flex-col justify-between min-h-0 bg-[var(--dt-workspace-bg)]">
-                <div className="desktop-battle-stage">
+                <div key={`${battleObj.groupId}-${leftId}-${rightId}`} className="desktop-battle-stage">
                   {/* Left Photo (current best candidate) */}
                   {leftPhoto ? (
                     <div className={cn(
