@@ -204,32 +204,36 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         ]
       });
 
-      if (selected) {
-        const paths = Array.isArray(selected)
-          ? selected
-          : typeof selected === 'string'
-            ? [selected]
-            : [];
+      // 1. 用户取消 dialog
+      if (!selected) {
+        return;
+      }
 
-        if (paths.length > 0) {
-          const X = paths.length;
+      const paths = Array.isArray(selected)
+        ? selected
+        : typeof selected === 'string'
+          ? [selected]
+          : [];
+
+      if (paths.length > 0) {
+        try {
+          const scanResult = await scanNativeSelectedImageFiles(paths);
           
-          try {
-            const scanResult = await scanNativeSelectedImageFiles(paths);
-            
-            if (scanResult && scanResult.items) {
-              const Y = scanResult.totalPreviewItems;
-              if (X > 200) {
-                setImageSelectionMessage(`已选择超过 200 张图片。当前最多准备前 200 张。已准备 ${Y} 张可预览图片。当前最多分析 200 张。分析接入将在下一阶段完成。`);
-              } else {
-                setImageSelectionMessage(`已选择 ${X} 张图片。已准备 ${Y} 张可预览图片。当前最多分析 200 张。分析接入将在下一阶段完成。`);
-              }
+          if (scanResult) {
+            if (scanResult.items && scanResult.items.length > 0) {
+              const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
+              startNativeFolderAnalysis(scanResult.items, projName, 'selected-files');
             } else {
-              setErrorMessage('无法准备所选图片，请重新选择。');
+              // 2. Rust 返回 0 个可用 preview
+              setErrorMessage('未找到可用图片，请重新选择。');
             }
-          } catch {
+          } else {
+            // 3. Rust command 失败 (返回 null)
             setErrorMessage('无法准备所选图片，请重新选择。');
           }
+        } catch {
+          // 3. Rust command 失败 (抛出异常)
+          setErrorMessage('无法准备所选图片，请重新选择。');
         }
       }
     } catch {

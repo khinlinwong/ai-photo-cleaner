@@ -551,7 +551,8 @@ interface PhotoWorkspaceContextType {
   deleteSuggestedPhotos: () => void;
   resetWorkspace: () => void;
   loadDemoPhotos: () => void;
-  startNativeFolderAnalysis: (previews: NativeImagePreviewItem[], name?: string) => void;
+  startNativeFolderAnalysis: (previews: NativeImagePreviewItem[], name?: string, sourceMode?: 'folder' | 'selected-files') => void;
+  nativeSourceMode: 'folder' | 'selected-files' | null;
   identifyNativeSimilarGroups: () => void;
   skippedCount: number;
   failedCount: number;
@@ -664,6 +665,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [projectName, setProjectName] = useState<string>('');
   const [skippedCount, setSkippedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [nativeSourceMode, setNativeSourceMode] = useState<'folder' | 'selected-files' | null>(null);
   const router = useRouter();
 
   const [isNativeProcessingCancelled, setIsNativeProcessingCancelled] = useState(false);
@@ -1147,6 +1149,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setProjectName(name || '');
 
     // 重置所有分析和 Battle 相关状态
+    setNativeSourceMode(null);
     setAnalysisProgress(0);
     setAnalysisLogs([]);
     setCurrentAnalysisIndex(-1);
@@ -1186,7 +1189,11 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   // 新增 Native Processing 独立入口
-  const startNativeFolderAnalysis = (previews: NativeImagePreviewItem[], name?: string) => {
+  const startNativeFolderAnalysis = (
+    previews: NativeImagePreviewItem[],
+    name?: string,
+    sourceMode: 'folder' | 'selected-files' = 'folder'
+  ) => {
     if (typeof window !== 'undefined') {
       window.sessionStorage.removeItem('ab_auto_opened');
     }
@@ -1197,6 +1204,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setProjectName(name || '');
 
     // 重置所有分析和 Battle 相关状态
+    setNativeSourceMode(sourceMode);
     resetNativeProcessingCancelState();
     setAnalysisProgress(0);
     setAnalysisLogs([]);
@@ -1579,6 +1587,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setProjectName('');
     setSkippedCount(0);
     setFailedCount(0);
+    setNativeSourceMode(null);
   };
 
   // 载入演示图片数据包
@@ -1589,6 +1598,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     photos.forEach(p => revokeBlobUrl(p.url));
 
     // 重置所有分析和 Battle 相关状态
+    setNativeSourceMode(null);
     setAnalysisProgress(0);
     setAnalysisLogs([]);
     setCurrentAnalysisIndex(-1);
@@ -1658,6 +1668,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         resetWorkspace,
         loadDemoPhotos,
         startNativeFolderAnalysis,
+        nativeSourceMode,
         identifyNativeSimilarGroups,
         skippedCount,
         failedCount,
