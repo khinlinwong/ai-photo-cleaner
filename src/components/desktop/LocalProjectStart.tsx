@@ -16,6 +16,7 @@ import { pickNativeImageFolder } from '@/lib/desktop/nativeFolderPicker';
 import { scanNativeFolderMetadata, NativeFolderMetadataSummary } from '@/lib/desktop/nativeFolderScanner';
 import { scanNativeFolderImageEntries } from '@/lib/desktop/nativeImageEntriesScanner';
 import { scanNativeFolderImagePreviews, NativeImagePreviewItem } from '@/lib/desktop/nativeImagePreviewScanner';
+import { scanNativeSelectedImageFiles } from '@/lib/desktop/nativeSelectedFilesScanner';
 import { getEffectiveNativeBatchLimit } from '@/lib/desktop/nativeBatchLimit';
 
 /**
@@ -204,24 +205,35 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       });
 
       if (selected) {
-        let count = 0;
-        if (Array.isArray(selected)) {
-          count = selected.length;
-        } else if (typeof selected === 'string') {
-          count = 1;
-        }
+        const paths = Array.isArray(selected)
+          ? selected
+          : typeof selected === 'string'
+            ? [selected]
+            : [];
 
-        if (count > 0) {
-          if (count > 200) {
-            setImageSelectionMessage(`已选择超过 200 张图片。当前最多分析前 200 张。完整分析将在下一阶段接入。`);
-          } else {
-            setImageSelectionMessage(`已选择 ${count} 张图片。多选图片导入入口已准备好，分析接入将在下一阶段完成。当前不会显示真实文件名或路径。`);
+        if (paths.length > 0) {
+          const X = paths.length;
+          
+          try {
+            const scanResult = await scanNativeSelectedImageFiles(paths);
+            
+            if (scanResult && scanResult.items) {
+              const Y = scanResult.totalPreviewItems;
+              if (X > 200) {
+                setImageSelectionMessage(`已选择超过 200 张图片。当前最多准备前 200 张。已准备 ${Y} 张可预览图片。当前最多分析 200 张。分析接入将在下一阶段完成。`);
+              } else {
+                setImageSelectionMessage(`已选择 ${X} 张图片。已准备 ${Y} 张可预览图片。当前最多分析 200 张。分析接入将在下一阶段完成。`);
+              }
+            } else {
+              setErrorMessage('无法准备所选图片，请重新选择。');
+            }
+          } catch {
+            setErrorMessage('无法准备所选图片，请重新选择。');
           }
         }
       }
-    } catch (err) {
-      console.error('Failed to select images:', err);
-      setErrorMessage('选择图片时出错，请重试。');
+    } catch {
+      setErrorMessage('无法准备所选图片，请重新选择。');
     }
   };
 
@@ -384,11 +396,12 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       return;
     }
 
-    const count = imgFiles.length;
-    if (count > 200) {
-      setImageSelectionMessage(`已选择超过 200 张图片。当前最多分析前 200 张。完整分析将在下一阶段接入。`);
+    const X = imgFiles.length;
+    const Y = Math.min(X, 200);
+    if (X > 200) {
+      setImageSelectionMessage(`已选择超过 200 张图片。当前最多准备前 200 张。已准备 ${Y} 张可预览图片。当前最多分析 200 张。分析接入将在下一阶段完成。`);
     } else {
-      setImageSelectionMessage(`已选择 ${count} 张图片。多选图片导入入口已准备好，分析接入将在下一阶段完成。当前不会显示真实文件名或路径。`);
+      setImageSelectionMessage(`已选择 ${X} 张图片。已准备 ${Y} 张可预览图片. 当前最多分析 200 张。分析接入将在下一阶段完成。`);
     }
   };
 

@@ -193,9 +193,14 @@ pub struct NativeImagePreviewScanResult {
 
 static PREVIEW_MAPPING: OnceLock<Mutex<HashMap<String, PathBuf>>> = OnceLock::new();
 static ACTIVE_FOLDER: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+static ACTIVE_FILES: OnceLock<Mutex<std::collections::HashSet<PathBuf>>> = OnceLock::new();
 
 fn get_preview_mapping() -> &'static Mutex<HashMap<String, PathBuf>> {
   PREVIEW_MAPPING.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn get_active_files() -> &'static Mutex<std::collections::HashSet<PathBuf>> {
+  ACTIVE_FILES.get_or_init(|| Mutex::new(std::collections::HashSet::new()))
 }
 
 fn set_active_folder(folder: PathBuf) {
@@ -207,6 +212,13 @@ fn set_active_folder(folder: PathBuf) {
 
 fn verify_in_active_folder(path: &Path) -> bool {
   if let Ok(canonical_path) = path.canonicalize() {
+    // Check if explicitly allowed via selected files
+    if let Ok(guard) = get_active_files().lock() {
+      if guard.contains(&canonical_path) {
+        return true;
+      }
+    }
+    // Check folder scope
     let cell = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None));
     if let Ok(guard) = cell.lock() {
       if let Some(ref active) = *guard {
@@ -235,6 +247,10 @@ fn scan_folder_image_previews(
   // Record the chosen folder path scope (canonicalized)
   set_active_folder(canonical_active.clone());
   expire_all_plans();
+
+  if let Ok(mut guard) = get_active_files().lock() {
+    guard.clear();
+  }
 
   let entries = fs::read_dir(&canonical_active)
     .map_err(|_| "当前文件夹暂时无法扫描。".to_string())?;
@@ -309,6 +325,96 @@ fn scan_folder_image_previews(
               });
             }
           }
+        }
+      }
+    }
+  }
+
+  Ok(NativeImagePreviewScanResult {
+    total_preview_items: preview_items.len(),
+    preview_limit: target_limit,
+    items: preview_items,
+  })
+}
+
+#[tauri::command]
+fn scan_selected_image_files(
+  file_paths: Vec<String>,
+  limit: Option<usize>,
+) -> Result<NativeImagePreviewScanResult, String> {
+  let target_limit = match limit {
+    Some(l) if l > 0 => std::cmp::min(l, 200),
+    _ => 200,
+  };
+
+  // Clear previous active folder/files
+  if let Ok(mut guard) = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock() {
+    *guard = None;
+  }
+  
+  let mut active_files_guard = get_active_files().lock().map_err(|_| "系统锁定错误".to_string())?;
+  active_files_guard.clear();
+
+  // Clear previous preview mapping
+  if let Ok(mut guard) = get_preview_mapping().lock() {
+    guard.clear();
+  }
+
+  expire_all_plans();
+
+  let mut preview_items = Vec::new();
+  let mut idx = 0;
+
+  for file_path_str in file_paths {
+    if preview_items.len() >= target_limit {
+      break;
+    }
+
+    let path = Path::new(&file_path_str);
+    
+    // Canonicalize path to check exists and resolve symlinks
+    if let Ok(canonical_path) = path.canonicalize() {
+      if canonical_path.is_file() {
+        let ext = canonical_path
+          .extension()
+          .and_then(|e| e.to_str())
+          .unwrap_or("")
+          .to_lowercase();
+
+        let is_image = match ext.as_str() {
+          "jpg" | "jpeg" | "png" | "webp" | "heic" | "heif" => true,
+          _ => false,
+        };
+
+        if is_image {
+          let size_bytes = match fs::metadata(&canonical_path) {
+            Ok(meta) => meta.len(),
+            Err(_) => 0,
+          };
+
+          let id = format!("native-preview-{}", idx);
+          idx += 1;
+
+          // Store in active files and mapping
+          active_files_guard.insert(canonical_path.clone());
+          
+          if let Ok(mut guard) = get_preview_mapping().lock() {
+            guard.insert(id.clone(), canonical_path.clone());
+          }
+
+          // Format opaque preview URL using custom protocol scheme
+          let preview_url = if cfg!(target_os = "windows") {
+            format!("http://preview.localhost/{}", id)
+          } else {
+            format!("preview://localhost/{}", id)
+          };
+
+          preview_items.push(NativeImagePreviewItem {
+            id,
+            preview_url,
+            extension: ext,
+            size_bytes,
+          });
         }
       }
     }
@@ -1135,6 +1241,7 @@ pub fn run() {
       scan_folder_metadata,
       scan_folder_image_entries,
       scan_folder_image_previews,
+      scan_selected_image_files,
       read_native_preview_bytes,
       select_physical_org_output_folder,
       create_physical_org_dry_run,
