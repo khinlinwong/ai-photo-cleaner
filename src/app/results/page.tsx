@@ -2032,18 +2032,16 @@ export default function ResultsPage() {
           : battleObj.contenderIds[battleObj.nextIndex];
         const leftPhoto = photos.find(p => p.id === leftId);
         const rightPhoto = photos.find(p => p.id === rightId);
-        const activeGroup = similarGroups.find(g => g.id === battleObj.groupId);
-        const groupPhotos = photos.filter(p => activeGroup?.photoIds.includes(p.id));
 
         return (
-          <div className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 select-none">
+          <div className="fixed inset-0 z-40 bg-black/65 flex items-center justify-center p-4 select-none">
             <div 
               style={{
                 background: 'linear-gradient(135deg, rgba(30, 35, 42, 0.98), rgba(40, 46, 54, 0.99))',
                 border: '1px solid var(--dt-border-strong)',
               }}
               className={cn(
-                "sm:max-w-6xl w-[96vw] max-h-[85vh] h-[80vh] flex flex-col text-[var(--dt-text-primary)] p-0 overflow-hidden rounded shadow-2xl relative",
+                "w-[98vw] h-[92vh] max-w-[1500px] flex flex-col text-[var(--dt-text-primary)] p-0 overflow-hidden rounded shadow-2xl relative",
                 isBattleClosing ? "animate-battle-out" : "animate-battle-in"
               )}
             >
@@ -2053,11 +2051,6 @@ export default function ResultsPage() {
                     <GitCompare className="h-4 w-4 text-yellow-400" />
                     {hasNativeSource ? `相似组 #${similarGroups.findIndex(g => g.id === battleObj.groupId) + 1} - 本地处理` : "选择更想保留的一张"}
                   </h3>
-                  <span className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">
-                    {hasNativeSource 
-                      ? "本地 A/B 对局中，不上传云端，原图保持不变。请挑选您更想保留的照片。"
-                      : "这组照片较相似，请直接选择你想保留的结果。未选照片会标记为淘汰候选，原图保持不变。"}
-                  </span>
                 </div>
                 <div className="bg-black/25 border border-white/5 rounded px-2.5 py-1 text-[10px] text-[var(--dt-text-primary)] font-mono font-bold">
                   当前组: {battleObj.roundIndex} / {battleObj.totalRounds}
@@ -2076,13 +2069,7 @@ export default function ResultsPage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-between min-h-0 bg-[var(--dt-workspace-bg)]">
-                
-                {/* Zoom Instructions */}
-                <div className="text-center text-[10px] text-[var(--dt-text-soft)] mb-2 select-none">
-                  💡 提示：鼠标悬停在左/右图上滚动 **鼠标滚轮** 可进行 **1x - 4x** 独立缩放，按住 **鼠标左键拖动** 平移细节。
-                </div>
-
+              <div className="flex-1 p-4 flex flex-col justify-between min-h-0 bg-[var(--dt-workspace-bg)]">
                 <div className="desktop-battle-stage">
                   {/* Left Photo (current best candidate) */}
                   {leftPhoto ? (
@@ -2119,33 +2106,6 @@ export default function ResultsPage() {
                             👑 当前优选 [ ← ] ({leftScale.toFixed(1)}x)
                           </Badge>
                         </div>
-                      </div>
-                      <div className="p-2.5 border-t border-white/5 shrink-0 flex flex-col gap-1 bg-black/10">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="max-w-[70%]">
-                            <p 
-                              className="text-xs font-bold text-[var(--dt-text-primary)] truncate" 
-                              title={hasNativeSource ? undefined : leftPhoto.name}
-                            >
-                              {getPhotoDisplayName(leftPhoto)}
-                            </p>
-                            <p className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">{leftPhoto.size} • {leftPhoto.resolution}</p>
-                          </div>
-                          <span className="text-[10px] text-emerald-400 font-semibold">
-                            {leftPhoto.issue === 'good' ? '质量良好' : '相似推荐'}
-                          </span>
-                        </div>
-                        
-                        <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-1 text-left">
-                          <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
-                            <span>▶</span> 查看技术详情
-                          </summary>
-                          <div className="pl-2 pt-1 font-mono space-y-0.5 border-l border-white/5 mt-0.5">
-                            <p>综合质量: {leftPhoto.score} / 100</p>
-                            <p>清晰对焦: {leftPhoto.sharpnessScore} / 100</p>
-                            <p>曝光亮度: {leftPhoto.exposureScore} / 100</p>
-                          </div>
-                        </details>
                       </div>
                     </div>
                   ) : (
@@ -2195,166 +2155,20 @@ export default function ResultsPage() {
                           </Badge>
                         </div>
                       </div>
-                      <div className="p-2.5 border-t border-white/5 shrink-0 flex flex-col gap-1 bg-black/10">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="max-w-[70%]">
-                            <p 
-                              className="text-xs font-bold text-[var(--dt-text-primary)] truncate" 
-                              title={hasNativeSource ? undefined : rightPhoto.name}
-                            >
-                              {getPhotoDisplayName(rightPhoto)}
-                            </p>
-                            <p className="text-[9px] text-[var(--dt-text-soft)] mt-0.5">{rightPhoto.size} • {rightPhoto.resolution}</p>
-                          </div>
-                          <span className="text-[10px] text-yellow-400 font-semibold">
-                            {rightPhoto.issue === 'good' ? '质量良好' : rightPhoto.issue === 'blurry' ? '画面模糊' : rightPhoto.issue === 'overexposed' ? '画面过曝' : rightPhoto.issue === 'underexposed' ? '画面欠曝' : '相似重复'}
-                          </span>
-                        </div>
-
-                        <details className="text-[9px] text-[var(--dt-text-soft)] cursor-pointer mt-1 text-left">
-                          <summary className="hover:text-[var(--dt-text-primary)] list-none flex items-center gap-1 select-none">
-                            <span>▶</span> 查看技术详情
-                          </summary>
-                          <div className="pl-2 pt-1 font-mono space-y-0.5 border-l border-white/5 mt-0.5">
-                            <p>综合质量: {rightPhoto.score} / 100</p>
-                            <p>清晰对焦: {rightPhoto.sharpnessScore} / 100</p>
-                            <p>曝光亮度: {rightPhoto.exposureScore} / 100</p>
-                          </div>
-                        </details>
-                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center bg-black/25 text-[var(--dt-text-soft)] rounded-lg">找不到右图</div>
                   )}
                 </div>
 
-                {/* Photo Battle Filmstrip */}
-                <div className="mt-3 border-t border-white/5 pt-2 shrink-0">
-                  <div className="flex items-center justify-between text-[9px] text-[var(--dt-text-soft)] mb-1 px-1">
-                    <span>相似组胶片带 ({groupPhotos.length} 张)</span>
-                    <span className="flex items-center gap-2">
-                      <span className="flex items-center gap-0.5">🟢 保留</span>
-                      <span className="flex items-center gap-0.5">🔴 淘汰候选</span>
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5 overflow-x-auto py-1 px-2 bg-black/35 rounded border border-white/5 scrollbar-thin">
-                    {groupPhotos.map((photo) => {
-                      const isLeft = photo.id === leftId;
-                      const isRight = photo.id === rightId;
-                      const isKeep = battleObj.recommendedKeepIds.includes(photo.id);
-                      const isReview = battleObj.similarBackupIds.includes(photo.id);
-                      const isDelete = battleObj.cullCandidateIds.includes(photo.id);
-
-                      return (
-                        <div
-                          key={photo.id}
-                          className={cn(
-                            "relative shrink-0 rounded overflow-hidden border transition-all duration-200",
-                            isLeft 
-                              ? "border-[#6FA887] ring-1 ring-[#6FA887]/30 scale-95"
-                              : isRight
-                              ? "border-yellow-500 ring-1 ring-yellow-500/30 scale-95"
-                              : "border-white/10"
-                          )}
-                          style={{ width: '44px', height: '33px' }}
-                        >
-                          <img
-                            src={photo.url}
-                            alt={getPhotoDisplayName(photo)}
-                            className="w-full h-full object-cover"
-                          />
-                          {/* Status Dot */}
-                          <div 
-                            className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full" 
-                            style={{ 
-                              backgroundColor: (isKeep || isReview) ? '#6FA887' : isDelete ? '#B96F68' : '#7E8588' 
-                            }} 
-                          />
-                          {isLeft && (
-                            <div className="absolute bottom-0 inset-x-0 bg-[#6FA887] text-white text-[6px] font-bold text-center leading-none py-0.5">
-                              左图
-                            </div>
-                          )}
-                          {isRight && (
-                            <div className="absolute bottom-0 inset-x-0 bg-yellow-500 text-black text-[6px] font-bold text-center leading-none py-0.5">
-                              右图
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Battle Actions Bar */}
-                <div className="mt-3.5 pt-2.5 border-t border-white/5 flex flex-col gap-2 shrink-0 animate-fade-in">
-                  {/* Keyboard Shortcuts Hint Panel */}
-                  <div className="hidden md:flex items-center justify-center gap-4 py-1.5 px-3 rounded-lg bg-black/20 border border-white/5 text-[10px] text-[var(--dt-text-soft)] select-none">
-                    <span className="font-bold text-[var(--dt-text-secondary)]">💻 快捷键提示：</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">←</kbd> 保留左图</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">→</kbd> 保留右图</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">B</kbd> 两张都保留</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">C</kbd> 两张都标记为淘汰候选</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">S</kbd> 跳过</span>
-                    <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">Esc</kbd> 关闭 / 返回</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-                    <button
-                      className="bg-[#6FA887] hover:bg-[#6FA887]/90 text-white font-bold text-xs py-2 px-1.5 rounded border border-white/5 flex flex-col items-center justify-center gap-0.5"
-                      onClick={() => applyBattleDecision('keep_left')}
-                    >
-                      <span>保留左图</span>
-                      <kbd className="desktop-battle-kbd">←</kbd>
-                    </button>
-                    <button
-                      className="bg-[#6FA887] hover:bg-[#6FA887]/90 text-white font-bold text-xs py-2 px-1.5 rounded border border-white/5 flex flex-col items-center justify-center gap-0.5"
-                      onClick={() => applyBattleDecision('keep_right')}
-                    >
-                      <span>保留右图</span>
-                      <kbd className="desktop-battle-kbd">→</kbd>
-                    </button>
-                    <button
-                      className="bg-white/5 hover:bg-white/10 text-[var(--dt-text-primary)] font-bold text-xs py-2 px-1.5 rounded border border-white/5 flex flex-col items-center justify-center gap-0.5"
-                      onClick={() => applyBattleDecision('keep_both')}
-                    >
-                      <span>两张都保留</span>
-                      <kbd className="desktop-battle-kbd">B</kbd>
-                    </button>
-                    <button
-                      className="border border-[#B96F68]/35 text-[#B96F68] hover:text-[#B96F68]/95 bg-[#B96F68]/10 hover:bg-[#B96F68]/15 font-bold text-xs py-2 px-1.5 rounded flex flex-col items-center justify-center gap-0.5"
-                      onClick={() => applyBattleDecision('cull_both')}
-                    >
-                      <span>标记为淘汰候选</span>
-                      <kbd className="desktop-battle-kbd">C</kbd>
-                    </button>
-                    
-                    {/* 重置缩放按钮：仅在有任意一侧放大时亮起 */}
-                    <button
-                      disabled={leftScale === 1 && rightScale === 1}
-                      className={cn(
-                        "font-bold text-xs py-2 px-1.5 rounded border flex flex-col items-center justify-center gap-0.5 transition-all",
-                        leftScale > 1 || rightScale > 1
-                          ? "bg-yellow-500/15 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20"
-                          : "border-white/5 bg-white/5 text-[var(--dt-text-faint)] opacity-40 cursor-not-allowed"
-                      )}
-                      onClick={handleResetZoom}
-                    >
-                      <span>重置缩放</span>
-                      <span className="text-[7.5px] opacity-75 font-mono">Zoom:1x</span>
-                    </button>
-
-                    <button
-                      className="border border-white/5 bg-white/5 hover:bg-white/10 text-[var(--dt-text-primary)] font-bold text-xs py-2 px-1.5 rounded flex flex-col items-center justify-center gap-0.5"
-                      onClick={() => applyBattleDecision('skip')}
-                    >
-                      <span>跳过</span>
-                      <kbd className="desktop-battle-kbd">S</kbd>
-                    </button>
-                  </div>
-                  <p className="text-[9px] text-[var(--dt-text-soft)] text-center select-none leading-relaxed mt-1">
-                    💡 提示：滚轮缩放，按住左键拖动查看细节。
-                  </p>
+                {/* Keyboard Shortcuts Hint Panel */}
+                <div className="mt-2 py-1 flex items-center justify-center gap-4 text-[10px] text-[var(--dt-text-soft)] select-none shrink-0 border-t border-white/5 pt-2">
+                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">←</kbd> 保留左图</span>
+                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">→</kbd> 保留右图</span>
+                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">B</kbd> 两张都保留</span>
+                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">C</kbd> 两张淘汰候选</span>
+                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">S</kbd> 跳过</span>
+                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">Esc</kbd> 关闭</span>
                 </div>
               </div>
             </div>
