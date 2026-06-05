@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePhotoWorkspace } from '@/context/PhotoWorkspaceContext';
-import { FolderOpen, ArrowRight, ShieldCheck, Cpu, Trash2, Clock, ChevronRight } from 'lucide-react';
+import { FolderOpen, ArrowRight, ShieldCheck, Cpu, Trash2, Clock, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import {
   getRecentLocalProjects,
   saveRecentLocalProject,
@@ -60,6 +60,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const { uploadFiles, loadDemoPhotos, startNativeFolderAnalysis } = usePhotoWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const relinkFileInputRef = useRef<HTMLInputElement>(null);
+  const webImageInputRef = useRef<HTMLInputElement>(null);
 
   const [isStarting, setIsStarting] = useState<'none' | 'upload' | 'demo'>('none');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -86,6 +87,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [isScanning, setIsScanning] = useState(false);
   const [scanSummary, setScanSummary] = useState<NativeFolderMetadataSummary | null>(null);
   const [previews, setPreviews] = useState<NativeImagePreviewItem[]>([]);
+  const [imageSelectionMessage, setImageSelectionMessage] = useState<string | null>(null);
 
 
   // 稳定性防护相关 Refs 与 timeouts
@@ -137,6 +139,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     setPickedFolder(null);
     setScanSummary(null);
     setPreviews([]);
+    setImageSelectionMessage(null);
     try {
       const res = await pickNativeImageFolder();
       if (res && res.path) {
@@ -179,6 +182,49 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     }
   };
 
+  const handleSelectImagesNativeClick = async () => {
+    setErrorMessage(null);
+    setPickedFolder(null);
+    setScanSummary(null);
+    setPreviews([]);
+    setImageSelectionMessage(null);
+
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      
+      const selected = await open({
+        multiple: true,
+        directory: false,
+        filters: [
+          {
+            name: 'Images',
+            extensions: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']
+          }
+        ]
+      });
+
+      if (selected) {
+        let count = 0;
+        if (Array.isArray(selected)) {
+          count = selected.length;
+        } else if (typeof selected === 'string') {
+          count = 1;
+        }
+
+        if (count > 0) {
+          if (count > 200) {
+            setImageSelectionMessage(`已选择超过 200 张图片。当前最多分析前 200 张。完整分析将在下一阶段接入。`);
+          } else {
+            setImageSelectionMessage(`已选择 ${count} 张图片。多选图片导入入口已准备好，分析接入将在下一阶段完成。当前不会显示真实文件名或路径。`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to select images:', err);
+      setErrorMessage('选择图片时出错，请重试。');
+    }
+  };
+
   const handleRemoveProject = (projectId: string) => {
     removeLocalProjectSummary(projectId);
     if (isMountedRef.current) {
@@ -197,6 +243,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleRelinkSelectClick = (project: LocalProjectSummary) => {
     setRelinkingProject(project);
+    setImageSelectionMessage(null);
     if (relinkFileInputRef.current) {
       relinkFileInputRef.current.value = '';
     }
@@ -282,6 +329,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     }
 
     setErrorMessage(null);
+    setImageSelectionMessage(null);
 
     try {
       // 创建新项目流程
@@ -314,6 +362,33 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
           onStatusChange('等待选择本地文件夹');
         }
       }
+    }
+  };
+
+  const handleWebImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+
+    setErrorMessage(null);
+    setPickedFolder(null);
+    setScanSummary(null);
+    setPreviews([]);
+    setImageSelectionMessage(null);
+
+    if (files.length === 0) return;
+
+    // 过滤图片文件
+    const imgFiles = files.filter(file => file.type.startsWith('image/'));
+    if (imgFiles.length === 0) {
+      setErrorMessage('请选择至少一张图片。');
+      return;
+    }
+
+    const count = imgFiles.length;
+    if (count > 200) {
+      setImageSelectionMessage(`已选择超过 200 张图片。当前最多分析前 200 张。完整分析将在下一阶段接入。`);
+    } else {
+      setImageSelectionMessage(`已选择 ${count} 张图片。多选图片导入入口已准备好，分析接入将在下一阶段完成。当前不会显示真实文件名或路径。`);
     }
   };
 
@@ -371,6 +446,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleLoadDemoClick = () => {
     setErrorMessage(null);
+    setImageSelectionMessage(null);
     setIsStarting('demo');
     if (onStatusChange) {
       onStatusChange('正在准备本地项目');
@@ -438,6 +514,16 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         className="hidden"
       />
 
+      {/* Hidden File Input for Web Image Selection */}
+      <input
+        type="file"
+        ref={webImageInputRef}
+        onChange={handleWebImageChange}
+        multiple
+        accept="image/*"
+        className="hidden"
+      />
+
       {/* Left/Right Two Columns Content */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 my-auto">
         {/* Left Column: Action area & basic intro */}
@@ -465,36 +551,113 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+          {/* Action Cards Grid */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              {/* Card 1: 选择文件夹 */}
               {isTauri ? (
-                <button
-                  onClick={handleSelectFolderNativeClick}
-                  disabled={isStarting !== 'none'}
-                  className="desktop-button-primary space-x-2 text-xs py-3 px-5 shadow-sm shrink-0 border border-emerald-500/30 hover:border-emerald-400/50"
+                <div
+                  onClick={() => {
+                    if (isStarting === 'none') {
+                      handleSelectFolderNativeClick();
+                    }
+                  }}
+                  className={`bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] border border-[var(--dt-border)] hover:border-emerald-500/30 rounded-lg p-4 cursor-pointer transition-all flex flex-col justify-between min-h-[110px] group relative ${isStarting !== 'none' ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
                 >
-                  <FolderOpen className="w-4 h-4 text-emerald-300" />
-                  <span>桌面端选择文件夹</span>
-                </button>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[var(--dt-text-primary)]">
+                      <FolderOpen className="w-4 h-4 text-emerald-400 group-hover:text-emerald-300" />
+                      <span>选择文件夹</span>
+                    </div>
+                    <p className="text-[10px] text-[var(--dt-text-secondary)] leading-relaxed">
+                      扫描整个文件夹内的照片进行整理
+                    </p>
+                  </div>
+                  <div className="text-[9px] text-[var(--dt-text-faint)] font-mono mt-2">
+                    自动检测子文件夹 | 限 {getEffectiveNativeBatchLimit()} 张
+                  </div>
+                </div>
               ) : (
-                <button
-                  onClick={handleSelectFolderClick}
-                  disabled={isStarting !== 'none'}
-                  className="desktop-button-primary space-x-2 text-xs py-3 px-5 shadow-sm shrink-0"
+                <div
+                  onClick={() => {
+                    if (isStarting === 'none') {
+                      handleSelectFolderClick();
+                    }
+                  }}
+                  className={`bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] border border-[var(--dt-border)] hover:border-emerald-500/30 rounded-lg p-4 cursor-pointer transition-all flex flex-col justify-between min-h-[110px] group relative ${isStarting !== 'none' ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
                 >
-                  <FolderOpen className="w-4 h-4" />
-                  <span>{isStarting === 'upload' ? '准备导入...' : '选择本地照片文件夹'}</span>
-                </button>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[var(--dt-text-primary)]">
+                      <FolderOpen className="w-4 h-4 text-emerald-400 group-hover:text-emerald-300" />
+                      <span>选择文件夹</span>
+                    </div>
+                    <p className="text-[10px] text-[var(--dt-text-secondary)] leading-relaxed">
+                      选择本地照片文件夹，支持多选导入
+                    </p>
+                  </div>
+                  <div className="text-[9px] text-[var(--dt-text-faint)] font-mono mt-2">
+                    限 200 张
+                  </div>
+                </div>
               )}
-              
+
+              {/* Card 2: 选择图片 */}
+              {isTauri ? (
+                <div
+                  onClick={() => {
+                    if (isStarting === 'none') {
+                      handleSelectImagesNativeClick();
+                    }
+                  }}
+                  className={`bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] border border-[var(--dt-border)] hover:border-sky-500/30 rounded-lg p-4 cursor-pointer transition-all flex flex-col justify-between min-h-[110px] group relative ${isStarting !== 'none' ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[var(--dt-text-primary)]">
+                      <ImageIcon className="w-4 h-4 text-sky-400 group-hover:text-sky-300" />
+                      <span>选择图片</span>
+                    </div>
+                    <p className="text-[10px] text-[var(--dt-text-secondary)] leading-relaxed">
+                      手动选择一批照片进行筛选
+                    </p>
+                  </div>
+                  <div className="text-[9px] text-[var(--dt-text-faint)] font-mono mt-2">
+                    当前最多分析 200 张
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => {
+                    if (isStarting === 'none') {
+                      webImageInputRef.current?.click();
+                    }
+                  }}
+                  className={`bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] border border-[var(--dt-border)] hover:border-sky-500/30 rounded-lg p-4 cursor-pointer transition-all flex flex-col justify-between min-h-[110px] group relative ${isStarting !== 'none' ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[var(--dt-text-primary)]">
+                      <ImageIcon className="w-4 h-4 text-sky-400 group-hover:text-sky-300" />
+                      <span>选择图片</span>
+                    </div>
+                    <p className="text-[10px] text-[var(--dt-text-secondary)] leading-relaxed">
+                      手动选择一批照片进行筛选
+                    </p>
+                  </div>
+                  <div className="text-[9px] text-[var(--dt-text-faint)] font-mono mt-2">
+                    当前最多分析 200 张
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Load Demo */}
+            <div className="pt-1">
               <button
                 onClick={handleLoadDemoClick}
                 disabled={isStarting !== 'none'}
-                className="desktop-button-secondary space-x-2 text-xs py-3 px-5 shrink-0"
+                className="desktop-button-secondary space-x-2 text-xs py-2.5 px-4 shrink-0 rounded"
               >
                 <span>{isStarting === 'demo' ? '正在载入 Demo...' : '载入 Demo 项目'}</span>
-                {isStarting !== 'demo' && <ArrowRight className="w-4 h-4 text-[var(--dt-text-secondary)]" />}
+                {isStarting !== 'demo' && <ArrowRight className="w-4 h-4 text-[var(--dt-text-secondary)] inline-block align-middle ml-1" />}
               </button>
             </div>
 
@@ -594,6 +757,25 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                       <p>💡 暂未开始分析，后续会接入本地整理流程。</p>
                     </>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Image picked summary banner */}
+            {imageSelectionMessage && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3.5 rounded-lg text-xs space-y-1.5 max-w-sm">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>已选择图片导入</span>
+                </div>
+                
+                <div className="bg-black/20 p-2.5 rounded border border-emerald-500/10 text-[10.5px] font-mono text-[var(--dt-text-secondary)] leading-relaxed">
+                  {imageSelectionMessage}
+                </div>
+
+                <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-emerald-500/10 space-y-1">
+                  <p>💡 多选图片导入将在下一阶段接入分析流程。</p>
+                  <p>💡 遵循极严的隐私边界保护，当前不会显示真实文件名或路径。</p>
                 </div>
               </div>
             )}
