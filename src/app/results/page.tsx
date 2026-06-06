@@ -574,9 +574,6 @@ export default function ResultsPage() {
     setLastDecisionAction(null);
 
     setToastMessage("已撤销最近一次整理调整。");
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
   }, [lastDecisionAction, contextUpdateMultiplePhotosStatus]);
 
   // 当照片集更新时，自动过滤掉已不存在的照片 ID，确保选择状态的安全与一致性
@@ -593,6 +590,15 @@ export default function ResultsPage() {
 
   // 全局轻量提示
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Toast 自动关闭效果，3秒内自动消失，组件卸载或消息变更时清理定时器防止内存泄漏
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => {
+      setToastMessage(null);
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
 
   // 左图的缩放与平移状态
   const [leftScale, setLeftScale] = useState(1);
@@ -670,13 +676,9 @@ export default function ResultsPage() {
       const isBattleCompleted = activeBattle.nextIndex >= activeBattle.contenderIds.length;
       if (isBattleCompleted) {
         isTransitioningRef.current = true;
-        setToastMessage("A/B 对比已完成，结果已更新。");
-        const timer = setTimeout(() => {
-          setToastMessage(null);
-        }, 3000);
+        setToastMessage("A/B 对局已完成，结果已更新。");
         handleCloseBattleWithAnimation();
         isTransitioningRef.current = false;
-        return () => clearTimeout(timer);
       }
     }
   }, [activeBattle, handleCloseBattleWithAnimation]);
@@ -2477,36 +2479,39 @@ export default function ResultsPage() {
       {(previewPhoto || isAnimateIn) && (
         <div 
           className={cn(
-            "fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-400 ease-out select-none",
+            "fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-start justify-center p-4 pt-16 transition-all duration-400 ease-out select-none",
             isAnimateIn ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
           onClick={closePreviewModal}
         >
-          {/* Centered Modal Card Box */}
+          {/* Centered Modal Card Box with safety top spacing */}
           <div 
             className={cn(
-              "w-[85vw] h-[82vh] max-w-7xl max-h-[85vh] bg-[#12161A]/95 border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden relative transition-all duration-400 ease-out",
+              "w-[85vw] h-[78vh] max-w-7xl max-h-[78vh] bg-[#12161A]/95 border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden relative transition-all duration-400 ease-out",
               isAnimateIn ? "scale-100" : "scale-95"
             )}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Title bar (desensitized name) */}
+            {/* Title bar with Close button moved to the left to avoid system X overlap */}
             <div 
               className="h-12 bg-black/40 border-b border-white/5 flex items-center justify-between px-6 shrink-0 z-10"
             >
-              <span className="text-xs font-bold text-[var(--dt-text-primary)]">
-                {previewPhoto ? getPhotoDisplayName(previewPhoto) : ""}
-              </span>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={closePreviewModal}
+                  className="text-[var(--dt-text-soft)] hover:text-white bg-transparent border-0 cursor-pointer p-1.5 rounded-full hover:bg-white/5 transition-all flex items-center justify-center"
+                  title="关闭预览 (Esc)"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+                <span className="text-xs font-bold text-[var(--dt-text-primary)]">
+                  {previewPhoto ? getPhotoDisplayName(previewPhoto) : ""}
+                </span>
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">
                   滚轮缩放 ({previewScale.toFixed(1)}x) • 拖动平移 • 双击重置
                 </span>
-                <button 
-                  onClick={closePreviewModal}
-                  className="text-[var(--dt-text-soft)] hover:text-white bg-transparent border-0 cursor-pointer p-1 rounded-full hover:bg-white/5 transition-all"
-                >
-                  <X className="h-5 w-5" />
-                </button>
               </div>
             </div>
 
