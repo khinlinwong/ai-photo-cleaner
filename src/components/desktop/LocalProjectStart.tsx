@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePhotoWorkspace } from '@/context/PhotoWorkspaceContext';
-import { FolderOpen, ArrowRight, ShieldCheck, Cpu, Trash2, Clock, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { FolderOpen, ArrowRight, ShieldCheck, Clock, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import {
   getRecentLocalProjects,
   saveRecentLocalProject,
@@ -775,54 +775,40 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             </p>
           </div>
 
-          {/* Short privacy statement */}
-          <div className="text-[10px] text-[var(--dt-text-secondary)] flex items-center space-x-1.5 opacity-80 pt-2 border-t border-[var(--dt-border)] max-w-sm">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#6FA887] shrink-0" />
-            <span>默认在本地处理原图，联网 AI 默认关闭。</span>
-          </div>
-        </div>
-
-        {/* Right Column: Recents & Details */}
-        <div className="md:col-span-5 space-y-6">
-          {/* Recent projects */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
-                <Clock className="w-3.5 h-3.5" />
-                <span>最近照片项目</span>
-              </h3>
-              {recentProjects.length > 0 && (
+          {/* Recent projects in left column */}
+          {recentProjects.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-[var(--dt-border)] max-w-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>最近照片项目</span>
+                </h3>
                 <button
+                  type="button"
                   onClick={() => setIsConfirmingClearAll(true)}
                   className="text-[9px] text-[var(--dt-text-muted)] hover:text-red-400 font-semibold transition-colors"
                 >
                   清空摘要列表
                 </button>
-              )}
-            </div>
-            
-            {recentProjects.length === 0 ? (
-              <div className="border border-dashed border-white/10 rounded-lg p-6 text-center text-[10px] text-[var(--dt-text-faint)]">
-                最近项目只记录项目名称、数量和整理进度摘要。原图保持在您的电脑中，不会被上传或改动。
               </div>
-            ) : (
-              <div className="space-y-2 max-h-[220px] overflow-y-auto scrollbar-thin pr-1">
+              
+              <div className="space-y-1.5 max-h-[120px] overflow-y-auto scrollbar-thin pr-1">
                 {recentProjects.map((project) => (
                   <div 
                     key={project.projectId} 
-                    className="bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] transition-colors p-3 rounded-lg flex items-center justify-between cursor-pointer border border-[var(--dt-border)] group"
+                    className="bg-[var(--dt-card-bg)] hover:bg-[var(--dt-card-hover-bg)] transition-colors p-2 rounded flex items-center justify-between cursor-pointer border border-[var(--dt-border)] group"
                     onClick={() => setSelectedProjectForReassociate(project)}
                   >
                     <div className="truncate pr-2 flex-1">
                       <div className="text-xs font-semibold text-[var(--dt-text-primary)] truncate">{project.projectName}</div>
-                      <div className="text-[9px] text-[var(--dt-text-secondary)] truncate font-mono mt-1 flex items-center gap-2">
+                      <div className="text-[9px] text-[var(--dt-text-secondary)] truncate font-mono mt-0.5 flex items-center gap-2">
                         <span>共 {project.photoCount} 张</span>
                         <span>•</span>
                         <span>{project.createdAt}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <div className="text-[9px] text-[var(--dt-text-muted)] font-mono text-right">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-[9px] text-[var(--dt-text-muted)] font-mono text-right mr-1.5">
                         {project.keepCount > 0 || project.cullCount > 0 ? (
                           <span className="text-[#6FA887]">已整理</span>
                         ) : (
@@ -830,6 +816,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                         )}
                       </div>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setProjectToRemove(project);
@@ -837,71 +824,52 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                         className="text-[9px] text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity font-medium px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20"
                         title="移除摘要"
                       >
-                        移除摘要
+                        移除
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Security & Privacy card */}
-          <div className="space-y-2.5">
-            <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
-              <ShieldCheck className="w-3.5 h-3.5 text-[var(--dt-text-secondary)]" />
-              <span>安全与隐私保护</span>
-            </h3>
-            <div className="bg-[var(--dt-panel-bg)] p-3.5 space-y-3 rounded-lg text-xs border border-[var(--dt-border)]">
-              <div className="flex items-start space-x-2.5">
-                <ShieldCheck className="w-4 h-4 text-[#6FA887] shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-[var(--dt-text-primary)] text-xs block">默认本地处理</span>
-                  <span className="text-[var(--dt-text-secondary)] text-[10px] leading-relaxed block mt-0.5">
-                    默认在本地处理原图，联网 AI 默认关闭。
-                  </span>
-                </div>
+          {/* Security & Privacy card in left column */}
+          <div className="space-y-2 pt-2 border-t border-[var(--dt-border)] max-w-sm">
+            <div className="bg-[var(--dt-panel-bg)] p-3 rounded border border-[var(--dt-border)] space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--dt-text-primary)]">
+                <ShieldCheck className="w-4 h-4 text-[#6FA887] shrink-0" />
+                <span>安全与隐私声明</span>
               </div>
-
-              <div className="flex items-start space-x-2.5">
-                <Cpu className="w-4 h-4 text-[#6F8FA8] shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-[var(--dt-text-primary)] text-xs block">联网 AI 默认关闭</span>
-                  <span className="text-[var(--dt-text-secondary)] text-[10px] leading-relaxed block mt-0.5">
-                    高级语义识别等联网功能默认关闭，仅在您手动授权后使用。
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-2.5">
-                <Trash2 className="w-4 h-4 text-[#B89A58] shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-[var(--dt-text-primary)] text-xs block">淘汰候选仅代表整理建议</span>
-                  <span className="text-[var(--dt-text-secondary)] text-[10px] leading-relaxed block mt-0.5">
-                    淘汰候选仅代表整理建议，原图保持不变，在您最终确认并导出时绝不被直接物理修改。
-                  </span>
-                </div>
-              </div>
+              <p className="text-[10px] text-[var(--dt-text-secondary)] leading-relaxed">
+                默认在本地处理照片，联网 AI 默认关闭。淘汰候选仅代表整理建议，在最终确认并导出前绝不被直接物理修改，原图保持不变。
+              </p>
             </div>
           </div>
+        </div>
 
-          {/* Selected resource preview card */}
-          {(isScanning || previews.length > 0) && (
-            <div className="space-y-2.5 animate-card-pop">
-              <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
-                <FolderOpen className="w-3.5 h-3.5 text-[var(--dt-text-secondary)]" />
-                <span>已选资源预览</span>
-              </h3>
-              <div className="bg-[var(--dt-panel-bg)] p-3.5 rounded-lg border border-[var(--dt-border)] space-y-3 max-h-[300px] overflow-y-auto scrollbar-thin">
-                <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-400">
+        {/* Right Column: Previews Only */}
+        <div className="md:col-span-5 flex flex-col h-full">
+          <div className="space-y-2.5 flex-1 flex flex-col h-full">
+            <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
+              <FolderOpen className="w-3.5 h-3.5 text-[var(--dt-text-secondary)]" />
+              <span>已选资源预览</span>
+            </h3>
+
+            {!(isScanning || previews.length > 0) ? (
+              <div className="flex-1 min-h-[300px] border border-dashed border-white/10 rounded-lg p-6 flex flex-col items-center justify-center text-center text-[10px] text-[var(--dt-text-faint)]">
+                选择文件夹或图片后，这里会显示本地预览。
+              </div>
+            ) : (
+              <div className="bg-[var(--dt-panel-bg)] p-3.5 rounded-lg border border-[var(--dt-border)] flex-1 flex flex-col min-h-[400px] max-h-[520px] animate-card-pop">
+                <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-400 mb-2">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>
                     {selectedMode === 'folder' ? '已授权本地文件夹' : '已选择本地图片'}
                   </span>
                 </div>
-                
+
                 {isScanning && (
-                  <div className="flex items-center gap-2 py-1 text-[10px] text-[var(--dt-text-secondary)] animate-pulse">
+                  <div className="flex items-center gap-2 py-1.5 text-[10px] text-[var(--dt-text-secondary)] animate-pulse">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -911,7 +879,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 )}
 
                 {!isScanning && scanSummary && (
-                  <div className="bg-[#101217] p-2.5 rounded border border-[var(--dt-border)] space-y-2 text-[10.5px] font-mono text-[var(--dt-text-secondary)]">
+                  <div className="bg-[#101217] p-2.5 rounded border border-[var(--dt-border)] space-y-2 text-[10.5px] font-mono text-[var(--dt-text-secondary)] mb-2">
                     <div className="space-y-1">
                       <div>发现图片：<span className="text-emerald-400 font-bold">{scanSummary.imageFilesCount} 张</span></div>
                       <div>文件总数：<span className="text-[var(--dt-text-primary)]">{scanSummary.totalFiles} 个</span></div>
@@ -923,42 +891,44 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 )}
 
                 {!isScanning && previews.length > 0 && (
-                  <div className="space-y-2 mt-2 pt-2 border-t border-[var(--dt-border)]">
-                    <div className="flex items-center justify-between text-[10.5px]">
+                  <div className="flex-1 flex flex-col min-h-0 border-t border-[var(--dt-border)] pt-2">
+                    <div className="flex items-center justify-between text-[10.5px] mb-1.5">
                       <span className="font-bold text-[var(--dt-text-primary)]">本地预览</span>
                       <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 {getEffectiveNativeBatchLimit()} 张</span>
                     </div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {previews.map((item, idx) => (
-                        <div key={item.id} className="relative aspect-square rounded overflow-hidden bg-[#101217] border border-[var(--dt-border)] group">
-                          <img
-                            src={item.previewUrl}
-                            alt={`Preview ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1 text-[8px] font-mono text-[var(--dt-text-primary)] leading-tight">
-                            <div>{(item.sizeBytes / (1024 * 1024)).toFixed(1)}M</div>
-                            <div className="uppercase text-[7px] text-[var(--dt-text-soft)]">{item.extension}</div>
+                    <div className="flex-1 overflow-y-auto scrollbar-thin pr-1 max-h-[320px]">
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {previews.map((item, idx) => (
+                          <div key={item.id} className="relative aspect-square rounded overflow-hidden bg-[#101217] border border-[var(--dt-border)] group">
+                            <img
+                              src={item.previewUrl}
+                              alt={`Preview ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1 text-[8px] font-mono text-[var(--dt-text-primary)] leading-tight">
+                              <div>{(item.sizeBytes / (1024 * 1024)).toFixed(1)}M</div>
+                              <div className="uppercase text-[7px] text-[var(--dt-text-soft)]">{item.extension}</div>
+                            </div>
+                            <div className="absolute top-0.5 left-0.5 bg-black/65 px-1 rounded-[3px] text-[8px] font-mono text-[var(--dt-text-primary)] leading-none py-0.5">
+                              {String(idx + 1).padStart(2, '0')}
+                            </div>
                           </div>
-                          <div className="absolute top-0.5 left-0.5 bg-black/65 px-1 rounded-[3px] text-[8px] font-mono text-[var(--dt-text-primary)] leading-none py-0.5">
-                            {String(idx + 1).padStart(2, '0')}
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-[var(--dt-border)] space-y-1">
+                <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-2 border-t border-[var(--dt-border)] space-y-1 mt-auto">
                   <p>💡 原图保持不变，不上传云端。</p>
                   <p>💡 路径与文件名仅在本地读取时临时载入，不做任何物理保存。</p>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
