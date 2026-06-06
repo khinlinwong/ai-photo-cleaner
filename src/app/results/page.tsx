@@ -239,7 +239,8 @@ export default function ResultsPage() {
     analysisProgress,
     isNativeProcessingCancelled,
     skippedCount,
-    failedCount
+    failedCount,
+    nativeSourceMode
   } = usePhotoWorkspace();
 
   interface UndoAction {
@@ -1339,18 +1340,32 @@ export default function ResultsPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {hasNativeSource && (
-                        <button
-                          onClick={() => setPhysicalOrgDialogOpen(true)}
-                          className="desktop-button-primary text-[10px] py-1.5 h-8 flex items-center gap-1.5 font-bold"
-                        >
-                          本地整理输出
-                        </button>
+                        nativeSourceMode === 'selected-files' ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              disabled={true}
+                              className="desktop-button-primary text-[10px] py-1.5 h-8 opacity-40 cursor-not-allowed flex items-center gap-1.5 font-bold shrink-0"
+                            >
+                              本地整理输出
+                            </button>
+                            <span className="text-[10px] text-amber-400/90 bg-amber-500/5 px-2.5 py-1 rounded border border-amber-500/10 font-medium">
+                              💡 桌面端多选图片模式暂不支持本地物理整理，功能将在后续版本中支持。您可以先导出整理清单。
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setPhysicalOrgDialogOpen(true)}
+                            className="desktop-button-primary text-[10px] py-1.5 h-8 flex items-center gap-1.5 font-bold"
+                          >
+                            本地整理输出
+                          </button>
+                        )
                       )}
                       <button
                         onClick={handleRestart}
                         className="desktop-button-secondary text-[10px] py-1.5 h-8 flex items-center gap-1.5 font-bold shrink-0 border border-[var(--dt-border)]"
                       >
-                        重新选择文件夹
+                        {nativeSourceMode === 'selected-files' ? "重新选择图片" : "重新选择文件夹"}
                       </button>
                     </div>
                   </div>
