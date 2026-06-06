@@ -755,7 +755,11 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 type="button"
                 onClick={handleStartAnalysisClick}
                 disabled={isStarting !== 'none' || previews.length === 0}
-                className="desktop-button-primary space-x-2 text-xs py-2.5 px-5 shrink-0 rounded animate-fade-in"
+                className={
+                  previews.length === 0
+                    ? 'desktop-button-secondary space-x-2 text-xs py-2.5 px-5 shrink-0 rounded opacity-40 cursor-not-allowed inline-flex items-center justify-center font-semibold'
+                    : 'desktop-button-cta space-x-2 text-xs py-2.5 px-5 shrink-0 rounded inline-flex items-center justify-center font-semibold animate-fade-in text-[#0E1612]'
+                }
               >
                 <span>{isStarting === 'upload' ? '正在准备分析...' : '开始本地分析'}</span>
                 {isStarting !== 'upload' && <ArrowRight className="w-4 h-4 inline-block align-middle ml-1" />}
@@ -856,11 +860,11 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             </h3>
 
             {!(isScanning || previews.length > 0) ? (
-              <div className="flex-1 min-h-[300px] border border-dashed border-white/10 rounded-lg p-6 flex flex-col items-center justify-center text-center text-[10px] text-[var(--dt-text-faint)]">
+              <div className="h-[540px] md:h-[calc(100vh-270px)] min-h-[520px] max-h-[640px] border border-dashed border-white/10 rounded-lg p-6 flex flex-col items-center justify-center text-center text-[10px] text-[var(--dt-text-faint)]">
                 选择文件夹或图片后，这里会显示本地预览。
               </div>
             ) : (
-              <div className="bg-[var(--dt-panel-bg)] p-3.5 rounded-lg border border-[var(--dt-border)] flex-1 flex flex-col min-h-[400px] max-h-[520px] animate-card-pop">
+              <div className="bg-[var(--dt-panel-bg)] p-3.5 rounded-lg border border-[var(--dt-border)] flex flex-col h-[540px] md:h-[calc(100vh-270px)] min-h-[520px] max-h-[640px] animate-card-pop">
                 <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-400 mb-2">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>
@@ -896,7 +900,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                       <span className="font-bold text-[var(--dt-text-primary)]">本地预览</span>
                       <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 {getEffectiveNativeBatchLimit()} 张</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto scrollbar-thin pr-1 max-h-[320px]">
+                    <div className="flex-1 overflow-y-auto scrollbar-thin pr-1">
                       <div className="grid grid-cols-4 gap-1.5">
                         {previews.map((item, idx) => (
                           <div key={item.id} className="relative aspect-square rounded overflow-hidden bg-[#101217] border border-[var(--dt-border)] group">
