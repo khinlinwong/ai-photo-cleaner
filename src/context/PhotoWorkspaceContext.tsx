@@ -670,10 +670,12 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
 
   const [isNativeProcessingCancelled, setIsNativeProcessingCancelled] = useState(false);
   const isCancelledRef = useRef(false);
+  const activeRunIdRef = useRef<string | null>(null);
 
   const cancelNativeProcessing = () => {
     setIsNativeProcessingCancelled(true);
     isCancelledRef.current = true;
+    activeRunIdRef.current = null; // Invalidate the current active run
     setAnalysisLogs((prev) => [...prev, '🛑 收到停止指令，正在停止分析队列...']);
   };
 
@@ -1257,6 +1259,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     resetNativeProcessingCancelState();
     isAnalyzingRef.current = true;
 
+    // Generate unique session ID for this analysis run
+    const runId = `run-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    activeRunIdRef.current = runId;
+
     let currentPhotos = [...photos];
     if (currentPhotos.length === 0) {
       // 兼容机制：如果为空，默认填充 6 张旅行照片
@@ -1278,8 +1284,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setAnalysisLogs((prev) => [...prev, '⚡ 正在初始化本地扫描计算模块...']);
 
     for (let i = 0; i < total; i++) {
-      if (isCancelledRef.current) {
-        setAnalysisLogs((prev) => [...prev, '🛑 停止分析：后续图片分析已被用户中止。']);
+      if (isCancelledRef.current || activeRunIdRef.current !== runId) {
+        if (isCancelledRef.current) {
+          setAnalysisLogs((prev) => [...prev, '🛑 停止分析：后续图片分析已被用户中止。']);
+        }
         for (let j = i; j < total; j++) {
           updatedPhotos[j] = {
             ...updatedPhotos[j],
@@ -1308,9 +1316,21 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
           // 运行真实 Canvas 分析
           const res = await analyzeImage(photo.file);
           
-          // 对接 UI 结构：
-          // blurValue 在结果页代表模糊度（0-100，高代表越模糊），故用 100 - sharpnessScore 映射
-          // exposureValue 在结果页为偏离值（-100到100，负代表欠曝，正代表过曝，0代表完美）
+          // Guard check after await
+          if (activeRunIdRef.current !== runId) return;
+          if (isCancelledRef.current) {
+            for (let j = i; j < total; j++) {
+              updatedPhotos[j] = {
+                ...updatedPhotos[j],
+                status: 'keep',
+                resolution: '未分析',
+                category: '已跳过',
+                reasonLabel: '分析已被中止，未进行质量检测'
+              };
+            }
+            break;
+          }
+
           const blurValue = 100 - res.sharpnessScore;
           const exposureValue = Math.round((res.averageBrightness - 127) * (100 / 127));
 
@@ -1347,6 +1367,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
             `  ✓ 综合得分: ${res.qualityScore} | 清晰度: ${res.sharpnessScore} | 亮度偏差: ${exposureValue > 0 ? '+' : ''}${exposureValue}`
           ]);
         } catch (err: unknown) {
+          if (activeRunIdRef.current !== runId) return;
           const errMsg = err instanceof Error ? err.message : '文件损坏或解析错误';
           setAnalysisLogs((prev) => [
             ...prev,
@@ -1377,8 +1398,39 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
           try {
             // 串行读取二进制字节流
             const { readNativePreviewBytes } = await import('@/lib/desktop/nativeReader');
+            
+            // Guard check after dynamic import await
+            if (activeRunIdRef.current !== runId) return;
+            if (isCancelledRef.current) {
+              for (let j = i; j < total; j++) {
+                updatedPhotos[j] = {
+                  ...updatedPhotos[j],
+                  status: 'keep',
+                  resolution: '未分析',
+                  category: '已跳过',
+                  reasonLabel: '分析已被中止，未进行质量检测'
+                };
+              }
+              break;
+            }
+
             const bytes = await readNativePreviewBytes(photo.id);
             
+            // Guard check after reading bytes await
+            if (activeRunIdRef.current !== runId) return;
+            if (isCancelledRef.current) {
+              for (let j = i; j < total; j++) {
+                updatedPhotos[j] = {
+                  ...updatedPhotos[j],
+                  status: 'keep',
+                  resolution: '未分析',
+                  category: '已跳过',
+                  reasonLabel: '分析已被中止，未进行质量检测'
+                };
+              }
+              break;
+            }
+
             if (!bytes) {
               throw new Error('安全拒绝：文件大小超过 15MB 限制或读取失败。');
             }
@@ -1390,6 +1442,21 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
             // analyzeImageFromBlob
             const res = await analyzeImageFromBlob(blob);
             
+            // Guard check after analyzing blob await
+            if (activeRunIdRef.current !== runId) return;
+            if (isCancelledRef.current) {
+              for (let j = i; j < total; j++) {
+                updatedPhotos[j] = {
+                  ...updatedPhotos[j],
+                  status: 'keep',
+                  resolution: '未分析',
+                  category: '已跳过',
+                  reasonLabel: '分析已被中止，未进行质量检测'
+                };
+              }
+              break;
+            }
+
             const blurValue = 100 - res.sharpnessScore;
             const exposureValue = Math.round((res.averageBrightness - 127) * (100 / 127));
 
@@ -1426,6 +1493,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
               `  ✓ 综合得分: ${res.qualityScore} | 清晰度: ${res.sharpnessScore} | 亮度偏差: ${exposureValue > 0 ? '+' : ''}${exposureValue}`
             ]);
           } catch (err: unknown) {
+            if (activeRunIdRef.current !== runId) return;
             const errMsg = err instanceof Error ? err.message : '读取失败';
             setAnalysisLogs((prev) => [
               ...prev,
@@ -1449,6 +1517,21 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         // 安全降级：对于 Demo 外链图片，使用预存的分析参数以防止 Canvas CORS 报错
         await new Promise((resolve) => setTimeout(resolve, 800)); // 模拟异步加载
         
+        // Guard check after timeout await
+        if (activeRunIdRef.current !== runId) return;
+        if (isCancelledRef.current) {
+          for (let j = i; j < total; j++) {
+            updatedPhotos[j] = {
+              ...updatedPhotos[j],
+              status: 'keep',
+              resolution: '未分析',
+              category: '已跳过',
+              reasonLabel: '分析已被中止，未进行质量检测'
+            };
+          }
+          break;
+        }
+
         const demoMatch = MOCK_TRAVEL_PHOTOS.find((m) => m.name === photo.name) || MOCK_TRAVEL_PHOTOS[0];
         
         let focusStatus:
@@ -1501,6 +1584,11 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       setAnalysisProgress(percentEnd);
     }
 
+    // Final guard checks before writing states
+    if (activeRunIdRef.current !== runId) {
+      return;
+    }
+
     setAnalysisLogs((prev) => [
       ...prev,
       isCancelledRef.current ? '🛑 本地扫描分析已停止！' : '✅ 本地扫描分析已完成！'
@@ -1512,6 +1600,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
 
     // 延时跳转，提供更好的交互感知
     setTimeout(() => {
+      // Guard check inside timeout
+      if (activeRunIdRef.current !== runId) {
+        return;
+      }
       setIsAnalyzing(false);
       isAnalyzingRef.current = false;
       const isSuccess = updatedPhotos.some(p => p.resolution !== '待分析' && p.resolution !== '格式不支持' && p.resolution !== '读取失败');
@@ -1574,6 +1666,9 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     if (typeof window !== 'undefined') {
       window.sessionStorage.removeItem('ab_auto_opened');
     }
+    isCancelledRef.current = true;
+    activeRunIdRef.current = null;
+    
     photos.forEach(p => revokeBlobUrl(p.url));
     setPhotos([]);
     setSimilarGroups([]);

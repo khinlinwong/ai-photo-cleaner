@@ -615,7 +615,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       />
 
       {/* Left/Right Two Columns Content */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 my-auto">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start my-auto">
         {/* Left Column: Action area & basic intro */}
         <div className="md:col-span-7 flex flex-col justify-center space-y-6">
           <div className="space-y-3">
@@ -852,8 +852,8 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         </div>
 
         {/* Right Column: Previews Only */}
-        <div className="md:col-span-5 flex flex-col h-full">
-          <div className="space-y-2.5 flex-1 flex flex-col h-full">
+        <div className="md:col-span-5 flex flex-col">
+          <div className="space-y-2.5 flex flex-col">
             <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
               <FolderOpen className="w-3.5 h-3.5 text-[var(--dt-text-secondary)]" />
               <span>已选资源预览</span>
@@ -864,7 +864,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 选择文件夹或图片后，这里会显示本地预览。
               </div>
             ) : (
-              <div className="bg-[var(--dt-panel-bg)] p-3.5 rounded-lg border border-[var(--dt-border)] flex flex-col h-[540px] md:h-[calc(100vh-270px)] min-h-[520px] max-h-[640px] animate-card-pop">
+              <div className="bg-[var(--dt-panel-bg)] p-3.5 rounded-lg border border-[var(--dt-border)] flex flex-col min-h-[520px] h-auto animate-card-pop">
                 <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-400 mb-2">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>
@@ -895,12 +895,12 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 )}
 
                 {!isScanning && previews.length > 0 && (
-                  <div className="flex-1 flex flex-col min-h-0 border-t border-[var(--dt-border)] pt-2">
-                    <div className="flex items-center justify-between text-[10.5px] mb-1.5">
+                  <div className="border-t border-[var(--dt-border)] pt-2.5 mb-3">
+                    <div className="flex items-center justify-between text-[10.5px] mb-2">
                       <span className="font-bold text-[var(--dt-text-primary)]">本地预览</span>
                       <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 {getEffectiveNativeBatchLimit()} 张</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto scrollbar-thin pr-1">
+                    <div>
                       <div className="grid grid-cols-4 gap-1.5">
                         {previews.map((item, idx) => (
                           <div key={item.id} className="relative aspect-square rounded overflow-hidden bg-[#101217] border border-[var(--dt-border)] group">
