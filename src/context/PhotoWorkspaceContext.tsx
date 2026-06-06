@@ -1281,168 +1281,43 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     const updatedPhotos = [...currentPhotos];
     const total = updatedPhotos.length;
 
-    setAnalysisLogs((prev) => [...prev, '⚡ 正在初始化本地扫描计算模块...']);
+    try {
+      setAnalysisLogs((prev) => [...prev, '⚡ 正在初始化本地扫描计算模块...']);
 
-    for (let i = 0; i < total; i++) {
-      if (isCancelledRef.current || activeRunIdRef.current !== runId) {
-        if (isCancelledRef.current) {
-          setAnalysisLogs((prev) => [...prev, '🛑 停止分析：后续图片分析已被用户中止。']);
-        }
-        for (let j = i; j < total; j++) {
-          updatedPhotos[j] = {
-            ...updatedPhotos[j],
-            status: 'keep',
-            resolution: '未分析',
-            category: '已跳过',
-            reasonLabel: '分析已被中止，未进行质量检测'
-          };
-        }
-        break;
-      }
-      const photo = updatedPhotos[i];
-      const percentEnd = Math.round(((i + 1) / total) * 100);
-      
-      setCurrentAnalysisIndex(i);
-      setCurrentAnalysisName(photo.name);
-
-      // 日志输出
-      setAnalysisLogs((prev) => [
-        ...prev,
-        `⚙️ 正在读取并分析第 ${i + 1}/${total} 张图片: ${photo.name}...`
-      ]);
-
-      if (photo.file) {
-        try {
-          // 运行真实 Canvas 分析
-          const res = await analyzeImage(photo.file);
-          
-          // Guard check after await
-          if (activeRunIdRef.current !== runId) return;
+      for (let i = 0; i < total; i++) {
+        if (isCancelledRef.current || activeRunIdRef.current !== runId) {
           if (isCancelledRef.current) {
-            for (let j = i; j < total; j++) {
-              updatedPhotos[j] = {
-                ...updatedPhotos[j],
-                status: 'keep',
-                resolution: '未分析',
-                category: '已跳过',
-                reasonLabel: '分析已被中止，未进行质量检测'
-              };
-            }
-            break;
+            setAnalysisLogs((prev) => [...prev, '🛑 停止分析：后续图片分析已被用户中止。']);
           }
-
-          const blurValue = 100 - res.sharpnessScore;
-          const exposureValue = Math.round((res.averageBrightness - 127) * (100 / 127));
-
-          let category = '标准曝光';
-          if (res.averageBrightness > 170) {
-            category = '高对比亮光';
-          } else if (res.averageBrightness < 80) {
-            category = '夜景/暗光';
+          for (let j = i; j < total; j++) {
+            updatedPhotos[j] = {
+              ...updatedPhotos[j],
+              status: 'keep',
+              resolution: '未分析',
+              category: '已跳过',
+              reasonLabel: '分析已被中止，未进行质量检测'
+            };
           }
-
-          updatedPhotos[i] = {
-            ...photo,
-            status: res.status,
-            issue: res.issue,
-            score: res.qualityScore,
-            blurValue,
-            exposureValue,
-            resolution: `${res.width} × ${res.height}`,
-            category,
-            sharpnessScore: res.sharpnessScore,
-            exposureScore: res.exposureScore,
-            focusStatus: res.focusStatus,
-            perceptualHash: res.perceptualHash,
-            exposureSeverity: res.exposureSeverity,
-            technicalRiskFlags: res.technicalRiskFlags,
-            confidence: res.confidence,
-            suggestedStatus: res.suggestedStatus,
-            displayLabel: res.displayLabel,
-            reasonLabel: res.reasonLabel
-          };
-
-          setAnalysisLogs((prev) => [
-            ...prev,
-            `  ✓ 综合得分: ${res.qualityScore} | 清晰度: ${res.sharpnessScore} | 亮度偏差: ${exposureValue > 0 ? '+' : ''}${exposureValue}`
-          ]);
-        } catch (err: unknown) {
-          if (activeRunIdRef.current !== runId) return;
-          const errMsg = err instanceof Error ? err.message : '文件损坏或解析错误';
-          setAnalysisLogs((prev) => [
-            ...prev,
-            `  ❌ 像素读取失败: ${errMsg}`
-          ]);
+          break;
         }
-      } else if (photo.sourceType === 'native-folder-preview') {
-        const ext = (photo.extension || '').toLowerCase();
+        const photo = updatedPhotos[i];
+        const percentEnd = Math.round(((i + 1) / total) * 100);
         
-        // HEIC / HEIF 跳过策略
-        if (ext === 'heic' || ext === 'heif') {
-          setAnalysisLogs((prev) => [
-            ...prev,
-            `  ⚠️ 跳过不支持的格式 (HEIC/HEIF): ${photo.name}`
-          ]);
-          setSkippedCount((prev) => prev + 1);
-          
-          updatedPhotos[i] = {
-            ...photo,
-            status: 'keep',
-            issue: 'good',
-            score: 0,
-            resolution: '格式不支持',
-            category: '已跳过',
-            reasonLabel: '文件格式不支持 (HEIC/HEIF)，已跳过处理'
-          };
-        } else {
+        setCurrentAnalysisIndex(i);
+        setCurrentAnalysisName(photo.name);
+
+        // 日志输出
+        setAnalysisLogs((prev) => [
+          ...prev,
+          `⚙️ 正在读取并分析第 ${i + 1}/${total} 张图片: ${photo.name}...`
+        ]);
+
+        if (photo.file) {
           try {
-            // 串行读取二进制字节流
-            const { readNativePreviewBytes } = await import('@/lib/desktop/nativeReader');
+            // 运行真实 Canvas 分析
+            const res = await analyzeImage(photo.file);
             
-            // Guard check after dynamic import await
-            if (activeRunIdRef.current !== runId) return;
-            if (isCancelledRef.current) {
-              for (let j = i; j < total; j++) {
-                updatedPhotos[j] = {
-                  ...updatedPhotos[j],
-                  status: 'keep',
-                  resolution: '未分析',
-                  category: '已跳过',
-                  reasonLabel: '分析已被中止，未进行质量检测'
-                };
-              }
-              break;
-            }
-
-            const bytes = await readNativePreviewBytes(photo.id);
-            
-            // Guard check after reading bytes await
-            if (activeRunIdRef.current !== runId) return;
-            if (isCancelledRef.current) {
-              for (let j = i; j < total; j++) {
-                updatedPhotos[j] = {
-                  ...updatedPhotos[j],
-                  status: 'keep',
-                  resolution: '未分析',
-                  category: '已跳过',
-                  reasonLabel: '分析已被中止，未进行质量检测'
-                };
-              }
-              break;
-            }
-
-            if (!bytes) {
-              throw new Error('安全拒绝：文件大小超过 15MB 限制或读取失败。');
-            }
-            
-            // bytes -> Blob
-            const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-            const blob = new Blob([bytes as unknown as BlobPart], { type: mimeType });
-            
-            // analyzeImageFromBlob
-            const res = await analyzeImageFromBlob(blob);
-            
-            // Guard check after analyzing blob await
+            // Guard check after await
             if (activeRunIdRef.current !== runId) return;
             if (isCancelledRef.current) {
               for (let j = i; j < total; j++) {
@@ -1494,123 +1369,256 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
             ]);
           } catch (err: unknown) {
             if (activeRunIdRef.current !== runId) return;
-            const errMsg = err instanceof Error ? err.message : '读取失败';
+            const errMsg = err instanceof Error ? err.message : '文件损坏或解析错误';
             setAnalysisLogs((prev) => [
               ...prev,
               `  ❌ 像素读取失败: ${errMsg}`
             ]);
-            setFailedCount((prev) => prev + 1);
+          }
+        } else if (photo.sourceType === 'native-folder-preview') {
+          const ext = (photo.extension || '').toLowerCase();
+          
+          // HEIC / HEIF 跳过策略
+          if (ext === 'heic' || ext === 'heif') {
+            setAnalysisLogs((prev) => [
+              ...prev,
+              `  ⚠️ 跳过不支持的格式 (HEIC/HEIF): ${photo.name}`
+            ]);
+            setSkippedCount((prev) => prev + 1);
             
-            // 失败时安全跳过，状态保持默认 keep
             updatedPhotos[i] = {
               ...photo,
               status: 'keep',
-              issue: 'needs_review',
+              issue: 'good',
               score: 0,
-              resolution: '读取失败',
+              resolution: '格式不支持',
               category: '已跳过',
-              reasonLabel: `本地读取或分析失败: ${errMsg}`
+              reasonLabel: '文件格式不支持 (HEIC/HEIF)，已跳过处理'
             };
-          }
-        }
-      } else {
-        // 安全降级：对于 Demo 外链图片，使用预存的分析参数以防止 Canvas CORS 报错
-        await new Promise((resolve) => setTimeout(resolve, 800)); // 模拟异步加载
-        
-        // Guard check after timeout await
-        if (activeRunIdRef.current !== runId) return;
-        if (isCancelledRef.current) {
-          for (let j = i; j < total; j++) {
-            updatedPhotos[j] = {
-              ...updatedPhotos[j],
-              status: 'keep',
-              resolution: '未分析',
-              category: '已跳过',
-              reasonLabel: '分析已被中止，未进行质量检测'
-            };
-          }
-          break;
-        }
+          } else {
+            try {
+              // 串行读取二进制字节流
+              const { readNativePreviewBytes } = await import('@/lib/desktop/nativeReader');
+              
+              // Guard check after dynamic import await
+              if (activeRunIdRef.current !== runId) return;
+              if (isCancelledRef.current) {
+                for (let j = i; j < total; j++) {
+                  updatedPhotos[j] = {
+                    ...updatedPhotos[j],
+                    status: 'keep',
+                    resolution: '未分析',
+                    category: '已跳过',
+                    reasonLabel: '分析已被中止，未进行质量检测'
+                  };
+                }
+                break;
+              }
 
-        const demoMatch = MOCK_TRAVEL_PHOTOS.find((m) => m.name === photo.name) || MOCK_TRAVEL_PHOTOS[0];
-        
-        let focusStatus:
-          | 'Excellent / Share-ready'
-          | 'Acceptable / Casual use'
-          | 'Soft Focus Detected'
-          | 'Directional Blur Detected'
-          | 'Motion Blur Detected'
-          | 'Edge Smear Detected'
-          | 'Insufficient Subject Sharpness'
-          | 'Not recommended' = 'Acceptable / Casual use';
+              const bytes = await readNativePreviewBytes(photo.id);
+              
+              // Guard check after reading bytes await
+              if (activeRunIdRef.current !== runId) return;
+              if (isCancelledRef.current) {
+                for (let j = i; j < total; j++) {
+                  updatedPhotos[j] = {
+                    ...updatedPhotos[j],
+                    status: 'keep',
+                    resolution: '未分析',
+                    category: '已跳过',
+                    reasonLabel: '分析已被中止，未进行质量检测'
+                  };
+                }
+                break;
+              }
 
-        if (demoMatch.sharpnessScore >= 85) {
-          focusStatus = 'Excellent / Share-ready';
-        } else if (demoMatch.sharpnessScore >= 60) {
-          focusStatus = 'Acceptable / Casual use';
-        } else if (demoMatch.sharpnessScore >= 40) {
-          focusStatus = 'Soft Focus Detected';
+              if (!bytes) {
+                throw new Error('安全拒绝：文件大小超过 15MB 限制或读取失败。');
+              }
+              
+              // bytes -> Blob
+              const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+              const blob = new Blob([bytes as unknown as BlobPart], { type: mimeType });
+              
+              // analyzeImageFromBlob
+              const res = await analyzeImageFromBlob(blob);
+              
+              // Guard check after analyzing blob await
+              if (activeRunIdRef.current !== runId) return;
+              if (isCancelledRef.current) {
+                for (let j = i; j < total; j++) {
+                  updatedPhotos[j] = {
+                    ...updatedPhotos[j],
+                    status: 'keep',
+                    resolution: '未分析',
+                    category: '已跳过',
+                    reasonLabel: '分析已被中止，未进行质量检测'
+                  };
+                }
+                break;
+              }
+
+              const blurValue = 100 - res.sharpnessScore;
+              const exposureValue = Math.round((res.averageBrightness - 127) * (100 / 127));
+
+              let category = '标准曝光';
+              if (res.averageBrightness > 170) {
+                category = '高对比亮光';
+              } else if (res.averageBrightness < 80) {
+                category = '夜景/暗光';
+              }
+
+              updatedPhotos[i] = {
+                ...photo,
+                status: res.status,
+                issue: res.issue,
+                score: res.qualityScore,
+                blurValue,
+                exposureValue,
+                resolution: `${res.width} × ${res.height}`,
+                category,
+                sharpnessScore: res.sharpnessScore,
+                exposureScore: res.exposureScore,
+                focusStatus: res.focusStatus,
+                perceptualHash: res.perceptualHash,
+                exposureSeverity: res.exposureSeverity,
+                technicalRiskFlags: res.technicalRiskFlags,
+                confidence: res.confidence,
+                suggestedStatus: res.suggestedStatus,
+                displayLabel: res.displayLabel,
+                reasonLabel: res.reasonLabel
+              };
+
+              setAnalysisLogs((prev) => [
+                ...prev,
+                `  ✓ 综合得分: ${res.qualityScore} | 清晰度: ${res.sharpnessScore} | 亮度偏差: ${exposureValue > 0 ? '+' : ''}${exposureValue}`
+              ]);
+            } catch (err: unknown) {
+              if (activeRunIdRef.current !== runId) return;
+              const errMsg = err instanceof Error ? err.message : '读取失败';
+              setAnalysisLogs((prev) => [
+                ...prev,
+                `  ❌ 像素读取失败: ${errMsg}`
+              ]);
+              setFailedCount((prev) => prev + 1);
+              
+              // 失败时安全跳过，状态保持默认 keep
+              updatedPhotos[i] = {
+                ...photo,
+                status: 'keep',
+                issue: 'needs_review',
+                score: 0,
+                resolution: '读取失败',
+                category: '已跳过',
+                reasonLabel: `本地读取或分析失败: ${errMsg}`
+              };
+            }
+          }
         } else {
-          focusStatus = demoMatch.name.includes('Blur') ? 'Motion Blur Detected' : 'Not recommended';
+          // 安全降级：对于 Demo 外链图片，使用预存的分析参数以防止 Canvas CORS 报错
+          await new Promise((resolve) => setTimeout(resolve, 800)); // 模拟异步加载
+          
+          // Guard check after timeout await
+          if (activeRunIdRef.current !== runId) return;
+          if (isCancelledRef.current) {
+            for (let j = i; j < total; j++) {
+              updatedPhotos[j] = {
+                ...updatedPhotos[j],
+                status: 'keep',
+                resolution: '未分析',
+                category: '已跳过',
+                reasonLabel: '分析已被中止，未进行质量检测'
+              };
+            }
+            break;
+          }
+
+          const demoMatch = MOCK_TRAVEL_PHOTOS.find((m) => m.name === photo.name) || MOCK_TRAVEL_PHOTOS[0];
+          
+          let focusStatus:
+            | 'Excellent / Share-ready'
+            | 'Acceptable / Casual use'
+            | 'Soft Focus Detected'
+            | 'Directional Blur Detected'
+            | 'Motion Blur Detected'
+            | 'Edge Smear Detected'
+            | 'Insufficient Subject Sharpness'
+            | 'Not recommended' = 'Acceptable / Casual use';
+
+          if (demoMatch.sharpnessScore >= 85) {
+            focusStatus = 'Excellent / Share-ready';
+          } else if (demoMatch.sharpnessScore >= 60) {
+            focusStatus = 'Acceptable / Casual use';
+          } else if (demoMatch.sharpnessScore >= 40) {
+            focusStatus = 'Soft Focus Detected';
+          } else {
+            focusStatus = demoMatch.name.includes('Blur') ? 'Motion Blur Detected' : 'Not recommended';
+          }
+
+          updatedPhotos[i] = {
+            ...photo,
+            status: demoMatch.status,
+            issue: demoMatch.issue,
+            score: demoMatch.score,
+            blurValue: demoMatch.blurValue,
+            exposureValue: demoMatch.exposureValue,
+            resolution: demoMatch.resolution,
+            category: demoMatch.category,
+            sharpnessScore: demoMatch.sharpnessScore,
+            exposureScore: demoMatch.exposureScore,
+            focusStatus,
+            perceptualHash: demoMatch.perceptualHash,
+            exposureSeverity: demoMatch.exposureSeverity,
+            technicalRiskFlags: demoMatch.technicalRiskFlags,
+            confidence: demoMatch.confidence,
+            suggestedStatus: demoMatch.suggestedStatus,
+            displayLabel: demoMatch.displayLabel,
+            reasonLabel: demoMatch.reasonLabel
+          };
+
+          setAnalysisLogs((prev) => [
+            ...prev,
+            `  ✓ 分析完毕: 得分 ${demoMatch.score} (已加载预置旅行报告)`
+          ]);
         }
 
-        updatedPhotos[i] = {
-          ...photo,
-          status: demoMatch.status,
-          issue: demoMatch.issue,
-          score: demoMatch.score,
-          blurValue: demoMatch.blurValue,
-          exposureValue: demoMatch.exposureValue,
-          resolution: demoMatch.resolution,
-          category: demoMatch.category,
-          sharpnessScore: demoMatch.sharpnessScore,
-          exposureScore: demoMatch.exposureScore,
-          focusStatus,
-          perceptualHash: demoMatch.perceptualHash,
-          exposureSeverity: demoMatch.exposureSeverity,
-          technicalRiskFlags: demoMatch.technicalRiskFlags,
-          confidence: demoMatch.confidence,
-          suggestedStatus: demoMatch.suggestedStatus,
-          displayLabel: demoMatch.displayLabel,
-          reasonLabel: demoMatch.reasonLabel
-        };
-
-        setAnalysisLogs((prev) => [
-          ...prev,
-          `  ✓ 分析完毕: 得分 ${demoMatch.score} (已加载预置旅行报告)`
-        ]);
+        setAnalysisProgress(percentEnd);
       }
 
-      setAnalysisProgress(percentEnd);
-    }
-
-    // Final guard checks before writing states
-    if (activeRunIdRef.current !== runId) {
-      return;
-    }
-
-    setAnalysisLogs((prev) => [
-      ...prev,
-      isCancelledRef.current ? '🛑 本地扫描分析已停止！' : '✅ 本地扫描分析已完成！'
-    ]);
-    const finalPhotos = detectDuplicates(updatedPhotos);
-    setPhotos(finalPhotos);
-    runDuplicateQA(finalPhotos);
-    initializeSimilarGroups(finalPhotos);
-
-    // 延时跳转，提供更好的交互感知
-    setTimeout(() => {
-      // Guard check inside timeout
+      // Final guard checks before writing states
       if (activeRunIdRef.current !== runId) {
         return;
       }
-      setIsAnalyzing(false);
-      isAnalyzingRef.current = false;
-      const isSuccess = updatedPhotos.some(p => p.resolution !== '待分析' && p.resolution !== '格式不支持' && p.resolution !== '读取失败');
-      if (isSuccess && !isCancelledRef.current) {
+
+      setAnalysisLogs((prev) => [
+        ...prev,
+        isCancelledRef.current ? '🛑 本地扫描分析已停止！' : '✅ 本地扫描分析已完成！'
+      ]);
+      const finalPhotos = detectDuplicates(updatedPhotos);
+      setPhotos(finalPhotos);
+      runDuplicateQA(finalPhotos);
+      initializeSimilarGroups(finalPhotos);
+
+      // 延时跳转，提供更好的交互感知
+      if (!isCancelledRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        // Guard check inside timeout
+        if (activeRunIdRef.current !== runId || isCancelledRef.current) {
+          return;
+        }
         router.push('/results');
       }
-    }, 1200);
+    } finally {
+      // 统一在 finally 里重置分析状态，且支持并行会话防护
+      if (activeRunIdRef.current === runId) {
+        setIsAnalyzing(false);
+        isAnalyzingRef.current = false;
+        activeRunIdRef.current = null;
+      } else if (activeRunIdRef.current === null) {
+        setIsAnalyzing(false);
+        isAnalyzingRef.current = false;
+      }
+    }
   };
 
   // 切换保留/删除状态
