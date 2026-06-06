@@ -84,12 +84,31 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   // 桌面端状态
   const [isTauri, setIsTauri] = useState(false);
-  const [pickedFolder, setPickedFolder] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanSummary, setScanSummary] = useState<NativeFolderMetadataSummary | null>(null);
   const [previews, setPreviews] = useState<NativeImagePreviewItem[]>([]);
-  const [imageSelectionMessage, setImageSelectionMessage] = useState<string | null>(null);
+  const [selectedMode, setSelectedMode] = useState<'folder' | 'selected-files' | null>(null);
+  const [selectedWebFiles, setSelectedWebFiles] = useState<File[]>([]);
 
+  const clearWebPreviews = (items: NativeImagePreviewItem[]) => {
+    items.forEach(item => {
+      if (item.previewUrl && item.previewUrl.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(item.previewUrl);
+        } catch {
+          // ignore
+        }
+      }
+    });
+  };
+
+  const resetSelectionStates = () => {
+    clearWebPreviews(previews);
+    setScanSummary(null);
+    setPreviews([]);
+    setSelectedMode(null);
+    setSelectedWebFiles([]);
+  };
 
   // 稳定性防护相关 Refs 与 timeouts
   const activeFocusListenerRef = useRef<(() => void) | null>(null);
@@ -136,15 +155,11 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   };
 
   const handleSelectFolderNativeClick = async () => {
-    setErrorMessage(null);
-    setPickedFolder(null);
-    setScanSummary(null);
-    setPreviews([]);
-    setImageSelectionMessage(null);
+    resetSelectionStates();
     try {
       const res = await pickNativeImageFolder();
       if (res && res.path) {
-        setPickedFolder(res.path);
+        setSelectedMode('folder');
         if (onStatusChange) {
           onStatusChange(`已选文件夹: ${getFolderBasename(res.path)}`);
         }
@@ -184,11 +199,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   };
 
   const handleSelectImagesNativeClick = async () => {
-    setErrorMessage(null);
-    setPickedFolder(null);
-    setScanSummary(null);
-    setPreviews([]);
-    setImageSelectionMessage(null);
+    resetSelectionStates();
 
     try {
       const { open } = await import('@tauri-apps/plugin-dialog');
@@ -221,8 +232,15 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
           
           if (scanResult) {
             if (scanResult.items && scanResult.items.length > 0) {
-              const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
-              startNativeFolderAnalysis(scanResult.items, projName, 'selected-files');
+              setPreviews(scanResult.items);
+              setSelectedMode('selected-files');
+              setScanSummary({
+                folderName: '已选择文件',
+                imageFilesCount: scanResult.items.length,
+                totalFiles: paths.length,
+                unsupportedFilesCount: paths.length - scanResult.items.length,
+                totalSizeBytes: scanResult.items.reduce((sum, item) => sum + item.sizeBytes, 0)
+              });
             } else {
               // 2. Rust 返回 0 个可用 preview
               setErrorMessage('未找到可用图片，请重新选择。');
@@ -259,7 +277,6 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleRelinkSelectClick = (project: LocalProjectSummary) => {
     setRelinkingProject(project);
-    setImageSelectionMessage(null);
     if (relinkFileInputRef.current) {
       relinkFileInputRef.current.value = '';
     }
@@ -278,7 +295,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
     relinkFileInputRef.current?.click();
 
-    // 监听 window focus 来检测系统文件对话框的取消行为
+    // 监听 window focus 来检测系统文件对话框 of 取消行为
     const handleWindowFocus = () => {
       if (activeFocusListenerRef.current) {
         window.removeEventListener('focus', activeFocusListenerRef.current);
@@ -344,52 +361,39 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       return;
     }
 
-    setErrorMessage(null);
-    setImageSelectionMessage(null);
+    resetSelectionStates();
 
     try {
-      // 创建新项目流程
-      setIsStarting('upload');
-      if (onStatusChange) {
-        onStatusChange('正在准备本地项目');
-      }
-      const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
-      const summary: LocalProjectSummary = {
-        projectId: createProjectId(),
-        projectName: projName,
-        createdAt: new Date().toLocaleString('zh-CN'),
-        updatedAt: new Date().toLocaleString('zh-CN'),
-        photoCount: imgFiles.length,
-        keepCount: 0,
-        cullCount: 0,
-        similarGroupCount: 0,
-        battleCompleted: 0,
-        battleTotal: 0,
-        fileFingerprints: createFileFingerprints(imgFiles)
-      };
-      saveRecentLocalProject(summary);
-      uploadFiles(imgFiles, projName);
+      setSelectedMode('folder');
+      setSelectedWebFiles(imgFiles);
+
+      // Generate previews
+      const webPreviews = imgFiles.slice(0, 200).map((file, idx) => ({
+        id: `web-preview-${idx}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        previewUrl: URL.createObjectURL(file),
+        extension: file.name.split('.').pop() || '',
+        sizeBytes: file.size
+      }));
+      setPreviews(webPreviews);
+
+      // Generate scan summary for uniform UI
+      const totalSize = imgFiles.reduce((acc, f) => acc + f.size, 0);
+      setScanSummary({
+        folderName: '已选择文件夹',
+        imageFilesCount: imgFiles.length,
+        totalFiles: files.length,
+        unsupportedFilesCount: files.length - imgFiles.length,
+        totalSizeBytes: totalSize
+      });
     } catch (err) {
       console.error('File import error:', err);
-      if (isMountedRef.current) {
-        setErrorMessage('导入失败，请重新选择图片。');
-        setIsStarting('none');
-        if (onStatusChange) {
-          onStatusChange('等待选择本地文件夹');
-        }
-      }
+      setErrorMessage('导入失败，请重新选择图片。');
     }
   };
 
   const handleWebImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
-
-    setErrorMessage(null);
-    setPickedFolder(null);
-    setScanSummary(null);
-    setPreviews([]);
-    setImageSelectionMessage(null);
 
     if (files.length === 0) return;
 
@@ -400,12 +404,33 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       return;
     }
 
-    const X = imgFiles.length;
-    const Y = Math.min(X, 200);
-    if (X > 200) {
-      setImageSelectionMessage(`已选择超过 200 张图片。当前最多准备前 200 张。已准备 ${Y} 张可预览图片。当前最多分析 200 张。分析接入将在下一阶段完成。`);
-    } else {
-      setImageSelectionMessage(`已选择 ${X} 张图片。已准备 ${Y} 张可预览图片. 当前最多分析 200 张。分析接入将在下一阶段完成。`);
+    resetSelectionStates();
+
+    try {
+      setSelectedMode('selected-files');
+      setSelectedWebFiles(imgFiles);
+
+      // Generate previews
+      const webPreviews = imgFiles.slice(0, 200).map((file, idx) => ({
+        id: `web-preview-${idx}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        previewUrl: URL.createObjectURL(file),
+        extension: file.name.split('.').pop() || '',
+        sizeBytes: file.size
+      }));
+      setPreviews(webPreviews);
+
+      // Generate scan summary for uniform UI
+      const totalSize = imgFiles.reduce((acc, f) => acc + f.size, 0);
+      setScanSummary({
+        folderName: '已选择文件',
+        imageFilesCount: imgFiles.length,
+        totalFiles: files.length,
+        unsupportedFilesCount: files.length - imgFiles.length,
+        totalSizeBytes: totalSize
+      });
+    } catch (err) {
+      console.error('File import error:', err);
+      setErrorMessage('导入失败，请重新选择图片。');
     }
   };
 
@@ -463,7 +488,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
 
   const handleLoadDemoClick = () => {
     setErrorMessage(null);
-    setImageSelectionMessage(null);
+    resetSelectionStates();
     setIsStarting('demo');
     if (onStatusChange) {
       onStatusChange('正在准备本地项目');
@@ -498,6 +523,54 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
           onStatusChange('等待选择本地文件夹');
         }
       }
+    }
+  };
+
+  const handleStartAnalysisClick = () => {
+    if (isStarting !== 'none' || previews.length === 0) return;
+
+    const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
+
+    if (isTauri) {
+      setIsStarting('upload');
+      if (onStatusChange) {
+        onStatusChange('正在准备本地项目');
+      }
+      const summary: LocalProjectSummary = {
+        projectId: createProjectId(),
+        projectName: projName,
+        createdAt: new Date().toLocaleString('zh-CN'),
+        updatedAt: new Date().toLocaleString('zh-CN'),
+        photoCount: previews.length,
+        keepCount: 0,
+        cullCount: 0,
+        similarGroupCount: 0,
+        battleCompleted: 0,
+        battleTotal: 0,
+        fileFingerprints: []
+      };
+      saveRecentLocalProject(summary);
+      startNativeFolderAnalysis(previews, projName, selectedMode || 'folder');
+    } else {
+      setIsStarting('upload');
+      if (onStatusChange) {
+        onStatusChange('正在准备本地项目');
+      }
+      const summary: LocalProjectSummary = {
+        projectId: createProjectId(),
+        projectName: projName,
+        createdAt: new Date().toLocaleString('zh-CN'),
+        updatedAt: new Date().toLocaleString('zh-CN'),
+        photoCount: selectedWebFiles.length,
+        keepCount: 0,
+        cullCount: 0,
+        similarGroupCount: 0,
+        battleCompleted: 0,
+        battleTotal: 0,
+        fileFingerprints: createFileFingerprints(selectedWebFiles)
+      };
+      saveRecentLocalProject(summary);
+      uploadFiles(selectedWebFiles, projName);
     }
   };
 
@@ -666,9 +739,10 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               )}
             </div>
 
-            {/* Load Demo */}
-            <div className="pt-1">
+            {/* Load Demo & Start Local Analysis */}
+            <div className="flex flex-wrap gap-3 pt-1">
               <button
+                type="button"
                 onClick={handleLoadDemoClick}
                 disabled={isStarting !== 'none'}
                 className="desktop-button-secondary space-x-2 text-xs py-2.5 px-4 shrink-0 rounded"
@@ -676,126 +750,17 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                 <span>{isStarting === 'demo' ? '正在载入 Demo...' : '载入 Demo 项目'}</span>
                 {isStarting !== 'demo' && <ArrowRight className="w-4 h-4 text-[var(--dt-text-secondary)] inline-block align-middle ml-1" />}
               </button>
+
+              <button
+                type="button"
+                onClick={handleStartAnalysisClick}
+                disabled={isStarting !== 'none' || previews.length === 0}
+                className="desktop-button-primary space-x-2 text-xs py-2.5 px-5 shrink-0 rounded animate-fade-in"
+              >
+                <span>{isStarting === 'upload' ? '正在准备分析...' : '开始本地分析'}</span>
+                {isStarting !== 'upload' && <ArrowRight className="w-4 h-4 inline-block align-middle ml-1" />}
+              </button>
             </div>
-
-            {/* Folder picked summary banner */}
-            {pickedFolder && (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3.5 rounded-lg text-xs space-y-1.5 max-w-sm">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>已选择并授权本地文件夹</span>
-                </div>
-                <p className="text-[10.5px] text-[var(--dt-text-primary)] font-semibold truncate">
-                  已选择文件夹：{getFolderBasename(pickedFolder)}
-                </p>
-                
-                {isScanning && (
-                  <div className="flex items-center gap-2 py-1 text-[10px] text-[var(--dt-text-secondary)] animate-pulse">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span>正在扫描文件夹元数据...</span>
-                  </div>
-                )}
-
-                {!isScanning && scanSummary && (
-                  <div className="bg-black/20 p-2.5 rounded border border-emerald-500/10 space-y-2 text-[10.5px] font-mono text-[var(--dt-text-secondary)]">
-                    <div className="space-y-1">
-                      <div>发现图片：<span className="text-emerald-400 font-bold">{scanSummary.imageFilesCount} 张</span></div>
-                      <div>文件总数：<span className="text-[var(--dt-text-primary)]">{scanSummary.totalFiles} 个</span></div>
-                      <div>其他 / 不支持文件：<span>{scanSummary.unsupportedFilesCount} 个</span></div>
-                      <div>图片总大小：<span className="text-[var(--dt-text-primary)] font-bold">{formatBytes(scanSummary.totalSizeBytes)}</span></div>
-                      <div>支持格式：<span className="text-[var(--dt-text-soft)]">JPG / PNG / WEBP / HEIC / HEIF</span></div>
-                    </div>
-                  </div>
-                )}
-
-                {!isScanning && previews.length > 0 && (
-                  <div className="space-y-2 mt-2 pt-2 border-t border-emerald-500/10">
-                    <div className="flex items-center justify-between text-[10.5px]">
-                      <span className="font-bold text-[var(--dt-text-primary)]">本地预览</span>
-                      <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 {getEffectiveNativeBatchLimit()} 张</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {previews.map((item, idx) => (
-                        <div key={item.id} className="relative aspect-square rounded overflow-hidden bg-black/35 border border-white/5 group">
-                          <img
-                            src={item.previewUrl}
-                            alt={`Preview ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1 text-[8px] font-mono text-[var(--dt-text-primary)] leading-tight">
-                            <div>{(item.sizeBytes / (1024 * 1024)).toFixed(1)}M</div>
-                            <div className="uppercase text-[7px] text-[var(--dt-text-soft)]">{item.extension}</div>
-                          </div>
-                          <div className="absolute top-0.5 left-0.5 bg-black/65 px-1 rounded-[3px] text-[8px] font-mono text-[var(--dt-text-primary)] leading-none py-0.5">
-                            {String(idx + 1).padStart(2, '0')}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <p className="text-[9px] text-[var(--dt-text-secondary)] leading-normal">
-                  完整路径仅在本次授权中临时使用，不会保存。
-                </p>
-
-                {!isScanning && previews.length > 0 && (
-                  <div className="pt-2.5 border-t border-emerald-500/10">
-                    <button
-                      onClick={() => {
-                        const projName = projectName.trim() || defaultNamePlaceholder || getDefaultProjectName();
-                        startNativeFolderAnalysis(previews, projName);
-                      }}
-                      className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold py-2 px-4 rounded text-xs transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                      开始本地分析
-                    </button>
-                  </div>
-                )}
-
-                <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-emerald-500/10 space-y-1">
-                  {!isScanning && previews.length > 0 ? (
-                    <>
-                      <p>💡 已可进行本地预览与小批量分析。</p>
-                      <p>💡 当前最多分析 {getEffectiveNativeBatchLimit()} 张。</p>
-                      <p>💡 原图保持不变，不上传云端。</p>
-                      <p>💡 整理结果页接入将在下一步完成。</p>
-                    </>
-                  ) : (
-                    <>
-                      <p>💡 本轮仅扫描文件夹第一层元数据，暂未读取图片内容。</p>
-                      <p>💡 暂未开始分析，后续会接入本地整理流程。</p>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Image picked summary banner */}
-            {imageSelectionMessage && (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3.5 rounded-lg text-xs space-y-1.5 max-w-sm">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>已选择图片导入</span>
-                </div>
-                
-                <div className="bg-black/20 p-2.5 rounded border border-emerald-500/10 text-[10.5px] font-mono text-[var(--dt-text-secondary)] leading-relaxed">
-                  {imageSelectionMessage}
-                </div>
-
-                <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-emerald-500/10 space-y-1">
-                  <p>💡 多选图片导入将在下一阶段接入分析流程。</p>
-                  <p>💡 遵循极严的隐私边界保护，当前不会显示真实文件名或路径。</p>
-                </div>
-              </div>
-            )}
 
             {/* Error Message */}
             {errorMessage && (
@@ -919,6 +884,81 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               </div>
             </div>
           </div>
+
+          {/* Selected resource preview card */}
+          {(isScanning || previews.length > 0) && (
+            <div className="space-y-2.5 animate-card-pop">
+              <h3 className="text-[11px] font-bold text-[var(--dt-text-secondary)] uppercase tracking-wider flex items-center space-x-1.5 font-mono">
+                <FolderOpen className="w-3.5 h-3.5 text-[var(--dt-text-secondary)]" />
+                <span>已选资源预览</span>
+              </h3>
+              <div className="bg-[var(--dt-panel-bg)] p-3.5 rounded-lg border border-[var(--dt-border)] space-y-3 max-h-[300px] overflow-y-auto scrollbar-thin">
+                <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>
+                    {selectedMode === 'folder' ? '已授权本地文件夹' : '已选择本地图片'}
+                  </span>
+                </div>
+                
+                {isScanning && (
+                  <div className="flex items-center gap-2 py-1 text-[10px] text-[var(--dt-text-secondary)] animate-pulse">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>正在扫描文件夹元数据...</span>
+                  </div>
+                )}
+
+                {!isScanning && scanSummary && (
+                  <div className="bg-[#101217] p-2.5 rounded border border-[var(--dt-border)] space-y-2 text-[10.5px] font-mono text-[var(--dt-text-secondary)]">
+                    <div className="space-y-1">
+                      <div>发现图片：<span className="text-emerald-400 font-bold">{scanSummary.imageFilesCount} 张</span></div>
+                      <div>文件总数：<span className="text-[var(--dt-text-primary)]">{scanSummary.totalFiles} 个</span></div>
+                      <div>其他 / 不支持文件：<span>{scanSummary.unsupportedFilesCount} 个</span></div>
+                      <div>图片总大小：<span className="text-[var(--dt-text-primary)] font-bold">{formatBytes(scanSummary.totalSizeBytes)}</span></div>
+                      <div>支持格式：<span className="text-[var(--dt-text-soft)]">JPG / PNG / WEBP / HEIC / HEIF</span></div>
+                    </div>
+                  </div>
+                )}
+
+                {!isScanning && previews.length > 0 && (
+                  <div className="space-y-2 mt-2 pt-2 border-t border-[var(--dt-border)]">
+                    <div className="flex items-center justify-between text-[10.5px]">
+                      <span className="font-bold text-[var(--dt-text-primary)]">本地预览</span>
+                      <span className="text-[9px] text-[var(--dt-text-secondary)]">不上传云端 | 限 {getEffectiveNativeBatchLimit()} 张</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {previews.map((item, idx) => (
+                        <div key={item.id} className="relative aspect-square rounded overflow-hidden bg-[#101217] border border-[var(--dt-border)] group">
+                          <img
+                            src={item.previewUrl}
+                            alt={`Preview ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1 text-[8px] font-mono text-[var(--dt-text-primary)] leading-tight">
+                            <div>{(item.sizeBytes / (1024 * 1024)).toFixed(1)}M</div>
+                            <div className="uppercase text-[7px] text-[var(--dt-text-soft)]">{item.extension}</div>
+                          </div>
+                          <div className="absolute top-0.5 left-0.5 bg-black/65 px-1 rounded-[3px] text-[8px] font-mono text-[var(--dt-text-primary)] leading-none py-0.5">
+                            {String(idx + 1).padStart(2, '0')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-[10px] text-[var(--dt-text-soft)] leading-normal pt-1.5 border-t border-[var(--dt-border)] space-y-1">
+                  <p>💡 原图保持不变，不上传云端。</p>
+                  <p>💡 路径与文件名仅在本地读取时临时载入，不做任何物理保存。</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
