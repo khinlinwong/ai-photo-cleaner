@@ -2479,7 +2479,7 @@ export default function ResultsPage() {
       {(previewPhoto || isAnimateIn) && (
         <div 
           className={cn(
-            "fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-start justify-center p-4 pt-16 transition-all duration-400 ease-out select-none",
+            "fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-start justify-center p-4 pt-20 transition-all duration-400 ease-out select-none",
             isAnimateIn ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
           onClick={closePreviewModal}
@@ -2492,26 +2492,27 @@ export default function ResultsPage() {
             )}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Title bar with Close button moved to the left to avoid system X overlap */}
+            {/* Title bar with Close button on the right, filename and guide on the left */}
             <div 
               className="h-12 bg-black/40 border-b border-white/5 flex items-center justify-between px-6 shrink-0 z-10"
             >
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={closePreviewModal}
-                  className="text-[var(--dt-text-soft)] hover:text-white bg-transparent border-0 cursor-pointer p-1.5 rounded-full hover:bg-white/5 transition-all flex items-center justify-center"
-                  title="关闭预览 (Esc)"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+              <div className="flex items-center gap-3">
                 <span className="text-xs font-bold text-[var(--dt-text-primary)]">
                   {previewPhoto ? getPhotoDisplayName(previewPhoto) : ""}
                 </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline">
+                <span className="text-[10px] text-[var(--dt-text-soft)] hidden sm:inline-block border-l border-white/10 pl-3">
                   滚轮缩放 ({previewScale.toFixed(1)}x) • 拖动平移 • 双击重置
                 </span>
+              </div>
+              <div>
+                <button 
+                  onClick={closePreviewModal}
+                  className="px-4 py-1.5 bg-[#B96F68] hover:bg-[#B96F68]/90 text-white text-xs font-bold rounded-md border border-red-500/10 shadow-lg flex items-center gap-1 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  title="关闭预览 (Esc / 点击外部)"
+                >
+                  <span>关闭预览</span>
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             </div>
 
