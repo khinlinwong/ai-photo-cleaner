@@ -8,7 +8,7 @@
   1. 用户通过 **Windows 设置 -> 应用 -> 安装的应用** 或 **控制面板** 卸载时，卸载完成后应彻底结束并关闭窗口，绝不能自动拉起安装程序。
   2. 用户双击运行同一个 `setup.exe` 覆盖安装或更新时，应明确提示是覆盖安装/修复/重新安装，而不是在执行完旧版本卸载后，在不经用户二次确认的情况下直接静默开始全新安装，甚至误触发卸载与安装的死循环。
 
-本方案旨在通过只读审计 Tauri v2 的打包配置，分析导致此现象的深层原因，设计一套完全依托 Tauri 官方配置及 NSIS 脚本规范的安全修复方案。
+本方案旨在通过只读审计 Tauri v2 的打包配置，分析导致此现象的深层原因，修正方案中的设计风险，并规划后续的手动复现矩阵。
 
 ---
 
@@ -27,7 +27,13 @@
    - 项目**完全使用 Tauri 默认的 NSIS 模板与内置逻辑**进行打包。
    - 未指定任何自定义 NSIS 模板（`template` 字段为空）。
    - 未指定任何安装器钩子（`installerHooks` 字段为空）。
-   - 未配置 `installMode`，因此默认采用 `perUser` 模式（安装至 `%LOCALAPPDATA%`，无需管理员权限）。
+   - 未配置 `installMode`，因此默认采用 `currentUser` 模式（安装至 `%LOCALAPPDATA%`，无需管理员权限）。
+
+### NSIS 安装模式说明：
+- `currentUser`：当前用户安装，默认安装到 `%LOCALAPPDATA%` 且不需要管理员权限。
+- `perMachine`：系统级安装，安装到 `Program Files`，通常涉及 UAC 管理员权限提升。
+- `both`：在安装时允许用户选择安装范围。
+- **配置规范**：当前项目如果要先做最小风险修复，应优先评估 `currentUser`。具体配置字段及其有效性必须以当前项目实际使用的 Tauri v2 / cargo-packager schema 为准。
 
 ---
 
@@ -40,40 +46,44 @@ Tauri 默认生成的 NSIS 脚本包含一个预设机制：**当用户运行 `s
 - **逻辑盲区**：如果用户双击运行 `setup.exe` 的本意是想通过它来“卸载”软件，那么当他点击“卸载现有版本”后，安装器在执行完卸载后并不会退出，而是会继续执行安装，导致用户产生“卸载完了为什么又装上了”的困惑。
 
 ### 原因 B：NSIS 默认重装页面（`PageReinstall`）在卸载分支中缺少 `Quit` 指令
-在默认的 NSIS 重装逻辑中：
-1. 检测到已安装版本后，会弹出提示页面（如“已存在旧版本，是否先卸载？”）。
-2. 用户选择“是”并触发 `ExecWait '"$INSTDIR\uninstall.exe" ...'` 执行卸载。
-3. 卸载程序运行并成功删除了程序文件。
-4. **关键缺陷**：卸载进程结束后，主安装包 `setup.exe` 并没有调用 `Abort` 或 `Quit` 退出，而是继续向下执行下一阶段的 `PageInstFiles`（安装文件复制阶段），导致重新安装。
+在默认 of NSIS 重装逻辑中，当用户选择“是”并触发 `ExecWait '"$INSTDIR\uninstall.exe" ...'` 执行卸载后，主安装包 `setup.exe` 并没有调用 `Abort` 或 `Quit` 退出，而是继续向下执行下一阶段的 `PageInstFiles`（安装文件复制阶段），导致重新安装。
 
 ### 原因 C：Windows 应用兼容性助手 (Application Compatibility Assistant - ACA) 误判
-由于当前生成的 `uninstall.exe` 是临时编译且**未进行代码签名 (Unsigned)**：
-1. 当用户从控制面板卸载时，`uninstall.exe` 运行并删除自身及安装目录。
-2. 卸载完成后，Windows ACA 可能会检测到未签名程序的卸载行为，并误认为“程序可能未正确卸载”。
-3. ACA 会弹出系统级提示：“此程序可能未正确卸载，是否重新安装？”。如果用户误点击，系统将自动重新运行临时缓存的安装包。
+由于当前生成的 `uninstall.exe` 是临时编译且**未进行代码签名 (Unsigned)**，当用户从控制面板卸载时，Windows ACA 可能会检测到未签名程序的卸载行为，并弹出系统级提示：“此程序可能未正确卸载，是否重新安装？”。如果用户误点击，系统将自动重新运行临时缓存的安装包。
 
 ### 原因 D：MSI 与 NSIS 重叠安装导致注册表混乱
-如果测试人员在同一台机器上交叉安装了 MSI 版本和 NSIS 版本：
-1. 它们可能注册了相同的 `productName` 和不同的 `Uninstall` 注册表项。
-2. 在控制面板中点击卸载时，可能会错误调用另一个版本的卸载/维护逻辑，导致卸载完 NSIS 后，MSI 判定配置受损并自动触发“自愈/修复 (Self-healing)”重新安装。
+如果测试人员在同一台机器上交叉安装了 MSI 版本和 NSIS 版本，它们可能注册了相同的 `productName` 和不同的 `Uninstall` 注册表项，造成卸载逻辑和自愈（Self-healing）机制冲突。
 
 ---
 
-## 4. 推荐修复方案
+## 4. 推荐方案规划 (重排与降级)
 
-为了从根本上解决卸载循环，同时不影响 MSI 且不新增运行时权限，推荐采用以下递进式修复方案：
+为了安全定位和解决该问题，避免盲目修改导致安装器崩溃或文件残留，对推荐方案进行重排和风险降级：
 
-### 方案一：升级 Tauri 的 NSIS 配置，指定 `installMode` 与 `displayLanguageSelector` (首选，最安全)
-首先在 `tauri.conf.json` 中显式定义 NSIS 的行为，约束安装范围，防止因虚拟化导致的注册表混乱。
+### 第一推荐：执行 NSIS / MSI 手动复现矩阵 (当前阶段首选)
+不急于修改打包配置，而是优先用当前已有安装包在干净的环境中执行手动复现测试，摸清问题触发的精确入口。
 
+#### 手动复现矩阵设计清单：
+1. **NSIS 全新安装**：在无软件残留的系统上安装，检查默认行为。
+2. **NSIS 已安装状态下再次运行 `setup.exe`**：检查弹窗文案及下一步走向。
+3. **NSIS `setup.exe` 维护模式中选择卸载**：观察卸载完成后主程序是否自动重装。
+4. **Windows Apps / Settings 中卸载 NSIS 安装**：确认卸载后是否自动拉起安装程序。
+5. **NSIS 卸载后重装**：确认卸载后能否直接全新安装。
+6. **MSI 全新安装**：测试 Windows 原生 MSI 安装体验。
+7. **MSI 卸载**：测试从控制面板卸载 MSI 是否表现稳定。
+8. **MSI 卸载后重装**：确认 MSI 重装正常。
+9. **NSIS 安装后运行 MSI**：测试 NSIS 和 MSI 交叉覆盖时的系统表现。
+10. **MSI 安装后运行 NSIS**：测试 MSI 和 NSIS 交叉覆盖时的系统表现。
+11. **ACA 与 SmartScreen 行为记录**：截图并记录未签名状态下的安全拦截与兼容性警告提示。
+
+### 第二推荐：如果复现证明问题只出在 NSIS `setup.exe` 维护模式，评估最小 NSIS 配置
+在排除其他干扰后，在 `tauri.conf.json` 中配置基础的 NSIS 字段，对其配置进行显式固化（此配置不能保证一定能解决卸载后继续安装的问题，仅作为规范化配置）：
 ```json
 {
   "bundle": {
-    "active": true,
-    "targets": "all",
     "windows": {
       "nsis": {
-        "installMode": "perUser",
+        "installMode": "currentUser",
         "displayLanguageSelector": true,
         "compression": "lzma"
       }
@@ -81,48 +91,40 @@ Tauri 默认生成的 NSIS 脚本包含一个预设机制：**当用户运行 `s
   }
 }
 ```
-*注：通过固化 `perUser`，确保卸载和安装路径都严格处于 `%LOCALAPPDATA%` 下，无需管理员权限，避免 UAC 虚拟化对注册表的干扰。*
 
-### 方案二：编写轻量级 NSIS 钩子脚本（`installerHooks`）控制卸载行为 (推荐)
-Tauri 支持在不重写整个 `installer.nsi` 的情况下，通过 `installerHooks` 注入自定义 `.nsh` 脚本。我们可以利用 `NSIS_HOOK_PREUNINSTALL` 或 `NSIS_HOOK_PREINSTALL` 钩子，优雅地控制流程。
+### 第三推荐：如果默认 NSIS 维护模式确实不符合预期，再设计 custom NSIS template 或 installerHooks
+如果复现矩阵和基础配置都无法解决问题，则需要通过自定义模板或钩子解决。**此步骤必须另行开展方案设计评审，严禁直接进入代码实现。**
 
-1. **配置 `tauri.conf.json`**：
-   ```json
-   "nsis": {
-     "installerHooks": "./nsis-hooks.nsh"
-   }
-   ```
-2. **编写 `nsis-hooks.nsh`**：
-   通过钩子判断当前执行上下文。如果是旧版本卸载逻辑，在执行完 `uninstall.exe` 后，立即强制主安装进程终止（调用 `Quit` 或 `Abort`），不给其继续安装的机会。
-   *(设计细节将在后续实现阶段进行详细脚本编写。)*
+### 高风险待验证方案 (暂不建议直接实现)：通过 `installerHooks + NSIS_HOOK_PREUNINSTALL + Quit` 截断
+- **风险分析**：`NSIS_HOOK_PREUNINSTALL` 发生在卸载器**删除任何文件和注册表键值之前**。如果在此钩子中直接调用 `Quit` 或 `Abort`，可能会直接强行终止卸载器，导致卸载流程未完成便意外退出，造成文件残留和注册表污染。
+- **实施红线**：禁止在没有确切的生命周期确认和手动复现矩阵支撑前实现此方案。
 
-### 方案三：采用官方标准的“卸载/维护模式 (Maintenance Mode)”改造 (进阶)
-如果默认的 PageReinstall 逻辑不能满足需求，需要自定义 NSIS 模板（`template: "./custom-installer.nsi"`）。
-- 在检测到已安装同名软件时，弹出包含三个单选按钮的对话框：
-  - [ ] **更新/覆盖安装 (Upgrade/Overwrite)**：保留数据，覆盖二进制文件。
-  - [ ] **修复安装 (Repair/Reinstall)**：重新写入所有文件。
-  - [ ] **彻底卸载 (Uninstall/Remove)**：调用卸载逻辑，卸载完成后**必须执行 `Quit` 终止当前安装器**。
+### 暂缓执行项：
+- 🚫 直接在 hooks 中写入 `Quit` 以期强行中止安装。
+- 🚫 在 App 业务代码（React/TypeScript/Rust）中增加或修改处理卸载的代码。
+- 🚫 允许 App 运行时具备危险的自删安装目录逻辑。
+- 🚫 编写任何高风险的递归删除用户目录/文件的脚本。
+- 🚫 允许安装器或卸载程序以任何方式触碰用户的原片目录。
+
+### Alpha 内测临时分发建议：
+如果在手动复现矩阵测试中，MSI 格式表现出闭环卸载与自愈稳定性，在 Alpha 测试阶段建议**优先分发 MSI 安装包**，将 NSIS 安装包继续作为待修复/待优化项留在后续迭代中处理。
 
 ---
 
-## 5. 不推荐方案 (红线警示)
+## 5. 安全边界与约束
 
-为保障系统与用户数据安全，以下方案**严禁采用**：
-1. **🚫 严禁在应用业务代码中调用系统命令自删除**：不要在 React/TypeScript 或 Rust 逻辑中编写杀死自身进程并删除安装目录的代码。安装与卸载属于系统级动作，必须由安装器（NSIS/MSI）管理。
-2. **🚫 严禁越权删除用户数据**：卸载程序只能清除安装释放的程序文件、快捷方式和特定注册表项，**绝不能**递归删除用户的照片目录或临时导出的整理目录。
-3. **🚫 严禁修改全局环境变量**：不应为了实现卸载而向 Windows System 注册表写入危险的全局启动项或修改全局 PATH。
-
----
-
-## 6. 实施边界
-
-1. **只在 Windows 构建管道生效**：所有的 NSIS 修改仅作用于 `src-tauri/tauri.conf.json` 的 `"windows"` 子项，绝不影响 Mac/Linux 打包。
-2. **不影响 MSI 逻辑**：MSI 包由 WiX 工具集编译，其升级与卸载逻辑由 Windows Installer 服务天然保障。本方案的修改应局限在 NSIS 范围内，确保 MSI 的构建和稳定性不受干扰。
-3. **保持应用“零联网”与“本地化”**：安装器不应尝试联网检测更新，依然保持 100% 离线隐私安全。
+任何打包修复和配置优化均**必须遵守以下红线约束**：
+- **不用 app 业务代码解决 installer 问题**：软件本身的运行时代码不得处理安装和卸载的具体文件系统清理工作，这必须完全由 Windows 安装服务或 NSIS 卸载程序隔离执行。
+- **不新增 Tauri 权限**：不可为了安装/卸载而在 `capabilities/default.json` 或 `tauri.conf.json` 中扩大权限范围。
+- **不开启危险 API**：严禁开启 `fs:allow-all`、`shell:allow-all` 等广域危险权限。
+- **不编写危险删除脚本**：不可在 NSIS 模板或钩子中加入可能导致用户照片丢失的递归删除命令（如危险的 `RMDir /r` 乱用）。
+- **绝对不触碰用户照片目录**：软件的安装与卸载逻辑与用户照片原件目录应物理隔绝，只能清除 App 安装释放的资源。
+- **不影响 copy-only / report schema**：此安装器问题的修复不得改动 Copy-Only 整理输出机制与导出的 `report.json` 脱敏配置。
+- **不影响 Native ZIP guard**：本地运行时对 ZIP 导出组件的安全置灰拦截逻辑必须原样保持。
 
 ---
 
-## 7. 验收测试清单 (Acceptance Test Checklist)
+## 6. 验收测试清单 (Acceptance Test Checklist)
 
 后续实现完成后，必须在干净的虚拟机（如 Windows Sandbox）中依次执行以下测试用例：
 
@@ -137,15 +139,9 @@ Tauri 支持在不重写整个 `installer.nsi` 的情况下，通过 `installerH
 
 ---
 
-## 8. 后续实现 Checkpoint 建议
+## 7. 后续实现 Checkpoint 建议
 
-本方案审核通过后，建议按照以下 checkpoint 分步实施：
+不建议在本阶段直接进入 NSIS 配置实现。
 
-1. **Checkpoint 1: NSIS Configuration & Hook Setup**
-   - 在 `tauri.conf.json` 中配置 `"nsis"` 相关参数。
-   - 编写 `nsis-hooks.nsh`，注入中止旧版本重装的逻辑。
-2. **Checkpoint 2: Local Packaging & Installation Verification**
-   - 运行 `npm run desktop:build` 编译新安装包。
-   - 在 Windows Sandbox 运行回归测试，验证 TC-03 与 TC-04。
-3. **Checkpoint 3: MSI Release Evaluation**
-   - 评估在未获取付费代码签名证书前，是否将 MSI 作为内部测试的首选分发格式（MSI 在未经签名时的 SmartScreen 拦截机制相对 NSIS 更温和，且卸载逻辑天然闭环）。
+### 第一推荐下一个 Checkpoint：
+`CORE-DESKTOP-NATIVE-NSIS-MSI-UNINSTALL-REPRO-MATRIX-1` (利用已有安装包运行手动复现矩阵测试，抓取未签名 SmartScreen 和 Windows 兼容性助手的行为截图，精确锁定问题入口)。
