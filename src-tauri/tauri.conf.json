@@ -36,6 +36,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "template": "./templates/installer.nsi"
+      }
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
