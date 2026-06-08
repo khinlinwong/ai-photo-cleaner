@@ -280,6 +280,25 @@ export default function ResultsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipExportWarning, setZipExportWarning] = useState<string | null>(null);
+  const [abGuidanceDismissed, setAbGuidanceDismissed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return window.sessionStorage.getItem('ab_guidance_dismissed') === 'true';
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+
+  const dismissAbGuidance = useCallback(() => {
+    setAbGuidanceDismissed(true);
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem('ab_guidance_dismissed', 'true');
+      } catch {}
+    }
+  }, []);
   const [activeTab, setActiveTab] = useState<'keep' | 'cull' | 'similar' | 'battle-status'>('keep');
   const [previewPhoto, setPreviewPhoto] = useState<PhotoItem | null>(null);
   const [previewScale, setPreviewScale] = useState(1);
@@ -778,6 +797,7 @@ export default function ResultsPage() {
   // 鼠标滚轮缩放处理 (1x 到 4x)
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>, side: 'left' | 'right') => {
     e.preventDefault();
+    dismissAbGuidance();
     const scaleFactor = 0.15;
     const delta = e.deltaY < 0 ? scaleFactor : -scaleFactor;
     
@@ -804,6 +824,7 @@ export default function ResultsPage() {
 
   // 鼠标拖拽平移相关处理
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    dismissAbGuidance();
     const scale = side === 'left' ? leftScale : rightScale;
     if (e.button !== 0 || scale <= 1) return; // 只有左键且已放大才允许拖拽
     e.preventDefault();
@@ -851,6 +872,7 @@ export default function ResultsPage() {
 
   // 双击图片重置当前侧缩放与平移状态
   const handleDoubleClick = (side: 'left' | 'right') => {
+    dismissAbGuidance();
     if (side === 'left') {
       setLeftScale(1);
       setLeftX(0);
@@ -2065,7 +2087,7 @@ export default function ResultsPage() {
                 isBattleClosing ? "animate-battle-out" : "animate-battle-in"
               )}
             >
-              <div className="p-3.5 border-b border-white/5 flex flex-row items-center justify-between space-y-0 shrink-0">
+              <div className="p-3.5 border-b border-white/5 flex flex-row items-center justify-between space-y-0 shrink-0 relative">
                 <div className="flex flex-col text-left">
                   <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
                     <GitCompare className="h-4 w-4 text-yellow-400" />
@@ -2087,10 +2109,27 @@ export default function ResultsPage() {
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+                {/* Thin progress line at the bottom of the header */}
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/5">
+                  <div 
+                    className="h-full bg-yellow-500/60 transition-all duration-300 ease-out"
+                    style={{ width: `${(battleObj.roundIndex / battleObj.totalRounds) * 100}%` }}
+                  />
+                </div>
               </div>
 
               <div className="flex-1 p-4 flex flex-col justify-between min-h-0 bg-[var(--dt-workspace-bg)]">
-                <div key={`${battleObj.groupId}-${leftId}-${rightId}`} className="desktop-battle-stage">
+                <div key={`${battleObj.groupId}-${leftId}-${rightId}`} className="desktop-battle-stage relative">
+                  {/* Floating guide hint in the middle bottom */}
+                  <div className={cn(
+                    "absolute bottom-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-all duration-500",
+                    abGuidanceDismissed ? "opacity-15 scale-95" : "opacity-85 scale-100"
+                  )}>
+                    <div className="bg-[#12151A]/90 border border-white/10 px-3 py-1.5 rounded-full text-[10px] text-[var(--dt-text-soft)] font-medium flex items-center gap-1.5 backdrop-blur-sm shadow-md">
+                      <span>💡 滚轮缩放 · 拖拽平移 · 双击重置</span>
+                    </div>
+                  </div>
+
                   {/* Left Photo (current best candidate) */}
                   {leftPhoto ? (
                     <div className={cn(
@@ -2102,7 +2141,7 @@ export default function ResultsPage() {
                     )}>
                       <div 
                         className={cn(
-                          "desktop-battle-photo-wrapper overflow-hidden relative",
+                          "desktop-battle-photo-wrapper overflow-hidden relative group",
                           leftScale > 1 ? (isLeftDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
                         )}
                         onWheel={(e) => handleWheel(e, 'left')}
@@ -2121,7 +2160,12 @@ export default function ResultsPage() {
                           }}
                           className="max-w-full max-h-full object-contain p-1 select-none pointer-events-none" 
                         />
-                        <div className="absolute top-2 left-2 z-10">
+                        <div 
+                          className={cn(
+                            "absolute top-2 left-2 z-10 transition-opacity duration-200 pointer-events-none",
+                            isLeftDragging ? "opacity-20" : "group-hover:opacity-20"
+                          )}
+                        >
                           <Badge className="bg-[#6FA887] text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm">
                             👑 当前优选 [ ← ] ({leftScale.toFixed(1)}x)
                           </Badge>
@@ -2150,7 +2194,7 @@ export default function ResultsPage() {
                     )}>
                       <div 
                         className={cn(
-                          "desktop-battle-photo-wrapper overflow-hidden relative",
+                          "desktop-battle-photo-wrapper overflow-hidden relative group",
                           rightScale > 1 ? (isRightDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
                         )}
                         onWheel={(e) => handleWheel(e, 'right')}
@@ -2169,7 +2213,12 @@ export default function ResultsPage() {
                           }}
                           className="max-w-full max-h-full object-contain p-1 select-none pointer-events-none" 
                         />
-                        <div className="absolute top-2 right-2 z-10">
+                        <div 
+                          className={cn(
+                            "absolute top-2 right-2 z-10 transition-opacity duration-200 pointer-events-none",
+                            isRightDragging ? "opacity-20" : "group-hover:opacity-20"
+                          )}
+                        >
                           <Badge className="bg-[#6F8FA8] text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm">
                             ⚔️ 挑战照片 [ → ] ({rightScale.toFixed(1)}x)
                           </Badge>
@@ -2182,13 +2231,33 @@ export default function ResultsPage() {
                 </div>
 
                 {/* Keyboard Shortcuts Hint Panel */}
-                <div className="mt-2 py-1 flex items-center justify-center gap-4 text-[10px] text-[var(--dt-text-soft)] select-none shrink-0 border-t border-white/5 pt-2">
-                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">←</kbd> 保留左图</span>
-                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">→</kbd> 保留右图</span>
-                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">B</kbd> 两张都保留</span>
-                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">C</kbd> 两张淘汰候选</span>
-                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">S</kbd> 跳过</span>
-                  <span className="flex items-center gap-1"><kbd className="desktop-battle-kbd">Esc</kbd> 关闭</span>
+                <div className="mt-2.5 py-1 px-4 bg-[#12151A]/60 border border-white/5 rounded flex items-center justify-center gap-4 text-[10px] text-[var(--dt-text-soft)] select-none shrink-0 mx-auto w-fit">
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="desktop-battle-kbd px-1.5 py-0.5 rounded border bg-neutral-900 border-white/10 text-white font-mono text-[9px] shadow-sm">←</kbd>
+                    <span className="text-white/30">/</span>
+                    <kbd className="desktop-battle-kbd px-1.5 py-0.5 rounded border bg-neutral-900 border-white/10 text-white font-mono text-[9px] shadow-sm">→</kbd>
+                    <span>选择左右</span>
+                  </span>
+                  <span className="w-px h-3 bg-white/5" />
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="desktop-battle-kbd px-1.5 py-0.5 rounded border bg-neutral-900 border-white/10 text-white font-mono text-[9px] shadow-sm">B</kbd>
+                    <span>保留两张</span>
+                  </span>
+                  <span className="w-px h-3 bg-white/5" />
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="desktop-battle-kbd px-1.5 py-0.5 rounded border bg-neutral-900 border-white/10 text-white font-mono text-[9px] shadow-sm">C</kbd>
+                    <span>淘汰两张</span>
+                  </span>
+                  <span className="w-px h-3 bg-white/5" />
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="desktop-battle-kbd px-1.5 py-0.5 rounded border bg-neutral-900 border-white/10 text-white font-mono text-[9px] shadow-sm">S</kbd>
+                    <span>跳过</span>
+                  </span>
+                  <span className="w-px h-3 bg-white/5" />
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="desktop-battle-kbd px-1.5 py-0.5 rounded border bg-neutral-900 border-white/10 text-white font-mono text-[9px] shadow-sm">Esc</kbd>
+                    <span>退出 / 关闭</span>
+                  </span>
                 </div>
               </div>
             </div>
