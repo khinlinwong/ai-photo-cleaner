@@ -25,12 +25,14 @@ import {
   GitCompare,
   X,
   Maximize2,
-  FolderOpen
+  FolderOpen,
+  Search
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from "@/lib/utils";
 import VirtualPhotoGrid from '@/components/desktop/VirtualPhotoGrid';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { buildManifestRows, buildManifestCsv, buildManifestJson } from '@/lib/export/exportManifest';
 import { buildZipExportFilename, buildManifestExportFilename } from '@/lib/export/exportFilenames';
 import { ResultsSummaryCards } from '@/components/results/ResultsSummaryCards';
@@ -105,13 +107,13 @@ const ResultsPhotoCard: React.FC<ResultsPhotoCardProps> = ({
         isSelected
           ? "border-emerald-500/80 bg-emerald-500/5 ring-1 ring-emerald-500/35"
           : getUserVisibleBucket(photo) === 'cull'
-          ? "border-[#B96F68]/30 bg-[#B96F68]/5 hover:border-[#B96F68]/60 hover:bg-[#B96F68]/15" 
-          : "border-white/5 bg-[var(--dt-card-bg)] hover:border-[#6F8FA8]/40 hover:bg-[#6F8FA8]/5"
+          ? "border-[#B96F68]/20 bg-[#B96F68]/[0.02] hover:border-[#B96F68]/50 hover:bg-[#B96F68]/10" 
+          : "border-emerald-500/15 bg-emerald-500/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/[0.06]"
       )}
     >
       {/* Image Section */}
       <div 
-        className="relative h-[100px] w-full overflow-hidden bg-neutral-800/20 rounded-t-lg cursor-pointer select-none"
+        className="group relative h-[100px] w-full overflow-hidden bg-neutral-800/20 rounded-t-lg cursor-pointer select-none"
         onClick={() => {
           setPreviewPhoto(photo);
           setPreviewScale(1);
@@ -125,12 +127,21 @@ const ResultsPhotoCard: React.FC<ResultsPhotoCardProps> = ({
             <span className="text-[10px] font-medium">预览不可用</span>
           </div>
         ) : (
-          <img
-            src={photo.url}
-            alt={getPhotoDisplayName(photo)}
-            className="w-full h-full object-contain bg-neutral-800/50"
-            onError={() => setImageError(true)}
-          />
+          <>
+            <img
+              src={photo.url}
+              alt={getPhotoDisplayName(photo)}
+              className="w-full h-full object-contain bg-neutral-800/50"
+              onError={() => setImageError(true)}
+            />
+            {/* Light hover overlay with magnifier icon and "预览大图" */}
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none rounded-t-lg">
+              <div className="flex items-center gap-1 bg-black/60 px-2 py-1 rounded text-white text-[10px] backdrop-blur-sm">
+                <Search className="h-3 w-3" />
+                <span>预览大图</span>
+              </div>
+            </div>
+          </>
         )}
         <div className="absolute top-1.5 left-1.5 z-10 scale-[0.8] origin-top-left">
           {renderIssueBadge(photo)}
@@ -1343,17 +1354,24 @@ export default function ResultsPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       {hasNativeSource && (
                         nativeSourceMode === 'selected-files' ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              disabled={true}
-                              className="desktop-button-primary text-[10px] py-1.5 h-8 opacity-40 cursor-not-allowed flex items-center gap-1.5 font-bold shrink-0"
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-block cursor-not-allowed shrink-0">
+                                <button
+                                  disabled={true}
+                                  className="desktop-button-primary text-[10px] py-1.5 h-8 opacity-40 pointer-events-none flex items-center gap-1.5 font-bold"
+                                >
+                                  本地整理输出
+                                </button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent 
+                              side="bottom"
+                              className="max-w-[280px] bg-neutral-900 border border-white/10 text-[var(--dt-text-primary)] p-3 text-[11px] leading-relaxed shadow-lg rounded-md"
                             >
-                              本地整理输出
-                            </button>
-                            <span className="text-[10px] text-amber-400/90 bg-amber-500/5 px-2.5 py-1 rounded border border-amber-500/10 font-medium">
-                              💡 桌面端多选图片模式暂不支持本地物理整理，功能将在后续版本中支持。您可以先导出整理清单。
-                            </span>
-                          </div>
+                              选择图片模式暂不支持本地整理输出。当前不会移动、删除或覆盖你的原图。你仍可查看整理结果；如需本地整理输出，请使用选择文件夹模式。
+                            </TooltipContent>
+                          </Tooltip>
                         ) : (
                           <button
                             onClick={() => setPhysicalOrgDialogOpen(true)}

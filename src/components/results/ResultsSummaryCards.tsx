@@ -31,10 +31,10 @@ export function ResultsSummaryCards({
       <button
         onClick={() => onTabChange('keep')}
         className={cn(
-          "p-3 rounded border text-left transition-all duration-150 cursor-pointer flex flex-col justify-between focus:outline-none",
+          "p-3 rounded border text-left transition-all duration-150 cursor-pointer flex flex-col justify-between focus:outline-none active:scale-[0.98]",
           activeTab === 'keep'
-            ? "bg-[var(--dt-nav-active-bg)] border-[var(--dt-accent)]"
-            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)]"
+            ? "bg-emerald-500/5 border-emerald-500/80 ring-1 ring-emerald-500/20"
+            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)] hover:border-emerald-500/30"
         )}
       >
         <span className="text-[10px] text-[var(--dt-text-soft)] font-semibold">🟢 保留照片</span>
@@ -46,10 +46,10 @@ export function ResultsSummaryCards({
       <button
         onClick={() => onTabChange('cull')}
         className={cn(
-          "p-3 rounded border text-left transition-all duration-150 cursor-pointer flex flex-col justify-between focus:outline-none",
+          "p-3 rounded border text-left transition-all duration-150 cursor-pointer flex flex-col justify-between focus:outline-none active:scale-[0.98]",
           activeTab === 'cull'
-            ? "bg-[var(--dt-nav-active-bg)] border-[#B96F68]/70"
-            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)]"
+            ? "bg-[#B96F68]/5 border-[#B96F68]/80 ring-1 ring-[#B96F68]/20"
+            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)] hover:border-[#B96F68]/30"
         )}
       >
         <span className="text-[10px] text-[var(--dt-text-soft)] font-semibold">🔴 淘汰候选照片</span>
@@ -61,10 +61,10 @@ export function ResultsSummaryCards({
       <button
         onClick={() => onTabChange('similar')}
         className={cn(
-          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none cursor-pointer",
+          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none cursor-pointer active:scale-[0.98]",
           activeTab === 'similar'
-            ? "bg-[var(--dt-nav-active-bg)] border-[var(--dt-accent)]"
-            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)]"
+            ? "bg-[var(--dt-accent)]/5 border-[var(--dt-accent)]/80 ring-1 ring-[var(--dt-accent)]/20"
+            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)] hover:border-[var(--dt-accent)]/30"
         )}
       >
         <span className="text-[10px] text-[var(--dt-text-soft)] font-semibold">
@@ -78,10 +78,10 @@ export function ResultsSummaryCards({
       <button
         onClick={() => onTabChange('battle-status')}
         className={cn(
-          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none cursor-pointer",
+          "p-3 rounded border text-left transition-all duration-150 flex flex-col justify-between focus:outline-none cursor-pointer active:scale-[0.98]",
           activeTab === 'battle-status'
-            ? "bg-[var(--dt-nav-active-bg)] border-yellow-500/70"
-            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)]"
+            ? "bg-yellow-500/5 border-yellow-500/80 ring-1 ring-yellow-500/20"
+            : "bg-[var(--dt-card-bg)] border-[var(--dt-border)] hover:bg-[var(--dt-card-hover-bg)] hover:border-yellow-500/30"
         )}
       >
         <span className="text-[10px] text-[var(--dt-text-soft)] font-semibold">
@@ -94,3 +94,4 @@ export function ResultsSummaryCards({
     </div>
   );
 }
+
