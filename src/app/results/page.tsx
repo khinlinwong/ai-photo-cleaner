@@ -360,8 +360,6 @@ export default function ResultsPage() {
   const [localActiveBattle, setLocalActiveBattle] = useState<ActiveBattleState | null>(null);
   const [isBattleClosing, setIsBattleClosing] = useState(false);
 
-  // A/B 对局细分动画状态机
-  const [battleMotionState, setBattleMotionState] = useState<'idle' | 'choosing-left' | 'choosing-right' | 'swapping' | 'group-enter' | 'group-exiting'>('idle');
   const lastGroupIdRef = useRef<string | null>(null);
   const isTransitioningRef = useRef(false);
 
@@ -468,10 +466,8 @@ export default function ResultsPage() {
   // A/B 对局中胜出者保持在原位置的 UI 侧状态：'left' 或 'right'
   const [winnerSide, setWinnerSide] = useState<'left' | 'right'>('left');
 
-  // 包装对局决策函数以加入 300ms 缓冲确认/退出/淡入过渡动画
-  const applyBattleDecision = useCallback(async (decision: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => {
-    if (battleMotionState !== 'idle') return;
-
+  // 包装对局决策函数，实现 0 延迟即时决策切换
+  const applyBattleDecision = useCallback((decision: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => {
     if (decision === 'keep_left' || decision === 'keep_right') {
       // 区分屏幕视觉上的 keep_left/keep_right，根据当前 winnerSide 映射到实际状态机的决策
       const targetDecision = winnerSide === 'left'
@@ -480,31 +476,17 @@ export default function ResultsPage() {
 
       const nextSide = decision === 'keep_left' ? 'left' : 'right';
       setWinnerSide(nextSide);
-
-      setBattleMotionState(decision === 'keep_left' ? 'choosing-left' : 'choosing-right');
-      await sleep(300);
       contextApplyBattleDecision(targetDecision);
-      setBattleMotionState('swapping');
-      await sleep(300);
-      setBattleMotionState('idle');
     } else {
-      setBattleMotionState('swapping');
       contextApplyBattleDecision(decision);
-      await sleep(300);
-      setBattleMotionState('idle');
     }
-  }, [battleMotionState, winnerSide, contextApplyBattleDecision]);
+  }, [winnerSide, contextApplyBattleDecision]);
 
-  // 对比对局组流转（进入下一组）的双图弹出动效监听与 winnerSide 重置
+  // 对比对局组流转（进入下一组）的 winnerSide 重置，无延迟
   useEffect(() => {
     if (activeBattle?.groupId) {
       if (lastGroupIdRef.current && lastGroupIdRef.current !== activeBattle.groupId) {
         setWinnerSide('left');
-        setBattleMotionState('group-enter');
-        const timer = setTimeout(() => {
-          setBattleMotionState('idle');
-        }, 300);
-        return () => clearTimeout(timer);
       } else if (!lastGroupIdRef.current) {
         setWinnerSide('left');
       }
@@ -2146,14 +2128,7 @@ export default function ResultsPage() {
 
                   {/* Left Photo (current best candidate) */}
                   {leftPhoto ? (
-                    <div className={cn(
-                      "desktop-battle-photo-card",
-                      battleMotionState === 'choosing-left' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
-                      battleMotionState === 'choosing-right' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
-                      battleMotionState === 'group-exiting' && "opacity-0 scale-[0.96] translate-y-[-6px] transition-all duration-250 ease-in",
-                      battleMotionState === 'group-enter' && "animate-battle-challenger-in",
-                      battleMotionState === 'swapping' && winnerSide === 'right' && "animate-battle-challenger-in"
-                    )}>
+                    <div className="desktop-battle-photo-card">
                       <div 
                         className={cn(
                           "desktop-battle-photo-wrapper overflow-hidden relative group",
@@ -2165,10 +2140,6 @@ export default function ResultsPage() {
                         onMouseUp={() => handleMouseUpOrLeave('left')}
                         onMouseLeave={() => handleMouseUpOrLeave('left')}
                         onDoubleClick={() => handleDoubleClick('left')}
-                        onClick={() => {
-                          if (leftScale > 1) return;
-                          applyBattleDecision('keep_left');
-                        }}
                       >
                         <img 
                           src={leftPhoto.url} 
@@ -2206,14 +2177,7 @@ export default function ResultsPage() {
 
                   {/* Right Photo (challenger) */}
                   {rightPhoto ? (
-                    <div className={cn(
-                      "desktop-battle-photo-card",
-                      battleMotionState === 'choosing-right' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
-                      battleMotionState === 'choosing-left' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
-                      battleMotionState === 'group-exiting' && "opacity-0 scale-[0.96] translate-y-[-6px] transition-all duration-250 ease-in",
-                      battleMotionState === 'group-enter' && "animate-battle-challenger-in",
-                      battleMotionState === 'swapping' && winnerSide === 'left' && "animate-battle-challenger-in"
-                    )}>
+                    <div className="desktop-battle-photo-card">
                       <div 
                         className={cn(
                           "desktop-battle-photo-wrapper overflow-hidden relative group",
@@ -2225,10 +2189,6 @@ export default function ResultsPage() {
                         onMouseUp={() => handleMouseUpOrLeave('right')}
                         onMouseLeave={() => handleMouseUpOrLeave('right')}
                         onDoubleClick={() => handleDoubleClick('right')}
-                        onClick={() => {
-                          if (rightScale > 1) return;
-                          applyBattleDecision('keep_right');
-                        }}
                       >
                         <img 
                           src={rightPhoto.url} 
