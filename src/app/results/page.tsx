@@ -465,21 +465,25 @@ export default function ResultsPage() {
     }
   };
 
+  // A/B 对局中胜出者保持在原位置的 UI 侧状态：'left' 或 'right'
+  const [winnerSide, setWinnerSide] = useState<'left' | 'right'>('left');
+
   // 包装对局决策函数以加入 300ms 缓冲确认/退出/淡入过渡动画
   const applyBattleDecision = useCallback(async (decision: 'keep_left' | 'keep_right' | 'keep_both' | 'cull_both' | 'skip') => {
     if (battleMotionState !== 'idle') return;
 
-    if (decision === 'keep_left') {
-      setBattleMotionState('choosing-left');
+    if (decision === 'keep_left' || decision === 'keep_right') {
+      // 区分屏幕视觉上的 keep_left/keep_right，根据当前 winnerSide 映射到实际状态机的决策
+      const targetDecision = winnerSide === 'left'
+        ? (decision === 'keep_left' ? 'keep_left' : 'keep_right')
+        : (decision === 'keep_left' ? 'keep_right' : 'keep_left');
+
+      const nextSide = decision === 'keep_left' ? 'left' : 'right';
+      setWinnerSide(nextSide);
+
+      setBattleMotionState(decision === 'keep_left' ? 'choosing-left' : 'choosing-right');
       await sleep(300);
-      contextApplyBattleDecision('keep_left');
-      setBattleMotionState('swapping');
-      await sleep(300);
-      setBattleMotionState('idle');
-    } else if (decision === 'keep_right') {
-      setBattleMotionState('choosing-right');
-      await sleep(300);
-      contextApplyBattleDecision('keep_right');
+      contextApplyBattleDecision(targetDecision);
       setBattleMotionState('swapping');
       await sleep(300);
       setBattleMotionState('idle');
@@ -489,19 +493,24 @@ export default function ResultsPage() {
       await sleep(300);
       setBattleMotionState('idle');
     }
-  }, [battleMotionState, contextApplyBattleDecision]);
+  }, [battleMotionState, winnerSide, contextApplyBattleDecision]);
 
-  // 对比对局组流转（进入下一组）的双图弹出动效监听
+  // 对比对局组流转（进入下一组）的双图弹出动效监听与 winnerSide 重置
   useEffect(() => {
     if (activeBattle?.groupId) {
       if (lastGroupIdRef.current && lastGroupIdRef.current !== activeBattle.groupId) {
+        setWinnerSide('left');
         setBattleMotionState('group-enter');
         const timer = setTimeout(() => {
           setBattleMotionState('idle');
         }, 300);
         return () => clearTimeout(timer);
+      } else if (!lastGroupIdRef.current) {
+        setWinnerSide('left');
       }
       lastGroupIdRef.current = activeBattle.groupId;
+    } else {
+      lastGroupIdRef.current = null;
     }
   }, [activeBattle?.groupId]);
 
@@ -2067,13 +2076,18 @@ export default function ResultsPage() {
         const battleObj = localActiveBattle || activeBattle;
         if (!battleObj) return null;
 
-        const leftId = battleObj.currentCandidateId;
+        const championId = battleObj.currentCandidateId;
         const isBattleCompleted = battleObj.nextIndex >= battleObj.contenderIds.length;
-        const rightId = isBattleCompleted 
+        const challengerId = isBattleCompleted 
           ? battleObj.contenderIds[battleObj.contenderIds.length - 1] 
           : battleObj.contenderIds[battleObj.nextIndex];
-        const leftPhoto = photos.find(p => p.id === leftId);
-        const rightPhoto = photos.find(p => p.id === rightId);
+        const championPhoto = photos.find(p => p.id === championId);
+        const challengerPhoto = photos.find(p => p.id === challengerId);
+
+        const leftPhoto = winnerSide === 'left' ? championPhoto : challengerPhoto;
+        const rightPhoto = winnerSide === 'left' ? challengerPhoto : championPhoto;
+        const leftId = leftPhoto?.id;
+        const rightId = rightPhoto?.id;
 
         return (
           <div className="fixed inset-0 z-40 bg-black/65 flex items-center justify-center p-4 select-none">
@@ -2137,7 +2151,8 @@ export default function ResultsPage() {
                       battleMotionState === 'choosing-left' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
                       battleMotionState === 'choosing-right' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
                       battleMotionState === 'group-exiting' && "opacity-0 scale-[0.96] translate-y-[-6px] transition-all duration-250 ease-in",
-                      battleMotionState === 'group-enter' && "animate-battle-challenger-in"
+                      battleMotionState === 'group-enter' && "animate-battle-challenger-in",
+                      battleMotionState === 'swapping' && winnerSide === 'right' && "animate-battle-challenger-in"
                     )}>
                       <div 
                         className={cn(
@@ -2150,6 +2165,10 @@ export default function ResultsPage() {
                         onMouseUp={() => handleMouseUpOrLeave('left')}
                         onMouseLeave={() => handleMouseUpOrLeave('left')}
                         onDoubleClick={() => handleDoubleClick('left')}
+                        onClick={() => {
+                          if (leftScale > 1) return;
+                          applyBattleDecision('keep_left');
+                        }}
                       >
                         <img 
                           src={leftPhoto.url} 
@@ -2166,8 +2185,11 @@ export default function ResultsPage() {
                             isLeftDragging ? "opacity-20" : "group-hover:opacity-20"
                           )}
                         >
-                          <Badge className="bg-[#6FA887] text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm">
-                            👑 当前优选 [ ← ] ({leftScale.toFixed(1)}x)
+                          <Badge className={cn(
+                            "text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm",
+                            winnerSide === 'left' ? "bg-[#6FA887]" : "bg-[#6F8FA8]"
+                          )}>
+                            {winnerSide === 'left' ? "👑 当前优选" : "⚔️ 挑战照片"} [ ← ] ({leftScale.toFixed(1)}x)
                           </Badge>
                         </div>
                       </div>
@@ -2189,8 +2211,8 @@ export default function ResultsPage() {
                       battleMotionState === 'choosing-right' && "ring-2 ring-emerald-500/80 scale-[0.985] bg-emerald-500/10 border-emerald-500/40 z-10 transition-all duration-200",
                       battleMotionState === 'choosing-left' && "opacity-0 scale-[0.94] translate-y-[6px] transition-all duration-300 ease-out",
                       battleMotionState === 'group-exiting' && "opacity-0 scale-[0.96] translate-y-[-6px] transition-all duration-250 ease-in",
-                      battleMotionState === 'swapping' && "animate-battle-challenger-in",
-                      battleMotionState === 'group-enter' && "animate-battle-challenger-in"
+                      battleMotionState === 'group-enter' && "animate-battle-challenger-in",
+                      battleMotionState === 'swapping' && winnerSide === 'left' && "animate-battle-challenger-in"
                     )}>
                       <div 
                         className={cn(
@@ -2203,6 +2225,10 @@ export default function ResultsPage() {
                         onMouseUp={() => handleMouseUpOrLeave('right')}
                         onMouseLeave={() => handleMouseUpOrLeave('right')}
                         onDoubleClick={() => handleDoubleClick('right')}
+                        onClick={() => {
+                          if (rightScale > 1) return;
+                          applyBattleDecision('keep_right');
+                        }}
                       >
                         <img 
                           src={rightPhoto.url} 
@@ -2219,8 +2245,11 @@ export default function ResultsPage() {
                             isRightDragging ? "opacity-20" : "group-hover:opacity-20"
                           )}
                         >
-                          <Badge className="bg-[#6F8FA8] text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm">
-                            ⚔️ 挑战照片 [ → ] ({rightScale.toFixed(1)}x)
+                          <Badge className={cn(
+                            "text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm",
+                            winnerSide === 'left' ? "bg-[#6F8FA8]" : "bg-[#6FA887]"
+                          )}>
+                            {winnerSide === 'left' ? "⚔️ 挑战照片" : "👑 当前优选"} [ → ] ({rightScale.toFixed(1)}x)
                           </Badge>
                         </div>
                       </div>
