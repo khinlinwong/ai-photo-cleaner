@@ -2219,6 +2219,51 @@ export default function ResultsPage() {
                   )}
                 </div>
 
+                {/* A/B Decision Buttons Bar */}
+                <div className="flex flex-row justify-center items-center gap-3 mt-3 shrink-0">
+                  <button
+                    onClick={() => applyBattleDecision('keep_left')}
+                    className="desktop-button-secondary text-xs h-9 px-4 rounded font-bold border border-white/10 flex items-center gap-1.5"
+                  >
+                    <span>👈 保留左侧</span>
+                    <span className="text-[10px] opacity-40 font-mono">[ ← ]</span>
+                  </button>
+
+                  <button
+                    onClick={() => applyBattleDecision('keep_right')}
+                    className="desktop-button-secondary text-xs h-9 px-4 rounded font-bold border border-white/10 flex items-center gap-1.5"
+                  >
+                    <span>保留右侧 👉</span>
+                    <span className="text-[10px] opacity-40 font-mono">[ → ]</span>
+                  </button>
+
+                  <div className="w-px h-6 bg-white/10 mx-1" />
+
+                  <button
+                    onClick={() => applyBattleDecision('keep_both')}
+                    className="desktop-button-secondary text-xs h-9 px-4 rounded font-bold border border-white/10 flex items-center gap-1.5"
+                  >
+                    <span>🙌 保留两张</span>
+                    <span className="text-[10px] opacity-40 font-mono">[ B ]</span>
+                  </button>
+
+                  <button
+                    onClick={() => applyBattleDecision('cull_both')}
+                    className="desktop-button-secondary text-xs h-9 px-4 rounded font-bold border border-white/10 flex items-center gap-1.5 text-red-400 hover:text-red-300"
+                  >
+                    <span>🗑️ 淘汰两张</span>
+                    <span className="text-[10px] opacity-40 font-mono">[ C ]</span>
+                  </button>
+
+                  <button
+                    onClick={() => applyBattleDecision('skip')}
+                    className="desktop-button-secondary text-xs h-9 px-4 rounded font-bold border border-white/10 flex items-center gap-1.5"
+                  >
+                    <span>⏭️ 跳过</span>
+                    <span className="text-[10px] opacity-40 font-mono">[ S ]</span>
+                  </button>
+                </div>
+
                 {/* Keyboard Shortcuts Hint Panel */}
                 <div className="mt-2.5 py-1 px-4 bg-[#12151A]/60 border border-white/5 rounded flex items-center justify-center gap-4 text-[10px] text-[var(--dt-text-soft)] select-none shrink-0 mx-auto w-fit">
                   <span className="flex items-center gap-1.5">
