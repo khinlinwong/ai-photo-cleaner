@@ -83,6 +83,7 @@ export interface PhotoItem {
   sourceId?: string;
   sourceType?: 'browser-file' | 'native-folder-preview' | 'native-folder-file';
   extension?: string;
+  importSessionId?: string | null;
 }
 
 // 预设的高质量旅行 Mock 照片（对应新版的类型定义）
@@ -553,6 +554,7 @@ interface PhotoWorkspaceContextType {
   loadDemoPhotos: () => void;
   startNativeFolderAnalysis: (previews: NativeImagePreviewItem[], name?: string, sourceMode?: 'folder' | 'selected-files') => void;
   nativeSourceMode: 'folder' | 'selected-files' | null;
+  importSessionId: string | null;
   identifyNativeSimilarGroups: () => void;
   skippedCount: number;
   failedCount: number;
@@ -671,6 +673,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
   const [isNativeProcessingCancelled, setIsNativeProcessingCancelled] = useState(false);
   const isCancelledRef = useRef(false);
   const activeRunIdRef = useRef<string | null>(null);
+  const [importSessionId, setImportSessionId] = useState<string | null>(null);
+  const activeImportSessionIdRef = useRef<string | null>(null);
 
   const cancelNativeProcessing = () => {
     setIsNativeProcessingCancelled(true);
@@ -1150,11 +1154,17 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     // 释放旧的预览 URL 防止泄露
     photos.forEach(p => revokeBlobUrl(p.url));
 
+    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setImportSessionId(newSessionId);
+    activeImportSessionIdRef.current = newSessionId;
+
     // 设置项目名称
     setProjectName(name || '');
 
     // 重置所有分析和 Battle 相关状态
     setNativeSourceMode(null);
+    setDuplicateSignalResult(null);
+    setDuplicateGroupQA(null);
     setAnalysisProgress(0);
     setAnalysisLogs([]);
     setCurrentAnalysisIndex(-1);
@@ -1180,7 +1190,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
           category: '待分类',
           file: file, // 保存 File 对象
           sharpnessScore: 0,
-          exposureScore: 0
+          exposureScore: 0,
+          importSessionId: newSessionId
         };
       });
       setPhotos(uploadedItems);
@@ -1205,11 +1216,17 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     // 释放旧的预览 URL 防止泄露
     photos.forEach(p => revokeBlobUrl(p.url));
 
+    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setImportSessionId(newSessionId);
+    activeImportSessionIdRef.current = newSessionId;
+
     // 设置项目名称
     setProjectName(name || '');
 
     // 重置所有分析和 Battle 相关状态
     setNativeSourceMode(sourceMode);
+    setDuplicateSignalResult(null);
+    setDuplicateGroupQA(null);
     resetNativeProcessingCancelState();
     setAnalysisProgress(0);
     setAnalysisLogs([]);
@@ -1244,7 +1261,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
           exposureScore: 0,
           sourceId: item.id,
           sourceType: 'native-folder-preview',
-          extension: item.extension
+          extension: item.extension,
+          importSessionId: newSessionId
         };
       });
       setPhotos(nativeItems);
@@ -1265,6 +1283,8 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     // Generate unique session ID for this analysis run
     const runId = `run-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     activeRunIdRef.current = runId;
+
+    const currentImportSessionId = activeImportSessionIdRef.current;
 
     let currentPhotos = [...photos];
     if (currentPhotos.length === 0) {
@@ -1288,7 +1308,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       setAnalysisLogs((prev) => [...prev, '⚡ 正在初始化本地扫描计算模块...']);
 
       for (let i = 0; i < total; i++) {
-        if (isCancelledRef.current || activeRunIdRef.current !== runId) {
+        if (isCancelledRef.current || activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) {
           if (isCancelledRef.current) {
             setAnalysisLogs((prev) => [...prev, '🛑 停止分析：后续图片分析已被用户中止。']);
           }
@@ -1321,7 +1341,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
             const res = await analyzeImage(photo.file);
             
             // Guard check after await
-            if (activeRunIdRef.current !== runId) return;
+            if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) return;
             if (isCancelledRef.current) {
               for (let j = i; j < total; j++) {
                 updatedPhotos[j] = {
@@ -1371,7 +1391,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
               `  ✓ 综合得分: ${res.qualityScore} | 清晰度: ${res.sharpnessScore} | 亮度偏差: ${exposureValue > 0 ? '+' : ''}${exposureValue}`
             ]);
           } catch (err: unknown) {
-            if (activeRunIdRef.current !== runId) return;
+            if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) return;
             const errMsg = err instanceof Error ? err.message : '文件损坏或解析错误';
             setAnalysisLogs((prev) => [
               ...prev,
@@ -1404,7 +1424,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
               const { readNativePreviewBytes } = await import('@/lib/desktop/nativeReader');
               
               // Guard check after dynamic import await
-              if (activeRunIdRef.current !== runId) return;
+              if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) return;
               if (isCancelledRef.current) {
                 for (let j = i; j < total; j++) {
                   updatedPhotos[j] = {
@@ -1421,7 +1441,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
               const bytes = await readNativePreviewBytes(photo.id);
               
               // Guard check after reading bytes await
-              if (activeRunIdRef.current !== runId) return;
+              if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) return;
               if (isCancelledRef.current) {
                 for (let j = i; j < total; j++) {
                   updatedPhotos[j] = {
@@ -1447,7 +1467,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
               const res = await analyzeImageFromBlob(blob);
               
               // Guard check after analyzing blob await
-              if (activeRunIdRef.current !== runId) return;
+              if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) return;
               if (isCancelledRef.current) {
                 for (let j = i; j < total; j++) {
                   updatedPhotos[j] = {
@@ -1497,7 +1517,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
                 `  ✓ 综合得分: ${res.qualityScore} | 清晰度: ${res.sharpnessScore} | 亮度偏差: ${exposureValue > 0 ? '+' : ''}${exposureValue}`
               ]);
             } catch (err: unknown) {
-              if (activeRunIdRef.current !== runId) return;
+              if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) return;
               const errMsg = err instanceof Error ? err.message : '读取失败';
               setAnalysisLogs((prev) => [
                 ...prev,
@@ -1522,7 +1542,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
           await new Promise((resolve) => setTimeout(resolve, 800)); // 模拟异步加载
           
           // Guard check after timeout await
-          if (activeRunIdRef.current !== runId) return;
+          if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) return;
           if (isCancelledRef.current) {
             for (let j = i; j < total; j++) {
               updatedPhotos[j] = {
@@ -1589,7 +1609,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       }
 
       // Final guard checks before writing states
-      if (activeRunIdRef.current !== runId) {
+      if (activeRunIdRef.current !== runId || activeImportSessionIdRef.current !== currentImportSessionId) {
         return;
       }
 
@@ -1606,7 +1626,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       if (!isCancelledRef.current) {
         await new Promise((resolve) => setTimeout(resolve, 1200));
         // Guard check inside timeout
-        if (activeRunIdRef.current !== runId || isCancelledRef.current) {
+        if (activeRunIdRef.current !== runId || isCancelledRef.current || activeImportSessionIdRef.current !== currentImportSessionId) {
           return;
         }
         router.push('/results');
@@ -1694,6 +1714,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setSkippedCount(0);
     setFailedCount(0);
     setNativeSourceMode(null);
+    setImportSessionId(null);
+    activeImportSessionIdRef.current = null;
+    setDuplicateSignalResult(null);
+    setDuplicateGroupQA(null);
   };
 
   // 载入演示图片数据包
@@ -1702,6 +1726,10 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       window.sessionStorage.removeItem('ab_auto_opened');
     }
     photos.forEach(p => revokeBlobUrl(p.url));
+
+    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setImportSessionId(newSessionId);
+    activeImportSessionIdRef.current = newSessionId;
 
     // 重置所有分析和 Battle 相关状态
     setNativeSourceMode(null);
@@ -1716,8 +1744,17 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     setProjectName('演示旅行照片项目');
     setSkippedCount(0);
     setFailedCount(0);
+    setDuplicateSignalResult(null);
+    setDuplicateGroupQA(null);
 
-    const processed = detectDuplicates(MOCK_TRAVEL_PHOTOS);
+    const processed = detectDuplicates(MOCK_TRAVEL_PHOTOS.map((p, index) => {
+      const ext = p.name.split('.').pop() || 'jpg';
+      return {
+        ...p,
+        id: `demo-${newSessionId}-${index}-${p.size.replace(/\s+/g, '')}-${ext}`,
+        importSessionId: newSessionId
+      };
+    }));
     setPhotos(processed);
     runDuplicateQA(processed);
     initializeSimilarGroups(processed);
@@ -1775,6 +1812,7 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
         loadDemoPhotos,
         startNativeFolderAnalysis,
         nativeSourceMode,
+        importSessionId,
         identifyNativeSimilarGroups,
         skippedCount,
         failedCount,

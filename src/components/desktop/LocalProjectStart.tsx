@@ -58,7 +58,7 @@ interface LocalProjectStartProps {
 
 export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusChange }) => {
   const router = useRouter();
-  const { uploadFiles, loadDemoPhotos, startNativeFolderAnalysis } = usePhotoWorkspace();
+  const { uploadFiles, loadDemoPhotos, startNativeFolderAnalysis, resetWorkspace } = usePhotoWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const relinkFileInputRef = useRef<HTMLInputElement>(null);
   const webImageInputRef = useRef<HTMLInputElement>(null);
@@ -108,6 +108,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     setPreviews([]);
     setSelectedMode(null);
     setSelectedWebFiles([]);
+    resetWorkspace();
   };
 
   // 稳定性防护相关 Refs 与 timeouts
@@ -125,14 +126,21 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     return `本地照片项目 ${yyyy}-${mm}-${dd}`;
   };
 
+  const previewsRef = useRef<NativeImagePreviewItem[]>([]);
+  useEffect(() => {
+    previewsRef.current = previews;
+  }, [previews]);
+
   useEffect(() => {
     isMountedRef.current = true;
     setIsTauri(isTauriRuntime());
     setDefaultNamePlaceholder(getDefaultProjectName());
     setRecentProjects(getRecentLocalProjects());
+    resetWorkspace();
 
     return () => {
       isMountedRef.current = false;
+      clearWebPreviews(previewsRef.current);
       
       // 组件卸载时清理全局监听，防止内存泄露与脏回调
       if (activeFocusListenerRef.current) {

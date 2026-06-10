@@ -257,6 +257,7 @@ fn scan_folder_image_previews(
 
   let mut preview_items = Vec::new();
   let mut idx = 0;
+  let session_token = generate_opaque_token("session");
   
   let target_limit = match limit {
     Some(l) if l > 0 => std::cmp::min(l, 200),
@@ -302,7 +303,7 @@ fn scan_folder_image_previews(
                 size_bytes = metadata.len();
               }
 
-              let id = format!("native-preview-{}", idx);
+              let id = format!("native-preview-{}-{}-{}-{}", session_token, idx, size_bytes, ext);
               idx += 1;
 
               // Store canonicalized mapping in memory
@@ -364,6 +365,7 @@ fn scan_selected_image_files(
 
   let mut preview_items = Vec::new();
   let mut idx = 0;
+  let session_token = generate_opaque_token("session");
 
   for file_path_str in file_paths {
     if preview_items.len() >= target_limit {
@@ -392,7 +394,7 @@ fn scan_selected_image_files(
             Err(_) => 0,
           };
 
-          let id = format!("native-preview-{}", idx);
+          let id = format!("native-preview-{}-{}-{}-{}", session_token, idx, size_bytes, ext);
           idx += 1;
 
           // Store in active files and mapping
