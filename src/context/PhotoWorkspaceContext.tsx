@@ -915,22 +915,20 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     let nextIndex = activeBattle.nextIndex;
     let roundIndex = activeBattle.roundIndex;
 
-    const newRecommended = [...activeBattle.recommendedKeepIds];
-    const newBackup = [...activeBattle.similarBackupIds];
-    const newCull = [...activeBattle.cullCandidateIds];
+    let newRecommended = [...activeBattle.recommendedKeepIds];
+    let newBackup = [...activeBattle.similarBackupIds];
+    let newCull = [...activeBattle.cullCandidateIds];
     const newUndecided = activeBattle.undecidedIds.filter(id => id !== leftId && id !== rightId);
-
-    const leftPhoto = photos.find(p => p.id === leftId);
-    const rightPhoto = photos.find(p => p.id === rightId);
 
     if (decisionType === 'keep_left') {
       if (!newRecommended.includes(leftId)) {
         newRecommended.push(leftId);
       }
-      if (rightPhoto && rightPhoto.score < 60) {
+      newRecommended = newRecommended.filter(id => id !== rightId);
+      newBackup = newBackup.filter(id => id !== leftId && id !== rightId);
+      newCull = newCull.filter(id => id !== leftId);
+      if (!newCull.includes(rightId)) {
         newCull.push(rightId);
-      } else {
-        newBackup.push(rightId);
       }
       nextIndex += 1;
       roundIndex += 1;
@@ -938,10 +936,11 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
       if (!newRecommended.includes(rightId)) {
         newRecommended.push(rightId);
       }
-      if (leftPhoto && leftPhoto.score < 60) {
+      newRecommended = newRecommended.filter(id => id !== leftId);
+      newBackup = newBackup.filter(id => id !== leftId && id !== rightId);
+      newCull = newCull.filter(id => id !== rightId);
+      if (!newCull.includes(leftId)) {
         newCull.push(leftId);
-      } else {
-        newBackup.push(leftId);
       }
       nextCandidateId = rightId;
       nextIndex += 1;
@@ -949,11 +948,15 @@ export const PhotoWorkspaceProvider: React.FC<{ children: React.ReactNode }> = (
     } else if (decisionType === 'keep_both') {
       if (!newRecommended.includes(leftId)) newRecommended.push(leftId);
       if (!newRecommended.includes(rightId)) newRecommended.push(rightId);
+      newBackup = newBackup.filter(id => id !== leftId && id !== rightId);
+      newCull = newCull.filter(id => id !== leftId && id !== rightId);
       nextIndex += 1;
       roundIndex += 1;
     } else if (decisionType === 'cull_both') {
-      newCull.push(leftId);
-      newCull.push(rightId);
+      newRecommended = newRecommended.filter(id => id !== leftId && id !== rightId);
+      newBackup = newBackup.filter(id => id !== leftId && id !== rightId);
+      if (!newCull.includes(leftId)) newCull.push(leftId);
+      if (!newCull.includes(rightId)) newCull.push(rightId);
       if (nextIndex + 1 < activeBattle.contenderIds.length) {
         nextCandidateId = activeBattle.contenderIds[nextIndex + 1];
         nextIndex += 2;
