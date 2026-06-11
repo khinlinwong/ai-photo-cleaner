@@ -1002,6 +1002,7 @@ export default function ResultsPage() {
       }
     } catch (err) {
       console.error('Failed to export CSV manifest:', err);
+      setToastMessage("无法打开保存窗口，请重新安装最新版后再试。");
     }
   };
 
@@ -1049,6 +1050,7 @@ export default function ResultsPage() {
       }
     } catch (err) {
       console.error('Failed to export JSON manifest:', err);
+      setToastMessage("无法打开保存窗口，请重新安装最新版后再试。");
     }
   };
 
