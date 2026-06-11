@@ -1244,7 +1244,7 @@ async fn copy_keep_photos_to_folder(
     }
   }
 
-  // 校验源路径重叠逻辑
+  // 校验源路径与目标目录重叠逻辑 (不局限于单一 ACTIVE_FOLDER)
   let active_folder = {
     let guard = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "系统锁定错误".to_string())?;
     guard.clone()
@@ -1256,7 +1256,7 @@ async fn copy_keep_photos_to_folder(
          || dest_canon.starts_with(&src_canon) 
          || src_canon.starts_with(&dest_canon) 
       {
-        return Err("安全拒绝：输出文件夹不能是源文件夹、源文件夹的子文件夹，或源文件夹的父文件夹。".to_string());
+        return Err("安全拒绝：导出目标不能是原照片所在文件夹或其子文件夹，请选择一个新的空文件夹。".to_string());
       }
     }
   }
@@ -1268,17 +1268,14 @@ async fn copy_keep_photos_to_folder(
     .unwrap_or("目标文件夹")
     .to_string();
 
-  let mut copied_count = 0;
-  let mut skipped_count = 0;
-  let mut failed_count = 0;
-  let mut errors = Vec::new();
+  // 第一轮：Pre-flight 安全与重叠性校验，并收集准备复制的条目
+  let mut ready_items = Vec::new();
 
-  for photo_id in keep_photo_ids {
-    // 2. 根据 id 从 PREVIEW_MAPPING 查找路径
+  for photo_id in &keep_photo_ids {
     let file_path = {
       let mapping = get_preview_mapping();
       if let Ok(guard) = mapping.lock() {
-        guard.get(&photo_id).cloned()
+        guard.get(photo_id).cloned()
       } else {
         None
       }
@@ -1286,33 +1283,36 @@ async fn copy_keep_photos_to_folder(
 
     let file_path = match file_path {
       Some(path) => path,
-      None => {
-        skipped_count += 1;
-        errors.push("未找到部分源图片文件缓存".to_string());
-        continue;
-      }
+      None => return Err("未找到部分源图片文件缓存，请刷新后重试。".to_string()),
     };
 
     // 校验安全性与授权范围
     let file_path_canon = match file_path.canonicalize() {
       Ok(p) => p,
-      Err(_) => {
-        failed_count += 1;
-        errors.push("源文件路径解析失败".to_string());
-        continue;
-      }
+      Err(_) => return Err("源照片路径解析失败，请检查文件是否存在。".to_string()),
     };
 
     if !verify_in_active_folder(&file_path_canon) {
-      failed_count += 1;
-      errors.push("安全拒绝：超出源文件夹授权范围".to_string());
-      continue;
+      return Err("安全拒绝：部分文件超出授权扫描范围。".to_string());
     }
 
     if !file_path_canon.exists() {
-      failed_count += 1;
-      errors.push("源图片不存在，可能已被移动或删除".to_string());
-      continue;
+      return Err("源图片不存在，可能已被移动或删除。".to_string());
+    }
+
+    // 核心重叠检查：对每个待复制原文件 parent 进行检查
+    if let Some(source_parent) = file_path_canon.parent() {
+      let source_parent_canon = match source_parent.canonicalize() {
+        Ok(p) => p,
+        Err(_) => return Err("解析源照片所在文件夹路径失败。".to_string()),
+      };
+
+      if dest_canon == source_parent_canon 
+         || dest_canon.starts_with(&source_parent_canon) 
+         || source_parent_canon.starts_with(&dest_canon) 
+      {
+        return Err("安全拒绝：导出目标不能是原照片所在文件夹或其子文件夹，请选择一个新的空文件夹。".to_string());
+      }
     }
 
     let ext = file_path_canon
@@ -1327,7 +1327,15 @@ async fn copy_keep_photos_to_folder(
       .unwrap_or("photo")
       .to_string();
 
-    // 3. 处理同名冲突，避免覆盖
+    ready_items.push((file_path_canon, file_stem, ext));
+  }
+
+  // 第二轮：物理拷贝阶段 (此时已完全确认所有目标路径安全，无部分拷贝失败风险)
+  let mut copied_count = 0;
+  let mut failed_count = 0;
+  let mut errors = Vec::new();
+
+  for (file_path_canon, file_stem, ext) in ready_items {
     let mut final_filename = if ext.is_empty() {
       file_stem.clone()
     } else {
@@ -1358,7 +1366,6 @@ async fn copy_keep_photos_to_folder(
       }
     }
 
-    // 4. 执行复制
     if let Some(mut dest) = dest_file {
       match fs::File::open(&file_path_canon) {
         Ok(mut src) => {
@@ -1383,12 +1390,11 @@ async fn copy_keep_photos_to_folder(
     }
   }
 
-  // 保证 errors 唯一且简洁
   errors.dedup();
 
   Ok(KeepCopySummary {
     copied_count,
-    skipped_count,
+    skipped_count: 0,
     failed_count,
     target_folder_name,
     errors,
