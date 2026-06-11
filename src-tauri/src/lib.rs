@@ -1207,11 +1207,7 @@ async fn copy_keep_photos_to_folder(
   output_folder_token: String,
   keep_photo_ids: Vec<String>,
 ) -> Result<KeepCopySummary, String> {
-  if keep_photo_ids.is_empty() {
-    return Err("没有保留照片可导出。".to_string());
-  }
-
-  // 1. 根据 token 找到目标输出文件夹
+  // A. 解析 output_folder_token 得到 output_dir
   let output_path = {
     let mapping = get_output_folder_mapping();
     let guard = mapping.lock().map_err(|_| "系统锁定错误".to_string())?;
@@ -1223,7 +1219,7 @@ async fn copy_keep_photos_to_folder(
     None => return Err("输出位置已失效，请重新选择输出位置。".to_string()),
   };
 
-  // 校验目标文件夹存在且可写（可通过创建临时文件确认其可写性）
+  // B. canonicalize output_dir
   let dest_canon = match output_path.canonicalize() {
     Ok(p) => p,
     Err(_) => return Err("安全拒绝：无法解析输出位置的绝对路径，可能不存在或无权限。".to_string()),
@@ -1233,15 +1229,9 @@ async fn copy_keep_photos_to_folder(
     return Err("目标文件夹不可用，可能已被移动或删除。".to_string());
   }
 
-  // 测试写入权限
-  let test_write_file = dest_canon.join(".ai_photo_cleaner_write_test");
-  match fs::write(&test_write_file, "write_test") {
-    Ok(_) => {
-      let _ = fs::remove_file(test_write_file);
-    }
-    Err(_) => {
-      return Err("目标文件夹没有写入权限，请重新选择。".to_string());
-    }
+  // C. 校验 keep_photo_ids 非空
+  if keep_photo_ids.is_empty() {
+    return Err("没有保留照片可导出。".to_string());
   }
 
   // 校验源路径与目标目录重叠逻辑 (不局限于单一 ACTIVE_FOLDER)
@@ -1330,7 +1320,18 @@ async fn copy_keep_photos_to_folder(
     ready_items.push((file_path_canon, file_stem, ext));
   }
 
-  // 第二轮：物理拷贝阶段 (此时已完全确认所有目标路径安全，无部分拷贝失败风险)
+  // 核心重叠检查和安全性校验全部通过后，此时才进行目标位置的写权限测试，杜绝在不安全目标创建临时文件
+  let test_write_file = dest_canon.join(".ai_photo_cleaner_write_test");
+  match fs::write(&test_write_file, "write_test") {
+    Ok(_) => {
+      let _ = fs::remove_file(test_write_file);
+    }
+    Err(_) => {
+      return Err("目标文件夹没有写入权限，请重新选择。".to_string());
+    }
+  }
+
+  // 第二轮：物理拷贝阶段 (此时已完全确认所有目标路径安全且可写，无中途失败风险)
   let mut copied_count = 0;
   let mut failed_count = 0;
   let mut errors = Vec::new();
