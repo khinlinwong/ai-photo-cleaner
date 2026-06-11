@@ -81,3 +81,37 @@ export async function clearPhysicalOrgSession(): Promise<boolean> {
     return false;
   }
 }
+
+export interface KeepCopySummary {
+  copiedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  targetFolderName: string;
+  errors: string[];
+}
+
+/**
+ * Copies keep-only photos to the selected target folder.
+ */
+export async function copyKeepPhotosToFolder(
+  outputFolderToken: string,
+  keepPhotoIds: string[]
+): Promise<KeepCopySummary | null> {
+  if (!isTauriRuntime()) {
+    console.warn('[PhysicalOrgBridge] copyKeepPhotosToFolder is only available in Tauri runtime.');
+    return null;
+  }
+
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const result = await invoke<KeepCopySummary>('copy_keep_photos_to_folder', {
+      outputFolderToken,
+      keepPhotoIds,
+    });
+    return result;
+  } catch (err) {
+    console.error('[PhysicalOrgBridge] Failed to execute copyKeepPhotosToFolder.', err);
+    throw err;
+  }
+}
+

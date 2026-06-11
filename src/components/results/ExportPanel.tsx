@@ -18,6 +18,11 @@ export interface ExportPanelProps {
   onContinueBattle: () => void;
   onRestart: () => void;
   hasNativeSource?: boolean;
+  onExportKeepToFolder?: () => void;
+  isFolderExporting?: boolean;
+  folderExportStatus?: 'idle' | 'success' | 'failed';
+  folderExportResultCount?: number;
+  folderExportError?: string | null;
 }
 
 export function ExportPanel({
@@ -36,7 +41,12 @@ export function ExportPanel({
   onExportManifestJson,
   onContinueBattle,
   onRestart,
-  hasNativeSource = false
+  hasNativeSource = false,
+  onExportKeepToFolder,
+  isFolderExporting = false,
+  folderExportStatus = 'idle',
+  folderExportResultCount = 0,
+  folderExportError = null
 }: ExportPanelProps) {
   return (
     <div 
@@ -71,20 +81,38 @@ export function ExportPanel({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        {/* ZIP Export Section */}
+        {/* ZIP / Folder Export Section */}
         <div className="flex-1 min-w-[280px]">
           {hasNativeSource ? (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <button
-                disabled={true}
-                className="desktop-button-primary text-[10px] py-1.5 opacity-40 cursor-not-allowed flex items-center justify-center gap-1.5 font-bold shrink-0"
-              >
-                <Download className="h-3.5 w-3.5" />
-                导出保留照片 ZIP
-              </button>
-              <span className="text-[10px] text-amber-400/90 bg-amber-500/5 px-2.5 py-1 rounded border border-amber-500/10 font-medium">
-                💡 桌面端本地照片暂不提供 ZIP 打包，本地原图保持不变。您可以先导出整理清单。
-              </span>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <button
+                  onClick={onExportKeepToFolder}
+                  disabled={keepCount === 0 || isFolderExporting}
+                  className="desktop-button-primary text-[10px] py-1.5 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold shrink-0 min-w-[150px]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isFolderExporting ? "正在导出照片..." : "导出保留照片到文件夹"}
+                </button>
+                <span className="text-[10px] text-emerald-400/90 bg-emerald-500/5 px-2.5 py-1 rounded border border-emerald-500/10 font-medium">
+                  💡 桌面端将复制保留照片到您选择的文件夹，原图不会被修改。
+                </span>
+              </div>
+              {keepCount === 0 && (
+                <div className="text-[10px] text-amber-400/90 font-medium text-left">
+                  ⚠️ 没有保留照片可导出。请在整理结果中标记保留照片。
+                </div>
+              )}
+              {folderExportStatus === 'success' && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2 rounded text-[10px] text-left font-medium animate-fade-in">
+                  🎉 已成功导出 {folderExportResultCount} 张保留照片！
+                </div>
+              )}
+              {folderExportStatus === 'failed' && (
+                <div className="bg-[#B96F68]/15 border border-[#B96F68]/30 text-[#B96F68] p-2 rounded text-[10px] text-left font-medium animate-fade-in leading-relaxed">
+                  ❌ 导出失败：{folderExportError || '无法写入目标位置，请重试。'}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-3">

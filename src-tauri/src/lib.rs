@@ -1189,6 +1189,212 @@ fn clear_physical_org_session() -> Result<(), String> {
   Ok(())
 }
 
+#[derive(Serialize, Clone)]
+pub struct KeepCopySummary {
+  #[serde(rename = "copiedCount")]
+  copied_count: usize,
+  #[serde(rename = "skippedCount")]
+  skipped_count: usize,
+  #[serde(rename = "failedCount")]
+  failed_count: usize,
+  #[serde(rename = "targetFolderName")]
+  target_folder_name: String,
+  errors: Vec<String>,
+}
+
+#[tauri::command]
+async fn copy_keep_photos_to_folder(
+  output_folder_token: String,
+  keep_photo_ids: Vec<String>,
+) -> Result<KeepCopySummary, String> {
+  if keep_photo_ids.is_empty() {
+    return Err("没有保留照片可导出。".to_string());
+  }
+
+  // 1. 根据 token 找到目标输出文件夹
+  let output_path = {
+    let mapping = get_output_folder_mapping();
+    let guard = mapping.lock().map_err(|_| "系统锁定错误".to_string())?;
+    guard.get(&output_folder_token).cloned()
+  };
+
+  let output_path = match output_path {
+    Some(path) => path,
+    None => return Err("输出位置已失效，请重新选择输出位置。".to_string()),
+  };
+
+  // 校验目标文件夹存在且可写（可通过创建临时文件确认其可写性）
+  let dest_canon = match output_path.canonicalize() {
+    Ok(p) => p,
+    Err(_) => return Err("安全拒绝：无法解析输出位置的绝对路径，可能不存在或无权限。".to_string()),
+  };
+
+  if !dest_canon.exists() || !dest_canon.is_dir() {
+    return Err("目标文件夹不可用，可能已被移动或删除。".to_string());
+  }
+
+  // 测试写入权限
+  let test_write_file = dest_canon.join(".ai_photo_cleaner_write_test");
+  match fs::write(&test_write_file, "write_test") {
+    Ok(_) => {
+      let _ = fs::remove_file(test_write_file);
+    }
+    Err(_) => {
+      return Err("目标文件夹没有写入权限，请重新选择。".to_string());
+    }
+  }
+
+  // 校验源路径重叠逻辑
+  let active_folder = {
+    let guard = ACTIVE_FOLDER.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "系统锁定错误".to_string())?;
+    guard.clone()
+  };
+
+  if let Some(src_path) = active_folder {
+    if let Ok(src_canon) = src_path.canonicalize() {
+      if dest_canon == src_canon 
+         || dest_canon.starts_with(&src_canon) 
+         || src_canon.starts_with(&dest_canon) 
+      {
+        return Err("安全拒绝：输出文件夹不能是源文件夹、源文件夹的子文件夹，或源文件夹的父文件夹。".to_string());
+      }
+    }
+  }
+
+  // 目标文件夹名称脱敏，只返回文件夹基本名
+  let target_folder_name = dest_canon
+    .file_name()
+    .and_then(|n| n.to_str())
+    .unwrap_or("目标文件夹")
+    .to_string();
+
+  let mut copied_count = 0;
+  let mut skipped_count = 0;
+  let mut failed_count = 0;
+  let mut errors = Vec::new();
+
+  for photo_id in keep_photo_ids {
+    // 2. 根据 id 从 PREVIEW_MAPPING 查找路径
+    let file_path = {
+      let mapping = get_preview_mapping();
+      if let Ok(guard) = mapping.lock() {
+        guard.get(&photo_id).cloned()
+      } else {
+        None
+      }
+    };
+
+    let file_path = match file_path {
+      Some(path) => path,
+      None => {
+        skipped_count += 1;
+        errors.push("未找到部分源图片文件缓存".to_string());
+        continue;
+      }
+    };
+
+    // 校验安全性与授权范围
+    let file_path_canon = match file_path.canonicalize() {
+      Ok(p) => p,
+      Err(_) => {
+        failed_count += 1;
+        errors.push("源文件路径解析失败".to_string());
+        continue;
+      }
+    };
+
+    if !verify_in_active_folder(&file_path_canon) {
+      failed_count += 1;
+      errors.push("安全拒绝：超出源文件夹授权范围".to_string());
+      continue;
+    }
+
+    if !file_path_canon.exists() {
+      failed_count += 1;
+      errors.push("源图片不存在，可能已被移动或删除".to_string());
+      continue;
+    }
+
+    let ext = file_path_canon
+      .extension()
+      .and_then(|e| e.to_str())
+      .unwrap_or("")
+      .to_lowercase();
+
+    let file_stem = file_path_canon
+      .file_stem()
+      .and_then(|s| s.to_str())
+      .unwrap_or("photo")
+      .to_string();
+
+    // 3. 处理同名冲突，避免覆盖
+    let mut final_filename = if ext.is_empty() {
+      file_stem.clone()
+    } else {
+      format!("{}.{}", file_stem, ext)
+    };
+
+    let mut dest_path = dest_canon.join(&final_filename);
+    let mut collision_counter = 1;
+    let mut dest_file = None;
+
+    while dest_file.is_none() {
+      match fs::OpenOptions::new().write(true).create_new(true).open(&dest_path) {
+        Ok(file) => {
+          dest_file = Some(file);
+        }
+        Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+          final_filename = if ext.is_empty() {
+            format!("{}-{}", file_stem, collision_counter)
+          } else {
+            format!("{}-{}.{}", file_stem, collision_counter, ext)
+          };
+          dest_path = dest_canon.join(&final_filename);
+          collision_counter += 1;
+        }
+        Err(_) => {
+          break;
+        }
+      }
+    }
+
+    // 4. 执行复制
+    if let Some(mut dest) = dest_file {
+      match fs::File::open(&file_path_canon) {
+        Ok(mut src) => {
+          match std::io::copy(&mut src, &mut dest) {
+            Ok(_) => {
+              copied_count += 1;
+            }
+            Err(_) => {
+              failed_count += 1;
+              errors.push("写入目标文件内容失败，磁盘可能已满。".to_string());
+            }
+          }
+        }
+        Err(_) => {
+          failed_count += 1;
+          errors.push("无法打开源文件进行读取。".to_string());
+        }
+      }
+    } else {
+      failed_count += 1;
+      errors.push("无法创建目标文件，可能无权限。".to_string());
+    }
+  }
+
+  // 保证 errors 唯一且简洁
+  errors.dedup();
+
+  Ok(KeepCopySummary {
+    copied_count,
+    skipped_count,
+    failed_count,
+    target_folder_name,
+    errors,
+  })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -1248,7 +1454,8 @@ pub fn run() {
       select_physical_org_output_folder,
       create_physical_org_dry_run,
       execute_physical_org_copy,
-      clear_physical_org_session
+      clear_physical_org_session,
+      copy_keep_photos_to_folder
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

@@ -356,6 +356,10 @@ export default function ResultsPage() {
     setFilteredGroupId(null);
   }, [activeTab]);
   const [exportOpen, setExportOpen] = useState(false);
+  const [isFolderExporting, setIsFolderExporting] = useState(false);
+  const [folderExportStatus, setFolderExportStatus] = useState<'idle' | 'success' | 'failed'>('idle');
+  const [folderExportResultCount, setFolderExportResultCount] = useState(0);
+  const [folderExportError, setFolderExportError] = useState<string | null>(null);
   const [isExportClosing, setIsExportClosing] = useState(false);
   const [localActiveBattle, setLocalActiveBattle] = useState<ActiveBattleState | null>(null);
   const [isBattleClosing, setIsBattleClosing] = useState(false);
@@ -671,6 +675,10 @@ export default function ResultsPage() {
     setTimeout(() => {
       setExportOpen(false);
       setIsExportClosing(false);
+      // 重置文件夹导出状态
+      setFolderExportStatus('idle');
+      setFolderExportResultCount(0);
+      setFolderExportError(null);
     }, 220);
   }, []);
 
@@ -995,6 +1003,67 @@ export default function ResultsPage() {
     }
   };
 
+  const handleExportKeepToFolder = async () => {
+    const keepPhotosList = photos.filter((p) => getUserVisibleBucket(p) === 'keep');
+    if (keepPhotosList.length === 0) {
+      setFolderExportError("没有保留照片可导出。");
+      setFolderExportStatus('failed');
+      return;
+    }
+
+    setIsFolderExporting(true);
+    setFolderExportStatus('idle');
+    setFolderExportError(null);
+
+    try {
+      // 1. 选择目标文件夹 (复用 selectPhysicalOrgOutputFolder)
+      const res = await selectPhysicalOrgOutputFolder();
+      if (!res) {
+        // 用户取消或没有返回结果
+        setIsFolderExporting(false);
+        return;
+      }
+
+      const [outputFolderToken] = res;
+
+      // 2. 收集 keep_photo_ids
+      const keepPhotoIds = keepPhotosList.map(p => p.id);
+
+      // 3. 调用 physicalOrgBridge 中的 copyKeepPhotosToFolder
+      const { copyKeepPhotosToFolder } = await import('@/lib/desktop/physicalOrgBridge');
+      const summary = await copyKeepPhotosToFolder(outputFolderToken, keepPhotoIds);
+
+      if (summary) {
+        if (summary.failedCount > 0 && summary.copiedCount === 0) {
+          setFolderExportStatus('failed');
+          setFolderExportError(summary.errors.join('; ') || "文件复制全部失败，请检查写入权限或目标路径可写性。");
+          setToastMessage("导出失败。");
+        } else if (summary.failedCount > 0) {
+          setFolderExportStatus('success');
+          setFolderExportResultCount(summary.copiedCount);
+          setFolderExportError(`部分照片导出失败: ${summary.errors.join('; ')}`);
+          setToastMessage(`导出完成，成功 ${summary.copiedCount} 张，失败 ${summary.failedCount} 张。`);
+        } else {
+          setFolderExportStatus('success');
+          setFolderExportResultCount(summary.copiedCount);
+          setToastMessage(`成功导出 ${summary.copiedCount} 张保留照片！`);
+        }
+      } else {
+        setFolderExportStatus('failed');
+        setFolderExportError("物理拷贝操作未返回结果，请检查本地环境。");
+        setToastMessage("导出失败。");
+      }
+    } catch (err) {
+      console.error('Failed to execute keep copy to folder:', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setFolderExportStatus('failed');
+      setFolderExportError(sanitizePathString(errMsg || "执行照片导出时发生异常。"));
+      setToastMessage("导出发生错误。");
+    } finally {
+      setIsFolderExporting(false);
+    }
+  };
+
   // 纯客户端分批打包下载保留照片整理包 (JSZip)
   const downloadPhotosZip = async () => {
     // 增加 helper 判断，Native source 不允许 ZIP 导出
@@ -1310,12 +1379,15 @@ export default function ResultsPage() {
         <div className="flex-1 flex overflow-hidden relative">
           {/* Sidebar Navigation */}
           <DesktopSidebar 
-            activeId="review" 
+            activeId={exportOpen ? "export" : "review"} 
             onExportClick={(rect) => {
               setExportAnchorRect(rect);
               if (exportOpen) {
                 handleCloseExport();
               } else {
+                setFolderExportStatus('idle');
+                setFolderExportResultCount(0);
+                setFolderExportError(null);
                 setExportOpen(true);
               }
             }} 
@@ -1876,6 +1948,11 @@ export default function ResultsPage() {
                 handleCloseExport();
               }}
               hasNativeSource={hasNativeSource}
+              onExportKeepToFolder={handleExportKeepToFolder}
+              isFolderExporting={isFolderExporting}
+              folderExportStatus={folderExportStatus}
+              folderExportResultCount={folderExportResultCount}
+              folderExportError={folderExportError}
             />
           </div>
         </>
