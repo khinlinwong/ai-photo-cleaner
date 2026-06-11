@@ -40,6 +40,7 @@ import { ExportPanel } from '@/components/results/ExportPanel';
 import { PhotoBucketSection } from '@/components/results/PhotoBucketSection';
 import { selectPhysicalOrgOutputFolder, createPhysicalOrgDryRun, executePhysicalOrgCopy, clearPhysicalOrgSession } from '@/lib/desktop/physicalOrgBridge';
 import { PhysicalOrgDryRunResult, PhysicalOrgExecutionResult } from '@/lib/desktop/physicalOrgTypes';
+import { isTauriRuntime } from '@/lib/desktop/tauriEnvironment';
 
 
 // 延时辅助函数
@@ -957,47 +958,95 @@ export default function ResultsPage() {
     return batches;
   }
 
-  const handleExportManifestCsv = () => {
+  const handleExportManifestCsv = async () => {
     if (photos.length === 0) return;
     try {
       const rows = buildManifestRows(photos);
       const csvContent = buildManifestCsv(rows);
       
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = buildManifestExportFilename(projectName, 'csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 10000);
+      if (isTauriRuntime()) {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { invoke } = await import('@tauri-apps/api/core');
+        
+        const filePath = await save({
+          defaultPath: 'ai-photo-cleaner-export.csv',
+          filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+        });
+        
+        if (!filePath) {
+          // 用户取消保存，直接返回，不提示任何错误或成功
+          return;
+        }
+        
+        try {
+          await invoke('save_text_file', { targetPath: filePath, contents: csvContent });
+          setToastMessage("CSV 整理清单已导出");
+        } catch (writeErr) {
+          console.error('Failed to write CSV manifest in Tauri:', writeErr);
+          const errMsg = writeErr instanceof Error ? writeErr.message : String(writeErr);
+          setToastMessage(`导出失败：${sanitizePathString(errMsg)}`);
+        }
+      } else {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = buildManifestExportFilename(projectName, 'csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 10000);
+      }
     } catch (err) {
       console.error('Failed to export CSV manifest:', err);
     }
   };
 
-  const handleExportManifestJson = () => {
+  const handleExportManifestJson = async () => {
     if (photos.length === 0) return;
     try {
       const rows = buildManifestRows(photos);
       const jsonContent = buildManifestJson(rows, projectName);
       
-      const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = buildManifestExportFilename(projectName, 'json');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 10000);
+      if (isTauriRuntime()) {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { invoke } = await import('@tauri-apps/api/core');
+        
+        const filePath = await save({
+          defaultPath: 'ai-photo-cleaner-export.json',
+          filters: [{ name: 'JSON Files', extensions: ['json'] }]
+        });
+        
+        if (!filePath) {
+          // 用户取消保存，直接返回，不提示任何错误或成功
+          return;
+        }
+        
+        try {
+          await invoke('save_text_file', { targetPath: filePath, contents: jsonContent });
+          setToastMessage("JSON 整理清单已导出");
+        } catch (writeErr) {
+          console.error('Failed to write JSON manifest in Tauri:', writeErr);
+          const errMsg = writeErr instanceof Error ? writeErr.message : String(writeErr);
+          setToastMessage(`导出失败：${sanitizePathString(errMsg)}`);
+        }
+      } else {
+        const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = buildManifestExportFilename(projectName, 'json');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 10000);
+      }
     } catch (err) {
       console.error('Failed to export JSON manifest:', err);
     }

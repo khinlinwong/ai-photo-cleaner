@@ -1203,6 +1203,15 @@ pub struct KeepCopySummary {
 }
 
 #[tauri::command]
+fn save_text_file(target_path: String, contents: String) -> Result<bool, String> {
+  let path = std::path::Path::new(&target_path);
+  std::fs::write(path, contents).map_err(|_| {
+    "写入文件失败，请确认目标位置可写。".to_string()
+  })?;
+  Ok(true)
+}
+
+#[tauri::command]
 async fn copy_keep_photos_to_folder(
   output_folder_token: String,
   keep_photo_ids: Vec<String>,
@@ -1462,7 +1471,8 @@ pub fn run() {
       create_physical_org_dry_run,
       execute_physical_org_copy,
       clear_physical_org_session,
-      copy_keep_photos_to_folder
+      copy_keep_photos_to_folder,
+      save_text_file
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
