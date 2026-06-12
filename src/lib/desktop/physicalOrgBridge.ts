@@ -12,11 +12,11 @@ export async function selectPhysicalOrgOutputFolder(): Promise<[string, string] 
 
   try {
     const { invoke } = await import('@tauri-apps/api/core');
-    const result = await invoke<[string, string]>('select_physical_org_output_folder');
+    const result = await invoke<[string, string] | null>('select_physical_org_output_folder');
     return result;
-  } catch {
-    console.error('[PhysicalOrgBridge] Failed to select output folder.');
-    return null;
+  } catch (err) {
+    console.error('[PhysicalOrgBridge] Failed to select output folder.', err);
+    throw err;
   }
 }
 

@@ -406,11 +406,10 @@ export default function ResultsPage() {
       if (res) {
         setPhysicalOrgToken(res[0]);
         setPhysicalOrgLabel(res[1]);
-      } else {
-        setOrgError("输出位置不可用，请重新选择输出位置。");
       }
-    } catch {
-      setOrgError("输出位置不可用，请重新选择输出位置。");
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setOrgError(sanitizePathString(errMsg || "输出位置不可用，请重新选择输出位置。"));
     }
   };
 

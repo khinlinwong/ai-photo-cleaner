@@ -593,7 +593,7 @@ pub struct PhysicalOrgExecutionResult {
 #[tauri::command]
 async fn select_physical_org_output_folder(
   app: tauri::AppHandle,
-) -> Result<(String, String), String> {
+) -> Result<Option<(String, String)>, String> {
   let (tx, rx) = std::sync::mpsc::channel();
   
   app.dialog().file().pick_folder(move |file_path| {
@@ -603,7 +603,7 @@ async fn select_physical_org_output_folder(
   let file_path_opt = rx.recv().map_err(|_| "选择目录对话框被取消。".to_string())?;
   let file_path = match file_path_opt {
     Some(fp) => fp,
-    None => return Err("用户取消了选择。".to_string()),
+    None => return Ok(None),
   };
   
   let raw_path = match file_path {
@@ -629,7 +629,23 @@ async fn select_physical_org_output_folder(
        || canonical_path.starts_with(&src_canon) 
        || src_canon.starts_with(&canonical_path) 
     {
-      return Err("安全拒绝：输出文件夹不能是源文件夹、源文件夹的子文件夹，或源文件夹的父文件夹。".to_string());
+      return Err("安全拒绝：导出目标不能是原照片所在文件夹或其子文件夹，请选择一个新的空文件夹。".to_string());
+    }
+  }
+
+  // Also check overlap with active files' parents if present (for selected-files mode)
+  if let Ok(active_files_guard) = get_active_files().lock() {
+    for src_file_path in active_files_guard.iter() {
+      if let Some(source_parent) = src_file_path.parent() {
+        if let Ok(source_parent_canon) = source_parent.canonicalize() {
+          if canonical_path == source_parent_canon 
+             || canonical_path.starts_with(&source_parent_canon) 
+             || source_parent_canon.starts_with(&canonical_path) 
+          {
+            return Err("安全拒绝：导出目标不能是原照片所在文件夹或其子文件夹，请选择一个新的空文件夹。".to_string());
+          }
+        }
+      }
     }
   }
 
@@ -644,7 +660,7 @@ async fn select_physical_org_output_folder(
   }
 
   // Return (token, "已选择输出位置")
-  Ok((token, "已选择输出位置".to_string()))
+  Ok(Some((token, "已选择输出位置".to_string())))
 }
 
 #[tauri::command]
@@ -677,6 +693,22 @@ fn create_physical_org_dry_run(
        || src_canon.starts_with(&output_path) 
     {
       return Err("安全拒绝：输出文件夹不能与源文件夹相同，且不能是层级重叠的子/父文件夹。".to_string());
+    }
+  }
+
+  // Also check active files' parents in dry-run
+  if let Ok(active_files_guard) = get_active_files().lock() {
+    for src_file_path in active_files_guard.iter() {
+      if let Some(source_parent) = src_file_path.parent() {
+        if let Ok(source_parent_canon) = source_parent.canonicalize() {
+          if output_path == source_parent_canon 
+             || output_path.starts_with(&source_parent_canon) 
+             || source_parent_canon.starts_with(&output_path) 
+          {
+            return Err("安全拒绝：输出文件夹不能是原照片所在文件夹或其子文件夹，请选择一个新的空文件夹。".to_string());
+          }
+        }
+      }
     }
   }
 
