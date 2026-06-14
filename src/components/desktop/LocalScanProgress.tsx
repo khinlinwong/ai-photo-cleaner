@@ -61,28 +61,36 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
       if (taskIndex <= 1) return 'completed';
       return 'pending';
     }
-    if (analysisProgress === 0) return 'pending';
+    if (!isAnalyzing && analysisProgress === 0) return 'pending';
+
+    const total = photos.length;
 
     switch (taskIndex) {
-      case 0:
-        if (analysisProgress >= 15) return 'completed';
-        return 'active';
-      case 1:
-        if (analysisProgress >= 75) return 'completed';
-        if (analysisProgress >= 15) return 'active';
+      case 0: // 读取本地照片 (Reading files)
+        if (currentAnalysisIndex >= 0 || analysisProgress > 0) return 'completed';
+        if (isAnalyzing) return 'active';
         return 'pending';
-      case 2:
-        if (analysisProgress >= 95) return 'completed';
-        if (analysisProgress >= 75) return 'active';
+
+      case 1: // 分析清晰度与曝光 (Analyzing focus & exposure)
+        if (isAnalyzing && currentAnalysisIndex >= 0 && currentAnalysisIndex < total - 1) return 'active';
+        if (currentAnalysisIndex >= total - 1 || analysisProgress === 100) return 'completed';
         return 'pending';
-      case 3:
-        if (analysisProgress === 100) return 'completed';
-        if (analysisProgress >= 95) return 'active';
+
+      case 2: // 识别相似照片 (Identifying similar groups)
+        if (analysisProgress === 100 && isAnalyzing) return 'active';
+        if (analysisProgress === 100 && !isAnalyzing) return 'completed';
         return 'pending';
-      case 4:
+
+      case 3: // 准备整理结果 (Preparing results)
+        if (analysisProgress === 100 && isAnalyzing) return 'active';
+        if (analysisProgress === 100 && !isAnalyzing) return 'completed';
+        return 'pending';
+
+      case 4: // 进入整理结果页 (Entering results view)
         if (analysisProgress === 100 && !isAnalyzing) return 'completed';
         if (analysisProgress === 100) return 'active';
         return 'pending';
+
       default:
         return 'pending';
     }
@@ -224,8 +232,12 @@ export const LocalScanProgress: React.FC<LocalScanProgressProps> = ({
 
             <div className="text-[10px] text-[var(--dt-text-secondary)] truncate font-mono">
               {analysisProgress === 100 && !isAnalyzing 
-                ? '准备就绪' 
-                : `正在读取: ${currentAnalysisName || '初始化通道...'}`}
+                ? '✅ 分析完成，正在进入结果页...' 
+                : analysisProgress === 100 && isAnalyzing
+                  ? '🔍 正在识别相似照片并整理结果...'
+                  : currentAnalysisIndex >= 0
+                    ? `⚙️ 正在分析第 ${currentAnalysisIndex + 1}/${photos.length} 张图片: ${currentAnalysisName || ''}`
+                    : '⚡ 正在初始化本地扫描计算模块...'}
             </div>
           </div>
 

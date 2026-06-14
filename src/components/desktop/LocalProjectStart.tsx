@@ -89,6 +89,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
   const [previews, setPreviews] = useState<NativeImagePreviewItem[]>([]);
   const [selectedMode, setSelectedMode] = useState<'folder' | 'selected-files' | null>(null);
   const [selectedWebFiles, setSelectedWebFiles] = useState<File[]>([]);
+  const [scanProgressText, setScanProgressText] = useState('正在读取本地照片...');
 
   const clearWebPreviews = (items: NativeImagePreviewItem[]) => {
     items.forEach(item => {
@@ -173,10 +174,27 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
         }
 
         setIsScanning(true);
+        setScanProgressText('正在扫描本地文件夹结构...');
         const meta = await scanNativeFolderMetadata(res.path);
+        
+        if (meta) {
+          if (meta.imageFilesCount === 0) {
+            setErrorMessage('所选文件夹中未找到支持的图片文件，请重新选择。');
+            setIsScanning(false);
+            return;
+          }
+          if (meta.imageFilesCount > getEffectiveNativeBatchLimit()) {
+            setErrorMessage(`当前 Alpha 最多支持 ${getEffectiveNativeBatchLimit()} 张图片，您选择的文件夹包含 ${meta.imageFilesCount} 张图片。`);
+            setIsScanning(false);
+            return;
+          }
+        }
+
+        setScanProgressText('正在核对图片类型与格式...');
         // Execute scanner command to verify desktop bridge functionality
         await scanNativeFolderImageEntries(res.path);
         
+        setScanProgressText('正在准备照片安全本地预览...');
         // Fetch previews
         const previewResult = await scanNativeFolderImagePreviews(res.path);
         if (previewResult && previewResult.items) {
@@ -235,6 +253,13 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
           : [];
 
       if (paths.length > 0) {
+        if (paths.length > getEffectiveNativeBatchLimit()) {
+          setErrorMessage(`当前 Alpha 最多支持 ${getEffectiveNativeBatchLimit()} 张图片，您选择了 ${paths.length} 张图片。`);
+          return;
+        }
+
+        setIsScanning(true);
+        setScanProgressText('正在读取选定图片文件...');
         try {
           const scanResult = await scanNativeSelectedImageFiles(paths);
           
@@ -261,6 +286,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
           // 3. Rust command 失败 (抛出异常)
           setErrorMessage('无法准备所选图片，请重新选择。');
         }
+        setIsScanning(false);
       }
     } catch {
       setErrorMessage('无法准备所选图片，请重新选择。');
@@ -369,6 +395,11 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
       return;
     }
 
+    if (imgFiles.length > getEffectiveNativeBatchLimit()) {
+      setErrorMessage(`当前 Alpha 最多支持 ${getEffectiveNativeBatchLimit()} 张图片，您选择了 ${imgFiles.length} 张图片。`);
+      return;
+    }
+
     resetSelectionStates();
 
     try {
@@ -409,6 +440,11 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
     const imgFiles = files.filter(file => file.type.startsWith('image/'));
     if (imgFiles.length === 0) {
       setErrorMessage('请选择至少一张图片。');
+      return;
+    }
+
+    if (imgFiles.length > getEffectiveNativeBatchLimit()) {
+      setErrorMessage(`当前 Alpha 最多支持 ${getEffectiveNativeBatchLimit()} 张图片，您选择了 ${imgFiles.length} 张图片。`);
       return;
     }
 
@@ -886,7 +922,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    <span>正在扫描文件夹元数据...</span>
+                    <span>{scanProgressText}</span>
                   </div>
                 )}
 
