@@ -935,12 +935,17 @@ export default function ResultsPage() {
       const isBattleCompleted = activeBattle.nextIndex >= activeBattle.contenderIds.length;
       if (isBattleCompleted) {
         isTransitioningRef.current = true;
-        setToastMessage("A/B 对局已完成，结果已更新。");
+        const allCompleted = similarGroups.filter(g => !g.battleCompleted && g.id !== activeBattle.groupId).length === 0;
+        if (allCompleted) {
+          setToastMessage("🎉 所有相似组均已对比完成！");
+        } else {
+          setToastMessage("A/B 对局已完成，结果已更新。");
+        }
         handleCloseBattleWithAnimation();
         isTransitioningRef.current = false;
       }
     }
-  }, [activeBattle, handleCloseBattleWithAnimation]);
+  }, [activeBattle, handleCloseBattleWithAnimation, similarGroups]);
 
   // A/B 自动进入策略：仅在 Native 正常分析完成并跳转到 Results 时，若 similarGroups.length > 0，自动打开第一组的 A/B 对局
   useEffect(() => {
@@ -2459,13 +2464,14 @@ export default function ResultsPage() {
             >
               <div className="p-3.5 border-b border-white/5 flex flex-row items-center justify-between space-y-0 shrink-0 relative">
                 <div className="flex flex-col text-left">
-                  <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold text-[var(--dt-text-primary)] flex items-center gap-1.5 flex-wrap">
                     <GitCompare className="h-4 w-4 text-yellow-400" />
-                    {hasNativeSource ? `相似组 #${similarGroups.findIndex(g => g.id === battleObj.groupId) + 1} - 本地处理` : "选择更想保留的一张"}
+                    <span>相似组 #{similarGroups.findIndex(g => g.id === battleObj.groupId) + 1} / {similarGroups.length}</span>
+                    <span className="text-[10px] text-[var(--dt-text-soft)] font-normal ml-1">(本组包含 {battleObj.photoIds.length} 张照片)</span>
                   </h3>
                 </div>
                 <div className="bg-black/25 border border-white/5 rounded px-2.5 py-1 text-[10px] text-[var(--dt-text-primary)] font-mono font-bold">
-                  当前组: {battleObj.roundIndex} / {battleObj.totalRounds}
+                  本组对比步骤: {battleObj.roundIndex} / {battleObj.totalRounds}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="desktop-pill text-[9px] scale-90 border-white/5 bg-white/5">
@@ -2526,16 +2532,19 @@ export default function ResultsPage() {
                         />
                         <div 
                           className={cn(
-                            "absolute top-2 left-2 z-10 transition-opacity duration-200 pointer-events-none",
+                            "absolute top-2 left-2 z-10 transition-opacity duration-200 pointer-events-none flex flex-col gap-1 items-start",
                             isLeftDragging ? "opacity-20" : "group-hover:opacity-20"
                           )}
                         >
                           <Badge className={cn(
-                            "text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm",
+                            "text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm w-fit",
                             winnerSide === 'left' ? "bg-[#6FA887]" : "bg-[#6F8FA8]"
                           )}>
                             {winnerSide === 'left' ? "👑 当前优选" : "⚔️ 挑战照片"} [ ← ] ({leftScale.toFixed(1)}x)
                           </Badge>
+                          <div className="bg-[#12161A]/85 border border-white/5 px-2 py-0.5 rounded text-[8.5px] text-[var(--dt-text-secondary)] backdrop-blur-sm w-fit font-mono font-bold shadow-sm">
+                            清晰度: {leftPhoto.sharpnessScore !== undefined && leftPhoto.sharpnessScore !== null ? leftPhoto.sharpnessScore : "—"} | 曝光: {leftPhoto.exposureScore !== undefined && leftPhoto.exposureScore !== null ? leftPhoto.exposureScore : "—"}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2575,16 +2584,19 @@ export default function ResultsPage() {
                         />
                         <div 
                           className={cn(
-                            "absolute top-2 right-2 z-10 transition-opacity duration-200 pointer-events-none",
+                            "absolute top-2 right-2 z-10 transition-opacity duration-200 pointer-events-none flex flex-col gap-1 items-end",
                             isRightDragging ? "opacity-20" : "group-hover:opacity-20"
                           )}
                         >
                           <Badge className={cn(
-                            "text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm",
+                            "text-white border-0 text-[9px] font-bold py-0.5 px-2 shadow-sm w-fit",
                             winnerSide === 'left' ? "bg-[#6F8FA8]" : "bg-[#6FA887]"
                           )}>
                             {winnerSide === 'left' ? "⚔️ 挑战照片" : "👑 当前优选"} [ → ] ({rightScale.toFixed(1)}x)
                           </Badge>
+                          <div className="bg-[#12161A]/85 border border-white/5 px-2 py-0.5 rounded text-[8.5px] text-[var(--dt-text-secondary)] backdrop-blur-sm w-fit font-mono font-bold shadow-sm">
+                            清晰度: {rightPhoto.sharpnessScore !== undefined && rightPhoto.sharpnessScore !== null ? rightPhoto.sharpnessScore : "—"} | 曝光: {rightPhoto.exposureScore !== undefined && rightPhoto.exposureScore !== null ? rightPhoto.exposureScore : "—"}
+                          </div>
                         </div>
                       </div>
                     </div>
