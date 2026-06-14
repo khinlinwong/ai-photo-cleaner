@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePhotoWorkspace, PhotoItem, ActiveBattleState } from '@/context/PhotoWorkspaceContext';
 import { getUserVisibleBucket, getReasonTags } from '@/lib/utils/photoLabelMapping';
@@ -60,6 +60,131 @@ const sanitizePathString = (str: string): string => {
     return "输出位置不可用，请重新选择输出位置。";
   }
   return cleaned;
+};
+
+const isBlurCandidate = (photo: PhotoItem): boolean => {
+  if (!photo) return false;
+  const issue = photo.issue;
+  if (issue === 'blurry') return true;
+  if (photo.technicalRiskFlags?.includes('possible_blur') || photo.technicalRiskFlags?.includes('possible_motion_blur') || photo.technicalRiskFlags?.includes('severe_quality_issue')) return true;
+  if (photo.blurValue && photo.blurValue > 50) return true;
+  if (photo.sharpnessScore && photo.sharpnessScore < 60) return true;
+  return false;
+};
+
+const isExposureIssue = (photo: PhotoItem): boolean => {
+  if (!photo) return false;
+  const issue = photo.issue;
+  if (issue === 'overexposed' || issue === 'underexposed') return true;
+  if (photo.technicalRiskFlags?.includes('exposure_risk')) return true;
+  if (photo.exposureValue && (photo.exposureValue > 25 || photo.exposureValue < -25)) return true;
+  if (photo.exposureScore && photo.exposureScore < 60) return true;
+  return false;
+};
+
+const isSimilarCandidate = (photo: PhotoItem): boolean => {
+  if (!photo) return false;
+  if (photo.duplicateGroupId) return true;
+  if (photo.isDuplicateCandidate) return true;
+  if (photo.technicalRiskFlags?.includes('duplicate_candidate')) return true;
+  return false;
+};
+
+interface FilterButtonGroupProps {
+  currentFilter: 'all' | 'blurry' | 'exposure' | 'duplicate';
+  onChange: (filter: 'all' | 'blurry' | 'exposure' | 'duplicate') => void;
+  counts: { all: number; blurry: number; exposure: number; duplicate: number };
+}
+
+const FilterButtonGroup: React.FC<FilterButtonGroupProps> = ({
+  currentFilter,
+  onChange,
+  counts
+}) => {
+  const options = [
+    { value: 'all', label: '全部' },
+    { value: 'blurry', label: '模糊候选' },
+    { value: 'exposure', label: '曝光异常' },
+    { value: 'duplicate', label: '相似重复' }
+  ] as const;
+
+  return (
+    <div className="flex items-center gap-1.5 mb-3 select-none flex-wrap">
+      {options.map((opt) => {
+        const count = counts[opt.value];
+        const isActive = currentFilter === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "px-2.5 py-1 text-[11px] rounded transition-all duration-150 flex items-center gap-1 border font-medium cursor-pointer focus:outline-none",
+              isActive
+                ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400 font-bold"
+                : "bg-white/5 border-white/10 text-[var(--dt-text-soft)] hover:bg-white/10 hover:text-[var(--dt-text-primary)]"
+            )}
+          >
+            <span>{opt.label}</span>
+            <span className={cn(
+              "px-1 py-0.25 text-[9px] rounded-full font-mono",
+              isActive ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-[var(--dt-text-muted)]"
+            )}>
+              {count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+interface SimilarFilterButtonGroupProps {
+  currentFilter: 'all' | 'pending' | 'completed';
+  onChange: (filter: 'all' | 'pending' | 'completed') => void;
+  counts: { all: number; pending: number; completed: number };
+}
+
+const SimilarFilterButtonGroup: React.FC<SimilarFilterButtonGroupProps> = ({
+  currentFilter,
+  onChange,
+  counts
+}) => {
+  const options = [
+    { value: 'all', label: '全部组' },
+    { value: 'pending', label: '待对比' },
+    { value: 'completed', label: '已完成' }
+  ] as const;
+
+  return (
+    <div className="flex items-center gap-1.5 select-none flex-wrap">
+      {options.map((opt) => {
+        const count = counts[opt.value];
+        const isActive = currentFilter === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "px-2.5 py-1 text-[11px] rounded transition-all duration-150 flex items-center gap-1 border font-medium cursor-pointer focus:outline-none",
+              isActive
+                ? "bg-amber-500/10 border-amber-500/40 text-amber-400 font-bold"
+                : "bg-white/5 border-white/10 text-[var(--dt-text-soft)] hover:bg-white/10 hover:text-[var(--dt-text-primary)]"
+            )}
+          >
+            <span>{opt.label}</span>
+            <span className={cn(
+              "px-1 py-0.25 text-[9px] rounded-full font-mono",
+              isActive ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-[var(--dt-text-muted)]"
+            )}>
+              {count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 };
 
 interface ResultsPhotoCardProps {
@@ -356,6 +481,105 @@ export default function ResultsPage() {
   useEffect(() => {
     setFilteredGroupId(null);
   }, [activeTab]);
+  const [keepFilter, setKeepFilter] = useState<'all' | 'blurry' | 'exposure' | 'duplicate'>('all');
+  const [cullFilter, setCullFilter] = useState<'all' | 'blurry' | 'exposure' | 'duplicate'>('all');
+  const [similarFilter, setSimilarFilter] = useState<'all' | 'pending' | 'completed'>('all');
+
+  const keepPhotos = useMemo(() => photos.filter((p) => getUserVisibleBucket(p) === 'keep'), [photos]);
+  const deletePhotos = useMemo(() => photos.filter((p) => getUserVisibleBucket(p) === 'cull'), [photos]);
+
+  // Derived filter categories for Keep/Cull/Similar Tabs
+  const keepPhotosFiltered = useMemo(() => {
+    return keepPhotos.filter(photo => {
+      if (keepFilter === 'all') return true;
+      if (keepFilter === 'blurry') return isBlurCandidate(photo);
+      if (keepFilter === 'exposure') return isExposureIssue(photo);
+      if (keepFilter === 'duplicate') return isSimilarCandidate(photo);
+      return true;
+    });
+  }, [keepPhotos, keepFilter]);
+
+  const cullPhotosFiltered = useMemo(() => {
+    return deletePhotos.filter(photo => {
+      if (cullFilter === 'all') return true;
+      if (cullFilter === 'blurry') return isBlurCandidate(photo);
+      if (cullFilter === 'exposure') return isExposureIssue(photo);
+      if (cullFilter === 'duplicate') return isSimilarCandidate(photo);
+      return true;
+    });
+  }, [deletePhotos, cullFilter]);
+
+  const similarGroupsFiltered = useMemo(() => {
+    return similarGroups.filter(group => {
+      if (similarFilter === 'all') return true;
+      if (similarFilter === 'pending') return !group.battleCompleted;
+      if (similarFilter === 'completed') return group.battleCompleted;
+      return true;
+    });
+  }, [similarGroups, similarFilter]);
+
+  const keepCounts = useMemo(() => {
+    let blurry = 0;
+    let exposure = 0;
+    let duplicate = 0;
+    for (const photo of keepPhotos) {
+      if (isBlurCandidate(photo)) blurry++;
+      if (isExposureIssue(photo)) exposure++;
+      if (isSimilarCandidate(photo)) duplicate++;
+    }
+    return { all: keepPhotos.length, blurry, exposure, duplicate };
+  }, [keepPhotos]);
+
+  const cullCounts = useMemo(() => {
+    let blurry = 0;
+    let exposure = 0;
+    let duplicate = 0;
+    for (const photo of deletePhotos) {
+      if (isBlurCandidate(photo)) blurry++;
+      if (isExposureIssue(photo)) exposure++;
+      if (isSimilarCandidate(photo)) duplicate++;
+    }
+    return { all: deletePhotos.length, blurry, exposure, duplicate };
+  }, [deletePhotos]);
+
+  const similarCounts = useMemo(() => {
+    let pending = 0;
+    let completed = 0;
+    for (const group of similarGroups) {
+      if (group.battleCompleted) {
+        completed++;
+      } else {
+        pending++;
+      }
+    }
+    return { all: similarGroups.length, pending, completed };
+  }, [similarGroups]);
+
+  const cullPhotosFilteredSpaceMB = useMemo(() => {
+    return cullPhotosFiltered.reduce((acc, p) => {
+      const val = parseFloat(p.size);
+      return acc + (isNaN(val) ? 0 : val);
+    }, 0).toFixed(1);
+  }, [cullPhotosFiltered]);
+
+  // Auto deselect hidden elements when keep filter changes
+  useEffect(() => {
+    setSelectedPhotoIds(prev => prev.filter(id => {
+      const isKeep = keepPhotos.some(p => p.id === id);
+      if (!isKeep) return true;
+      return keepPhotosFiltered.some(p => p.id === id);
+    }));
+  }, [keepFilter, keepPhotos, keepPhotosFiltered]);
+
+  // Auto deselect hidden elements when cull filter changes
+  useEffect(() => {
+    setSelectedPhotoIds(prev => prev.filter(id => {
+      const isCull = deletePhotos.some(p => p.id === id);
+      if (!isCull) return true;
+      return cullPhotosFiltered.some(p => p.id === id);
+    }));
+  }, [cullFilter, deletePhotos, cullPhotosFiltered]);
+
   const [exportOpen, setExportOpen] = useState(false);
   const [isFolderExporting, setIsFolderExporting] = useState(false);
   const [folderExportStatus, setFolderExportStatus] = useState<'idle' | 'success' | 'failed'>('idle');
@@ -559,15 +783,21 @@ export default function ResultsPage() {
 
   const handleBatchKeep = useCallback(() => {
     if (selectedPhotoIds.length === 0) return;
-    updateMultiplePhotosStatus(selectedPhotoIds, 'keep');
-    clearSelection();
-  }, [selectedPhotoIds, updateMultiplePhotosStatus, clearSelection]);
+    const visiblePhotos = activeTab === 'keep' ? keepPhotosFiltered : (activeTab === 'cull' ? cullPhotosFiltered : photos);
+    const visibleSelectedIds = selectedPhotoIds.filter(id => visiblePhotos.some(p => p.id === id));
+    if (visibleSelectedIds.length === 0) return;
+    updateMultiplePhotosStatus(visibleSelectedIds, 'keep');
+    setSelectedPhotoIds(prev => prev.filter(id => !visibleSelectedIds.includes(id)));
+  }, [selectedPhotoIds, activeTab, keepPhotosFiltered, cullPhotosFiltered, photos, updateMultiplePhotosStatus]);
 
   const handleBatchCull = useCallback(() => {
     if (selectedPhotoIds.length === 0) return;
-    updateMultiplePhotosStatus(selectedPhotoIds, 'delete');
-    clearSelection();
-  }, [selectedPhotoIds, updateMultiplePhotosStatus, clearSelection]);
+    const visiblePhotos = activeTab === 'keep' ? keepPhotosFiltered : (activeTab === 'cull' ? cullPhotosFiltered : photos);
+    const visibleSelectedIds = selectedPhotoIds.filter(id => visiblePhotos.some(p => p.id === id));
+    if (visibleSelectedIds.length === 0) return;
+    updateMultiplePhotosStatus(visibleSelectedIds, 'delete');
+    setSelectedPhotoIds(prev => prev.filter(id => !visibleSelectedIds.includes(id)));
+  }, [selectedPhotoIds, activeTab, keepPhotosFiltered, cullPhotosFiltered, photos, updateMultiplePhotosStatus]);
 
   const undoLastDecisionAction = useCallback(() => {
     if (!lastDecisionAction) return;
@@ -1205,26 +1435,24 @@ export default function ResultsPage() {
 
   // 分类计算照片
   const totalPhotos = photos.length;
-  const keepPhotos = photos.filter((p) => getUserVisibleBucket(p) === 'keep');
-  const deletePhotos = photos.filter((p) => getUserVisibleBucket(p) === 'cull');
 
-  const selectedKeepCount = selectedPhotoIds.filter(id => keepPhotos.some(p => p.id === id)).length;
-  const selectedCullCount = selectedPhotoIds.filter(id => deletePhotos.some(p => p.id === id)).length;
+  const selectedKeepCount = selectedPhotoIds.filter(id => keepPhotosFiltered.some(p => p.id === id)).length;
+  const selectedCullCount = selectedPhotoIds.filter(id => cullPhotosFiltered.some(p => p.id === id)).length;
 
   const selectAllInBucket = useCallback((bucket: 'keep' | 'cull') => {
-    const targetPhotos = bucket === 'keep' ? keepPhotos : deletePhotos;
+    const targetPhotos = bucket === 'keep' ? keepPhotosFiltered : cullPhotosFiltered;
     const targetIds = targetPhotos.map(p => p.id);
     setSelectedPhotoIds(prev => {
       const otherBucketIds = prev.filter(id => !targetIds.includes(id));
       return [...otherBucketIds, ...targetIds];
     });
-  }, [keepPhotos, deletePhotos]);
+  }, [keepPhotosFiltered, cullPhotosFiltered]);
 
   const clearSelectionInBucket = useCallback((bucket: 'keep' | 'cull') => {
-    const targetPhotos = bucket === 'keep' ? keepPhotos : deletePhotos;
+    const targetPhotos = bucket === 'keep' ? keepPhotosFiltered : cullPhotosFiltered;
     const targetIds = targetPhotos.map(p => p.id);
     setSelectedPhotoIds(prev => prev.filter(id => !targetIds.includes(id)));
-  }, [keepPhotos, deletePhotos]);
+  }, [keepPhotosFiltered, cullPhotosFiltered]);
 
   const pendingGroupsCount = similarGroups.filter(g => !g.battleCompleted).length;
 
@@ -1660,13 +1888,18 @@ export default function ResultsPage() {
                     <div className="animate-fade-in-up">
                       <PhotoBucketSection
                         bucketType="keep"
-                        photosCount={keepPhotos.length}
+                        photosCount={keepPhotosFiltered.length}
                         onSelectAll={() => selectAllInBucket('keep')}
                         onClearSelection={() => clearSelectionInBucket('keep')}
-                        isAllSelected={selectedKeepCount === keepPhotos.length && keepPhotos.length > 0}
-                        hasSelected={selectedKeepCount > 0}
+                        isAllSelected={keepPhotosFiltered.length > 0 && keepPhotosFiltered.every(p => selectedPhotoIds.includes(p.id))}
+                        hasSelected={keepPhotosFiltered.some(p => selectedPhotoIds.includes(p.id))}
                       >
-                        {renderPartitionGrid(keepPhotos, 'keep')}
+                        <FilterButtonGroup
+                          currentFilter={keepFilter}
+                          onChange={setKeepFilter}
+                          counts={keepCounts}
+                        />
+                        {renderPartitionGrid(keepPhotosFiltered, 'keep')}
                       </PhotoBucketSection>
                     </div>
                   )}
@@ -1675,14 +1908,19 @@ export default function ResultsPage() {
                     <div className="animate-fade-in-up">
                       <PhotoBucketSection
                         bucketType="cull"
-                        photosCount={deletePhotos.length}
-                        spaceMB={spaceSavedMB}
+                        photosCount={cullPhotosFiltered.length}
+                        spaceMB={cullPhotosFilteredSpaceMB}
                         onSelectAll={() => selectAllInBucket('cull')}
                         onClearSelection={() => clearSelectionInBucket('cull')}
-                        isAllSelected={selectedCullCount === deletePhotos.length && deletePhotos.length > 0}
-                        hasSelected={selectedCullCount > 0}
+                        isAllSelected={cullPhotosFiltered.length > 0 && cullPhotosFiltered.every(p => selectedPhotoIds.includes(p.id))}
+                        hasSelected={cullPhotosFiltered.some(p => selectedPhotoIds.includes(p.id))}
                       >
-                        {renderPartitionGrid(deletePhotos, 'cull')}
+                        <FilterButtonGroup
+                          currentFilter={cullFilter}
+                          onChange={setCullFilter}
+                          counts={cullCounts}
+                        />
+                        {renderPartitionGrid(cullPhotosFiltered, 'cull')}
                       </PhotoBucketSection>
                     </div>
                   )}
@@ -1727,17 +1965,26 @@ export default function ResultsPage() {
                         );
                       })() : (
                         <>
-                          <div className="border-b border-[var(--dt-border)] pb-2 flex items-center justify-between">
+                          <div className="border-b border-[var(--dt-border)] pb-2 flex items-center justify-between flex-wrap gap-2">
                             <h3 className="text-xs font-bold text-[var(--dt-text-primary)]">📊 相似照片组列表</h3>
-                            <span className="text-[10px] text-[var(--dt-text-soft)] font-mono">共 {similarGroups.length} 组</span>
+                            <SimilarFilterButtonGroup
+                              currentFilter={similarFilter}
+                              onChange={setSimilarFilter}
+                              counts={similarCounts}
+                            />
                           </div>
                           {similarGroups.length === 0 ? (
                             <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
                               未发现相似照片。
                             </div>
+                          ) : similarGroupsFiltered.length === 0 ? (
+                            <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
+                              当前筛选条件下没有相似照片组。
+                            </div>
                           ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {similarGroups.map((group, idx) => {
+                              {similarGroupsFiltered.map((group) => {
+                                const originalIdx = similarGroups.findIndex(g => g.id === group.id);
                                 const groupPhotos = group.photoIds
                                   .map(id => photos.find(p => p.id === id))
                                   .filter((p): p is PhotoItem => !!p);
@@ -1764,7 +2011,7 @@ export default function ResultsPage() {
                                   >
                                     <div className="flex items-center justify-between w-full gap-3">
                                       <div className="space-y-1">
-                                        <p className="text-[11px] font-bold text-[var(--dt-text-primary)]">相似组 #{idx + 1}</p>
+                                        <p className="text-[11px] font-bold text-[var(--dt-text-primary)]">相似组 #{originalIdx + 1}</p>
                                         <p className="text-[10px] text-[var(--dt-text-soft)]">
                                           包含 {group.photoIds.length} 张照片 • {hasNativeSource ? "已识别" : (group.battleCompleted ? "⚔️ 对决已完成" : "⏳ 待筛选对决")}
                                         </p>
