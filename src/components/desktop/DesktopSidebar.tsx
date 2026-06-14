@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Play, 
   Search, 
@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { QuickStartGuideDialog } from './QuickStartGuideDialog';
 
 interface DesktopSidebarProps {
   activeId?: string;
@@ -31,6 +32,16 @@ interface DesktopSidebarProps {
 
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'start', onExportClick }) => {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isQuickStartOpen, setIsQuickStartOpen] = useState(false);
+
+  useEffect(() => {
+    if (activeId === 'start') {
+      const seen = localStorage.getItem('ai-photo-cleaner.quickstart.seen.v1');
+      if (!seen) {
+        setIsQuickStartOpen(true);
+      }
+    }
+  }, [activeId]);
 
   const menuItems = [
     { id: 'start', step: '01', label: '开始', icon: Play },
@@ -155,6 +166,18 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
           <DialogFooter className="border-t border-white/5 pt-2 flex justify-end">
             <Button 
               variant="outline" 
+              onClick={() => {
+                setIsAboutOpen(false);
+                setTimeout(() => {
+                  setIsQuickStartOpen(true);
+                }, 150);
+              }}
+              className="text-xs px-3 h-7 bg-transparent border-white/10 hover:bg-white/5 hover:text-white mr-2"
+            >
+              查看快速引导
+            </Button>
+            <Button 
+              variant="outline" 
               onClick={() => setIsAboutOpen(false)}
               className="text-xs px-3 h-7 bg-transparent border-white/10 hover:bg-white/5 hover:text-white"
             >
@@ -163,6 +186,12 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <QuickStartGuideDialog 
+        open={isQuickStartOpen} 
+        onOpenChange={setIsQuickStartOpen} 
+        onComplete={() => localStorage.setItem('ai-photo-cleaner.quickstart.seen.v1', 'true')}
+      />
     </div>
   );
 };
