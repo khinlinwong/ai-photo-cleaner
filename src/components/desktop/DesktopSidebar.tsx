@@ -1,4 +1,6 @@
-import React from 'react';
+"use client";
+
+import React, { useState } from 'react';
 import { 
   Play, 
   Search, 
@@ -7,6 +9,15 @@ import {
   Download, 
   Settings 
 } from 'lucide-react';
+import { APP_VERSION_LABEL } from '@/lib/config/appVersion';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface DesktopSidebarProps {
   activeId?: string;
@@ -14,6 +25,8 @@ interface DesktopSidebarProps {
 }
 
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'start', onExportClick }) => {
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+
   const menuItems = [
     { id: 'start', step: '01', label: '开始', icon: Play },
     { id: 'scan', step: '02', label: '扫描', icon: Search },
@@ -76,10 +89,70 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
             <span className="flex-1 text-left">设置</span>
           </button>
         </div>
-        <div className="text-[9px] text-[var(--dt-text-muted)] text-center font-mono select-none">
-          v0.1.0-alpha
-        </div>
+        
+        {/* Version & About Toggle Button */}
+        <button
+          onClick={() => setIsAboutOpen(true)}
+          className="w-full text-center text-[9px] text-[var(--dt-text-muted)] hover:text-[var(--dt-text-primary)] transition-colors font-mono cursor-pointer select-none"
+        >
+          {APP_VERSION_LABEL}
+        </button>
       </div>
+
+      {/* About/Version Modal */}
+      <Dialog open={isAboutOpen} onOpenChange={setIsAboutOpen}>
+        <DialogContent className="max-w-xs sm:max-w-md bg-[#181E24]/95 text-xs text-[var(--dt-text-secondary)] border border-white/10 rounded-xl p-5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] outline-none backdrop-blur-md">
+          <DialogHeader className="border-b border-white/5 pb-2">
+            <DialogTitle className="text-sm font-bold text-[var(--dt-text-primary)]">
+              关于 AI Photo Cleaner
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 leading-relaxed">
+            <div>
+              <p className="font-bold text-[var(--dt-text-primary)] text-sm mb-0.5">AI Photo Cleaner</p>
+              <p className="text-[var(--dt-text-muted)] font-mono">{APP_VERSION_LABEL}</p>
+            </div>
+            
+            <div className="space-y-1">
+              <p className="font-semibold text-[var(--dt-text-primary)]">本版本包含：</p>
+              <ul className="list-disc list-inside pl-1 text-[var(--dt-text-secondary)] space-y-0.5">
+                <li>本地照片分析</li>
+                <li>selected-files / folder import 最多 200 张</li>
+                <li>Results Keep / Cull 快捷过滤</li>
+                <li>Similar Groups 状态过滤</li>
+                <li>A/B 对比进度与质量参考</li>
+                <li>CSV / JSON 保存</li>
+                <li>Keep 文件夹导出</li>
+              </ul>
+            </div>
+            
+            <div className="space-y-1 border-t border-white/5 pt-2">
+              <p className="font-semibold text-[var(--dt-text-primary)]">安全说明：</p>
+              <ul className="list-disc list-inside pl-1 text-[var(--dt-text-secondary)] space-y-0.5">
+                <li>照片只在本机处理</li>
+                <li>不上传照片</li>
+                <li>不移动原图</li>
+                <li>不删除原图</li>
+                <li>不修改原图</li>
+              </ul>
+            </div>
+            
+            <div className="border-t border-white/5 pt-2 text-[var(--dt-text-muted)]">
+              <p>测试反馈请注明版本：</p>
+              <p className="font-mono text-[var(--dt-text-primary)] mt-0.5">{APP_VERSION_LABEL}</p>
+            </div>
+          </div>
+          <DialogFooter className="border-t border-white/5 pt-2 flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsAboutOpen(false)}
+              className="text-xs px-3 h-7 bg-transparent border-white/10 hover:bg-white/5 hover:text-white"
+            >
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
