@@ -9,7 +9,12 @@ import {
   Download, 
   Settings 
 } from 'lucide-react';
-import { APP_VERSION_LABEL } from '@/lib/config/appVersion';
+import { 
+  APP_VERSION_LABEL, 
+  APP_VERSION_SHORT_LABEL, 
+  APP_RELEASE_BASELINE, 
+  APP_IDENTITY_PATCH 
+} from '@/lib/config/appVersion';
 import {
   Dialog,
   DialogContent,
@@ -95,7 +100,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
           onClick={() => setIsAboutOpen(true)}
           className="w-full text-center text-[9px] text-[var(--dt-text-muted)] hover:text-[var(--dt-text-primary)] transition-colors font-mono cursor-pointer select-none"
         >
-          {APP_VERSION_LABEL}
+          {APP_VERSION_SHORT_LABEL}
         </button>
       </div>
 
@@ -111,6 +116,11 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
             <div>
               <p className="font-bold text-[var(--dt-text-primary)] text-sm mb-0.5">AI Photo Cleaner</p>
               <p className="text-[var(--dt-text-muted)] font-mono">{APP_VERSION_LABEL}</p>
+            </div>
+            
+            <div className="space-y-1 text-[11px] text-[var(--dt-text-secondary)] border-t border-white/5 pt-2 font-mono">
+              <p><span className="text-[var(--dt-text-muted)]">Release baseline:</span> {APP_RELEASE_BASELINE}</p>
+              <p><span className="text-[var(--dt-text-muted)]">Identity patch:</span> {APP_IDENTITY_PATCH}</p>
             </div>
             
             <div className="space-y-1">
@@ -138,7 +148,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
             </div>
             
             <div className="border-t border-white/5 pt-2 text-[var(--dt-text-muted)]">
-              <p>测试反馈请注明版本：</p>
+              <p>测试反馈请注明：</p>
               <p className="font-mono text-[var(--dt-text-primary)] mt-0.5">{APP_VERSION_LABEL}</p>
             </div>
           </div>
