@@ -13,7 +13,8 @@ import {
   APP_VERSION_LABEL, 
   APP_VERSION_SHORT_LABEL, 
   APP_RELEASE_BASELINE, 
-  APP_IDENTITY_PATCH 
+  APP_IDENTITY_PATCH,
+  APP_CURRENT_PACKAGE_ID
 } from '@/lib/config/appVersion';
 import {
   Dialog,
@@ -34,14 +35,21 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isQuickStartOpen, setIsQuickStartOpen] = useState(false);
 
+  const QUICKSTART_SEEN_KEY = `ai-photo-cleaner.quickstart.seen.${APP_CURRENT_PACKAGE_ID}`;
+
   useEffect(() => {
     if (activeId === 'start') {
-      const seen = localStorage.getItem('ai-photo-cleaner.quickstart.seen.v1');
-      if (!seen) {
-        setIsQuickStartOpen(true);
+      try {
+        const seen = localStorage.getItem(QUICKSTART_SEEN_KEY);
+        if (!seen) {
+          setIsQuickStartOpen(true);
+        }
+      } catch (err) {
+        console.error("Failed to read Quick Start seen status from localStorage:", err);
+        // Fallback: Default to not showing to prevent potential render loops or blocking error states
       }
     }
-  }, [activeId]);
+  }, [activeId, QUICKSTART_SEEN_KEY]);
 
   const menuItems = [
     { id: 'start', step: '01', label: '开始', icon: Play },
@@ -190,7 +198,13 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
       <QuickStartGuideDialog 
         open={isQuickStartOpen} 
         onOpenChange={setIsQuickStartOpen} 
-        onComplete={() => localStorage.setItem('ai-photo-cleaner.quickstart.seen.v1', 'true')}
+        onComplete={() => {
+          try {
+            localStorage.setItem(QUICKSTART_SEEN_KEY, 'true');
+          } catch (err) {
+            console.error("Failed to write Quick Start seen status to localStorage:", err);
+          }
+        }}
       />
     </div>
   );
