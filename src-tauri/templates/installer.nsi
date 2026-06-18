@@ -872,6 +872,12 @@ Section Uninstall
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCTNAME}"
   ${EndIf}
 
+  ; Alpha QA reset: remove Tauri/WebView2 profile so Quick Start appears again after reinstall.
+  ; This only deletes app profile data under LocalAppData and never touches user photo folders.
+  ${If} $UpdateMode <> 1
+    RMDir /r "$LOCALAPPDATA\com.aiphotocleaner.app"
+  ${EndIf}
+
   ; Delete app data if the checkbox is selected
   ; and if not updating
   {{#if appdata_paths}}
