@@ -667,7 +667,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
               开始整理本地照片
             </h1>
             <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed max-w-md">
-              创建一个本地整理项目。当前浏览器原型只保存项目摘要，不保存原图文件，也不会上传云端。
+              创建一个本地照片整理项目。最近项目仅在本机保存摘要记录，不保存原图副本，不会上传云端。原图不会保存在 App 内，且绝不被移动或修改。
             </p>
           </div>
 
@@ -818,9 +818,11 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             )}
 
             {/* Browser fallback comment */}
-            <p className="text-[10px] text-[var(--dt-text-faint)] leading-relaxed">
-              * 当前浏览器原型会选择本地图片文件；桌面版将支持完整文件夹授权。
-            </p>
+            {!isTauri && (
+              <p className="text-[10px] text-[var(--dt-text-faint)] leading-relaxed">
+                * 当前浏览器原型会选择本地图片文件；桌面版将支持完整文件夹授权。
+              </p>
+            )}
           </div>
 
           {/* Recent projects in left column */}
@@ -877,6 +879,9 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="text-[9px] text-[var(--dt-text-faint)] leading-normal font-sans pt-1">
+                💡 最近项目仅在本机记录照片摘要，不保存原图副本。移除记录或清空列表只清除本机摘要，绝不影响您的本地原图片。
               </div>
             </div>
           )}
@@ -1028,14 +1033,14 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             </div>
 
             <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
-              这是一个项目摘要。当前浏览器原型不会保存原图文件。若要继续整理该项目，请点击下方按钮重新选择同一批照片进行关联。
+              AI Photo Cleaner 不会把原图保存在 App 内。请重新选择同一批照片或原文件夹，App 会重新读取并生成整理建议。重新关联后会重新读取并分析这批照片，当前测试版本不保存上一次人工筛选的临时进度。
             </p>
 
             <div className="bg-black/25 border border-white/5 rounded-lg p-3 text-[10px] text-[var(--dt-text-soft)] space-y-1 leading-relaxed">
-              <p className="font-semibold text-white/90">💡 安全声明：</p>
-              <p>• 原图保持在您的本地电脑中，不会被上传或改动。</p>
-              <p>• 淘汰候选仅代表整理建议，原图保持不变。</p>
-              <p>• 最近项目摘要只存储在您的浏览器缓存中，不会上传云端。</p>
+              <p className="font-semibold text-white/90">💡 安全与记录声明：</p>
+              <p>• 重新关联只会重新读取照片，不会修改、移动或删除原图。</p>
+              <p>• 淘汰候选仅代表整理建议，不会删除原图。</p>
+              <p>• 最近项目记录仅为本机摘要，不保存原图副本。</p>
             </div>
 
             <div className="flex items-center justify-end space-x-2 pt-2">
@@ -1071,7 +1076,7 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             </h3>
             
             <p className="text-xs text-[var(--dt-text-secondary)] leading-relaxed">
-              本次选择的照片数量与上次不同，仍可继续整理。
+              本次选择的照片数量与上次记录不同。重新关联会重新读取并分析这批照片，这不会修改或删除原图。但如果导入照片不同，整理建议可能与上次摘要记录不一致。
             </p>
 
             <div className="text-[10px] text-[var(--dt-text-faint)] font-mono bg-black/15 p-2 rounded space-y-1">
@@ -1115,9 +1120,9 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             </p>
 
             <div className="bg-black/25 border border-white/5 rounded-lg p-3 text-[10px] text-[var(--dt-text-soft)] space-y-1.5 leading-relaxed">
-              <p>• 只会移除此项目的最近记录摘要。</p>
-              <p>• <span className="font-semibold text-white">不会影响您的本地原图照片</span>，原图保持不变。</p>
-              <p>• 之后您仍可以重新选择照片开始新整理。</p>
+              <p>• 只会移除本机记录摘要，不影响电脑里的原片，也不影响已导出的文件夹。</p>
+              <p>• 原图绝对保持不变，不会被修改、移动或删除。</p>
+              <p>• 之后您仍可以重新选择文件夹或照片开始新整理。</p>
             </div>
 
             <div className="flex items-center justify-end space-x-2 pt-2">
@@ -1152,9 +1157,8 @@ export const LocalProjectStart: React.FC<LocalProjectStartProps> = ({ onStatusCh
             </p>
 
             <div className="bg-black/25 border border-white/5 rounded-lg p-3 text-[10px] text-[var(--dt-text-soft)] space-y-1.5 leading-relaxed">
-              <p>• 只会清空当前浏览器中存储的本地摘要记录。</p>
-              <p>• <span className="font-semibold text-white">绝对不会影响您的本地原图照片</span>，原图保持不变。</p>
-              <p>• 绝对不改动您的本地原图文件。</p>
+              <p>• 只会清空当前应用记录的本地项目摘要，不影响电脑里的原图，也不影响已导出的文件夹。</p>
+              <p>• 原图绝对保持不变，不会被修改、移动或删除。</p>
             </div>
 
             <div className="flex items-center justify-end space-x-2 pt-2">

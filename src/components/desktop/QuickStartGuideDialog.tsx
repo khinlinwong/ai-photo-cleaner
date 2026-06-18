@@ -121,6 +121,11 @@ export const QuickStartGuideDialog: React.FC<QuickStartGuideDialogProps> = ({
           </div>
         </div>
 
+        {/* Alpha note footer */}
+        <p className="text-[9px] text-[var(--dt-text-muted)] text-center leading-normal max-w-xs mx-auto mb-2 select-none">
+          💡 Alpha 测试版的最近项目记录只保存在本机 App profile 中；卸载重装可能清空这些摘要，但绝对不会影响您的原图或已导出文件。
+        </p>
+
         {/* Progress dots */}
         <div className="flex justify-center space-x-1.5 mb-4">
           {steps.map((_, idx) => (

@@ -156,13 +156,12 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeId = 'star
             </div>
             
             <div className="space-y-1 border-t border-white/5 pt-2">
-              <p className="font-semibold text-[var(--dt-text-primary)]">安全说明：</p>
+              <p className="font-semibold text-[var(--dt-text-primary)]">安全与记录说明：</p>
               <ul className="list-disc list-inside pl-1 text-[var(--dt-text-secondary)] space-y-0.5">
-                <li>照片只在本机处理</li>
-                <li>不上传照片</li>
-                <li>不移动原图</li>
-                <li>不删除原图</li>
-                <li>不修改原图</li>
+                <li>照片只在本机处理，不上传云端</li>
+                <li>不复制或保存任何原图副本，原图始终在原文件夹中</li>
+                <li>不修改、不移动、不删除原图</li>
+                <li>最近项目记录仅为本机摘要，卸载重置测试包会清空此列表，但绝不影响原图和已导出文件</li>
               </ul>
             </div>
             
