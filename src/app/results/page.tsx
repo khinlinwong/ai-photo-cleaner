@@ -1214,7 +1214,7 @@ export default function ResultsPage() {
         
         try {
           await invoke('save_text_file', { targetPath: filePath, contents: csvContent });
-          setToastMessage("CSV 整理清单已导出");
+          setToastMessage("🎉 CSV 整理建议清单已保存。这是您的整理记录，原始照片在原位置保持完好、不受影响。");
         } catch (writeErr) {
           console.error('Failed to write CSV manifest in Tauri:', writeErr);
           const errMsg = writeErr instanceof Error ? writeErr.message : String(writeErr);
@@ -1262,7 +1262,7 @@ export default function ResultsPage() {
         
         try {
           await invoke('save_text_file', { targetPath: filePath, contents: jsonContent });
-          setToastMessage("JSON 整理清单已导出");
+          setToastMessage("🎉 JSON 完整整理数据已保存。这是您的整理记录，原始照片在原位置保持完好、不受影响。");
         } catch (writeErr) {
           console.error('Failed to write JSON manifest in Tauri:', writeErr);
           const errMsg = writeErr instanceof Error ? writeErr.message : String(writeErr);
