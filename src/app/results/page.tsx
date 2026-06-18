@@ -1682,29 +1682,29 @@ export default function ResultsPage() {
               
               {totalPhotos === 0 ? (
                 <div className="max-w-xl mx-auto py-16 text-center select-none desktop-panel p-8 mt-10">
-                  <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 mb-3">
+                  <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-500/10 border border-zinc-500/20 text-zinc-400 mb-3">
                     <AlertTriangle className="h-4 w-4" />
                   </div>
                   
-                  <h2 className="text-sm font-bold text-[var(--dt-text-primary)] mb-1">未检测到已导入的照片</h2>
+                  <h2 className="text-sm font-bold text-[var(--dt-text-primary)] mb-1">工作台尚无照片数据</h2>
                   <p className="text-[var(--dt-text-soft)] text-xs max-w-xs mx-auto mb-5 leading-relaxed">
-                    工作台当前为空。请先返回选择本地照片文件夹以开始分析，或载入预设演示项目。
+                    当前整理结果为空。请先返回主页选择本地照片或文件夹，让系统生成整理建议。您也可以直接载入演示项目。
                   </p>
                   
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <button 
                       onClick={handleRestart}
-                      className="desktop-button-secondary text-xs h-8"
+                      className="desktop-button-secondary text-xs h-8 cursor-pointer"
                     >
                       <FolderOpen className="mr-1.5 h-3.5 w-3.5 inline text-[var(--dt-text-soft)]" />
-                      返回选择本地文件夹
+                      返回选择本地照片
                     </button>
                     <button 
                       onClick={loadDemoPhotos}
-                      className="desktop-button-primary text-xs h-8"
+                      className="desktop-button-primary text-xs h-8 cursor-pointer"
                     >
                       <FolderSync className="mr-1.5 h-3.5 w-3.5 inline" />
-                      载入 Demo 项目
+                      载入 Demo 演示项目
                     </button>
                   </div>
                 </div>
@@ -1716,7 +1716,7 @@ export default function ResultsPage() {
                     <div className="space-y-0.5">
                       <h2 className="text-sm font-bold text-[var(--dt-text-primary)]">整理结果</h2>
                       <p className="text-[10.5px] text-[var(--dt-text-soft)] leading-relaxed">
-                        这只调整整理结果，不会修改原图，原图在您的电脑上保持不变。
+                        照片已自动分入「保留」和「淘汰候选」。我们不会删除原图，所有整理建议仅供参考。您可以手动调整分类，或使用 A/B 对比逐组筛选相似照片。
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1737,7 +1737,7 @@ export default function ResultsPage() {
                               side="bottom"
                               className="max-w-[280px] bg-neutral-900 border border-white/10 text-[var(--dt-text-primary)] p-3 text-[11px] leading-relaxed shadow-lg rounded-md"
                             >
-                              选择图片模式暂不支持本地整理输出。当前不会移动、删除或覆盖你的原图。你仍可查看整理结果；如需本地整理输出，请使用选择文件夹模式。
+                              选择图片模式暂不支持本地整理输出。当前不会修改原图，也不会删除原图。你仍可查看整理结果；如需本地整理输出，请使用选择文件夹模式。
                             </TooltipContent>
                           </Tooltip>
                         ) : (
@@ -1775,19 +1775,25 @@ export default function ResultsPage() {
                       setActiveTab(tab);
                     }}
                     hasNativeSource={hasNativeSource}
+                    totalPhotoCount={totalPhotos}
                   />
 
                   {/* A/B 对局主视觉引导 / 无相似组提示区域 */}
                   {similarGroups.length > 0 ? (
                     <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
-                      <div className="flex items-center gap-2 flex-wrap text-left">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                        </span>
-                        <span className="text-[var(--dt-text-primary)] font-medium">
-                          检测到本地存在 {similarGroups.length} 组相似照片 ({similarGroups.filter(g => !g.battleCompleted).length} 组待对比)。系统建议进行 A/B 挑选，以选择保留最佳照片。
-                        </span>
+                      <div className="flex flex-col gap-1 text-left">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                          <span className="text-[var(--dt-text-primary)] font-bold text-[12px]">
+                            发现相似照片组 ({similarGroups.length} 组)
+                          </span>
+                        </div>
+                        <p className="text-[var(--dt-text-secondary)] text-[11px] leading-relaxed">
+                          您可以逐组比较相似照片，挑选出最想保留的版本。A/B 对比的选择只会更新整理建议，不会删除原图，也不会修改任何照片文件。
+                        </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
@@ -1799,21 +1805,21 @@ export default function ResultsPage() {
                           }}
                           className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-8 px-4 text-xs transition-all shadow-none border-0"
                         >
-                          ⚔️ 开始 A/B 对比
+                          ⚔️ 进入 A/B 对比
                         </Button>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-lg flex items-start gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
-                      <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-blue-400 mt-0.5" />
+                    <div className="p-4 bg-zinc-500/5 border border-zinc-500/20 text-zinc-400 rounded-lg flex items-start gap-3 text-xs select-none backdrop-blur-md transition-all duration-300">
+                      <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-zinc-400 mt-0.5" />
                       <div className="space-y-1 text-left">
-                        <p className="font-bold text-[var(--dt-text-primary)]">相似检测完成</p>
+                        <p className="font-bold text-[var(--dt-text-primary)]">未检测到相似照片组</p>
                         <p className="text-[var(--dt-text-secondary)] leading-relaxed">
-                          未发现足够相似的照片组，因此不会自动进入 A/B。你仍可查看整理结果。
+                          本次扫描中未发现相似重复的照片组，无需使用 A/B 对比挑选。您可以通过上方分类卡片手动查看和调整所有照片的整理结果。
                         </p>
                         {(skippedCount > 0 || failedCount > 0) && (
-                          <p className="text-[10px] text-blue-300 mt-1 font-medium">
-                            诊断信息: 本次扫描共跳过 {skippedCount} 张不支持或重复的图片文件，有 {failedCount} 张图片分析失败。
+                          <p className="text-[10px] text-[var(--dt-text-muted)] mt-1 font-medium font-mono">
+                            诊断信息: 本次扫描共跳过 {skippedCount} 张重复或不支持的图片文件，有 {failedCount} 张图片处理异常。
                           </p>
                         )}
                       </div>
@@ -1979,8 +1985,9 @@ export default function ResultsPage() {
                             />
                           </div>
                           {similarGroups.length === 0 ? (
-                            <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
-                              未发现相似照片。
+                            <div className="text-center py-10 bg-black/5 border border-[var(--dt-border)] rounded-md text-xs text-[var(--dt-text-muted)] space-y-1">
+                              <p className="font-bold text-[var(--dt-text-soft)]">未发现相似照片组</p>
+                              <p className="text-[10px] text-[var(--dt-text-faint)]">本次扫描中没有发现满足相似阈值的照片，无需进行 A/B 对比整理。</p>
                             </div>
                           ) : similarGroupsFiltered.length === 0 ? (
                             <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
@@ -2101,8 +2108,9 @@ export default function ResultsPage() {
                       
                       {hasNativeSource ? (
                         similarGroups.length === 0 ? (
-                          <div className="text-center py-10 bg-black/10 rounded border border-[var(--dt-border)] text-xs text-[var(--dt-text-soft)]">
-                            未发现足够相似的照片组，因此不会自动进入 A/B。你仍可查看整理结果。
+                          <div className="text-center py-10 bg-black/5 border border-[var(--dt-border)] rounded-md text-xs text-[var(--dt-text-muted)] space-y-1">
+                            <p className="font-bold text-[var(--dt-text-soft)]">无需进行 A/B 对局</p>
+                            <p className="text-[10px] text-[var(--dt-text-faint)]">本次照片扫描中没有检测到相似组，系统已自动跳过 A/B 挑选环节。</p>
                           </div>
                         ) : (
                           <div className="space-y-4">
@@ -2256,6 +2264,19 @@ export default function ResultsPage() {
               folderExportResultCount={folderExportResultCount}
               folderExportError={folderExportError}
             />
+            
+            {/* 安全提示说明 */}
+            <div className="mt-3.5 pt-3.5 border-t border-white/10 text-[10px] text-[var(--dt-text-soft)] space-y-1.5 select-none leading-relaxed text-left">
+              <div className="flex items-center gap-1.5 font-bold text-[var(--dt-text-primary)]">
+                <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full" />
+                <span>安全与隐私说明</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 pl-1 font-mono text-[9.5px]">
+                <li><span className="text-[var(--dt-text-primary)] font-medium">照片复制</span>：保留照片导出只会复制目标文件，原照片保持完好；</li>
+                <li><span className="text-[var(--dt-text-primary)] font-medium">整理清单</span>：CSV 与 JSON 报告仅用于记录当前的整理建议；</li>
+                <li><span className="text-[var(--dt-text-primary)] font-medium">原图保护</span>：本软件在任何情况下都不会修改原图，也不会删除原图。</li>
+              </ul>
+            </div>
           </div>
         </>
       )}
